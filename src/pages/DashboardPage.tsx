@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { NewStaffRequestModal } from '../components/requests/NewStaffRequestModal';
-import { isRequestOwnedByUser, getRoleLabel } from '../types';
+import { isRequestOwnedByUser, getRoleLabel, canUserApproveRequest } from '../types';
 import {
   Users,
   Calendar,
@@ -71,16 +71,8 @@ export const DashboardPage: React.FC = () => {
 
             <div className="flex items-center gap-3 flex-wrap">
               <button
-                onClick={() => navigate('/facial-verification')}
-                className="inline-flex items-center gap-2 px-5 py-3 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-blue-950/50 transition-all cursor-pointer"
-              >
-                <ScanFace className="w-4 h-4" />
-                <span>Facial Gate Check-In</span>
-              </button>
-
-              <button
                 onClick={() => setIsNewRequestModalOpen(true)}
-                className="inline-flex items-center gap-2 px-5 py-3 bg-[#131E36] hover:bg-[#1A294A] border border-[#203050] text-white text-xs font-bold rounded-xl transition-colors cursor-pointer"
+                className="inline-flex items-center gap-2 px-5 py-3 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-blue-950/50 transition-all cursor-pointer"
               >
                 <Send className="w-4 h-4" />
                 <span>Submit Request</span>
@@ -91,23 +83,22 @@ export const DashboardPage: React.FC = () => {
 
         {/* 4 KPI Metric Cards (Matches Image 1 Exactly) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Card 1: Today's Gate Status */}
+          {/* Card 1: Workplace Identity Status */}
           <div
-            onClick={() => navigate('/facial-verification')}
-            className="p-5 bg-[#080E1C] rounded-2xl border border-[#1E293B] shadow-sm hover:border-blue-500/50 transition-all cursor-pointer group"
+            className="p-5 bg-[#080E1C] rounded-2xl border border-[#1E293B] shadow-sm"
           >
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-400">Today's Gate Status</span>
+              <span className="text-xs font-semibold text-slate-400">Workplace Status</span>
               <div className="w-8 h-8 rounded-xl bg-blue-950 text-blue-400 flex items-center justify-center">
-                <Calendar className="w-4 h-4" />
+                <ShieldCheck className="w-4 h-4" />
               </div>
             </div>
             <div className="mt-3">
-              <span className="text-xl font-black text-white tracking-tight">CHECK-IN DUE</span>
+              <span className="text-xl font-black text-white tracking-tight">ACTIVE</span>
             </div>
             <div className="mt-2 text-xs text-[#38BDF8] flex items-center gap-1.5 font-medium">
-              <Clock className="w-3.5 h-3.5" />
-              <span>Optical kiosk online</span>
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Identity synchronized</span>
             </div>
           </div>
 
@@ -233,27 +224,7 @@ export const DashboardPage: React.FC = () => {
             </h2>
 
             <div className="space-y-2 pt-1 text-xs">
-              <button
-                onClick={() => navigate('/attendance')}
-                className="w-full p-3.5 rounded-xl bg-[#0B132B] hover:bg-[#131E36] border border-[#1E293B] flex items-center justify-between text-slate-200 transition-colors cursor-pointer"
-              >
-                <div className="flex items-center gap-3">
-                  <Calendar className="w-4 h-4 text-sky-400" />
-                  <span className="font-semibold">Personal Attendance</span>
-                </div>
-                <ArrowRight className="w-4 h-4 text-slate-400" />
-              </button>
 
-              <button
-                onClick={() => navigate('/facial-verification')}
-                className="w-full p-3.5 rounded-xl bg-[#0B132B] hover:bg-[#131E36] border border-[#1E293B] flex items-center justify-between text-slate-200 transition-colors cursor-pointer"
-              >
-                <div className="flex items-center gap-3">
-                  <ScanFace className="w-4 h-4 text-emerald-400" />
-                  <span className="font-semibold">Biometric Check-In</span>
-                </div>
-                <ArrowRight className="w-4 h-4 text-slate-400" />
-              </button>
 
               <button
                 onClick={() => navigate('/requests')}
@@ -319,22 +290,14 @@ export const DashboardPage: React.FC = () => {
             </h1>
 
             <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">
-              Operating under <span className="text-[#38BDF8] font-semibold">{roleName}</span> clearance. All employee records, facial verification gates, and payroll disbursements are synchronized.
+              Operating under <span className="text-[#38BDF8] font-semibold">{roleName}</span> clearance. All workforce records, departmental workflows, and payroll disbursements are synchronized.
             </p>
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
             <button
-              onClick={() => navigate('/facial-verification')}
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer"
-            >
-              <ScanFace className="w-4 h-4" />
-              <span>Facial Gate Check-In</span>
-            </button>
-
-            <button
               onClick={() => navigate('/employees')}
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#131E36] hover:bg-[#1A294A] border border-[#203050] text-white text-xs font-bold rounded-xl transition-colors cursor-pointer"
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer"
             >
               <Users className="w-4 h-4" />
               <span>Employee Master</span>
@@ -366,24 +329,23 @@ export const DashboardPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Card 2: Today's Check-ins */}
+        {/* Card 2: Operations & Compliance */}
         <div
-          onClick={() => navigate('/attendance')}
-          className="p-5 bg-[#0B132B] rounded-2xl border border-[#1E293B] shadow-sm hover:border-blue-500/50 transition-all cursor-pointer group"
+          className="p-5 bg-[#0B132B] rounded-2xl border border-[#1E293B] shadow-sm"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400">Today's Check-ins</span>
-            <div className="w-9 h-9 rounded-xl bg-sky-950/80 text-sky-400 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors">
-              <Calendar className="w-4 h-4" />
+            <span className="text-xs font-semibold text-slate-400">Operations Status</span>
+            <div className="w-9 h-9 rounded-xl bg-sky-950/80 text-sky-400 flex items-center justify-center">
+              <ShieldCheck className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl font-extrabold text-white">4</span>
-            <span className="text-xs text-slate-400">Present</span>
+            <span className="text-2xl font-extrabold text-white">100%</span>
+            <span className="text-xs text-emerald-400">Optimal</span>
           </div>
           <div className="mt-2 text-[11px] text-blue-400 flex items-center gap-1 font-medium">
-            <Clock className="w-3 h-3" />
-            <span>Biometric Gate Online</span>
+            <CheckCircle2 className="w-3 h-3 text-sky-400" />
+            <span>Enterprise Enclave Active</span>
           </div>
         </div>
 
@@ -506,20 +468,30 @@ export const DashboardPage: React.FC = () => {
                   </button>
 
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => updateStaffRequestStatus(req.id, 'REJECTED')}
-                      className="px-2.5 py-1 bg-rose-950/50 hover:bg-rose-900/60 text-rose-300 text-xs font-semibold rounded-lg border border-rose-800/60 transition-colors flex items-center gap-1 cursor-pointer"
-                    >
-                      <XCircle className="w-3 h-3" />
-                      Reject
-                    </button>
-                    <button
-                      onClick={() => updateStaffRequestStatus(req.id, 'APPROVED')}
-                      className="px-3 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 text-white text-xs font-semibold rounded-lg shadow transition-all flex items-center gap-1 cursor-pointer"
-                    >
-                      <CheckCircle2 className="w-3 h-3" />
-                      Approve
-                    </button>
+                    {canUserApproveRequest(currentUser?.role, req.type) ? (
+                      <>
+                        <button
+                          onClick={() => updateStaffRequestStatus(req.id, 'REJECTED')}
+                          className="px-2.5 py-1 bg-rose-950/50 hover:bg-rose-900/60 text-rose-300 text-xs font-semibold rounded-lg border border-rose-800/60 transition-colors flex items-center gap-1 cursor-pointer"
+                        >
+                          <XCircle className="w-3 h-3" />
+                          Reject
+                        </button>
+                        <button
+                          onClick={() => updateStaffRequestStatus(req.id, 'APPROVED')}
+                          className="px-3 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 text-white text-xs font-semibold rounded-lg shadow transition-all flex items-center gap-1 cursor-pointer"
+                        >
+                          <CheckCircle2 className="w-3 h-3" />
+                          Approve
+                        </button>
+                      </>
+                    ) : (
+                      <span className="text-[11px] font-medium text-amber-400/90 bg-[#2A1B02] border border-[#B45309]/60 px-2.5 py-1 rounded-lg">
+                        {req.type === 'LEAVE'
+                          ? 'View Only • Manager Approval Required'
+                          : 'View Only • Admin Approval Required'}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>

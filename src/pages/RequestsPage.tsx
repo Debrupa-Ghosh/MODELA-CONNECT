@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
-import { StaffWorkflowRequest, isRequestOwnedByUser } from '../types';
+import { StaffWorkflowRequest, isRequestOwnedByUser, canUserApproveRequest, hasFullAccessRole } from '../types';
 import { NewStaffRequestModal } from '../components/requests/NewStaffRequestModal';
 import {
   Search,
@@ -16,7 +16,7 @@ import {
 
 export const RequestsPage: React.FC = () => {
   const { staffRequests, updateStaffRequestStatus, openRequestDetails, refreshStaffRequests, showToast } = useApp();
-  const { currentUser, isAdmin, isSuperAdmin } = useAuth();
+  const { currentUser, isAdmin, isSuperAdmin, hasFullAccess } = useAuth();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -25,16 +25,15 @@ export const RequestsPage: React.FC = () => {
   // Workflow filters for staff requests
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
-  // Default to ALL for Super Admin and Administrators so newly submitted staff requests are immediately visible
+  // Default to ALL for Super Admin, Director, HR, and Manager so newly submitted staff requests are immediately visible
   const [adminScope, setAdminScope] = useState<'MINE' | 'ALL'>('ALL');
 
-  // Verify privileged access for Super Admin, Executive Director, or HR Manager
+  // Verify privileged access for Super Admin, Director, HR, and Manager
   const isPrivilegedAdmin = Boolean(
+    hasFullAccess ||
     isAdmin ||
     isSuperAdmin ||
-    currentUser?.role === 'SUPER_ADMIN' ||
-    currentUser?.role === 'EXECUTIVE_DIRECTOR' ||
-    currentUser?.role === 'HR_MANAGER'
+    hasFullAccessRole(currentUser?.role)
   );
 
   // Staff workflow requests strictly owned by current user
@@ -302,24 +301,34 @@ export const RequestsPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Actions for Admin if Pending */}
-                {isAdmin && isPending && (
-                  <div className="pt-2 border-t border-[#1E293B]/60 flex items-center justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={e => handleRejectStaff(e, req.id, req.title)}
-                      className="px-3 py-1.5 bg-transparent hover:bg-rose-950/40 text-rose-400 border border-rose-900/60 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
-                    >
-                      Reject
-                    </button>
-                    <button
-                      type="button"
-                      onClick={e => handleApproveStaff(e, req.id, req.title)}
-                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#16A34A] hover:bg-[#15803D] text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-950/40 transition-all cursor-pointer"
-                    >
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>Approve</span>
-                    </button>
+                {/* Actions for Privileged Roles if Pending */}
+                {isPrivilegedAdmin && isPending && (
+                  <div className="pt-2 border-t border-[#1E293B]/60 flex items-center justify-end gap-2 flex-wrap">
+                    {canUserApproveRequest(currentUser?.role, req.type) ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={e => handleRejectStaff(e, req.id, req.title)}
+                          className="px-3 py-1.5 bg-transparent hover:bg-rose-950/40 text-rose-400 border border-rose-900/60 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                        >
+                          Reject
+                        </button>
+                        <button
+                          type="button"
+                          onClick={e => handleApproveStaff(e, req.id, req.title)}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#16A34A] hover:bg-[#15803D] text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-950/40 transition-all cursor-pointer"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Approve</span>
+                        </button>
+                      </>
+                    ) : (
+                      <span className="text-[11px] font-medium text-amber-400/90 bg-[#2A1B02] border border-[#B45309]/60 px-2.5 py-1 rounded-lg">
+                        {req.type === 'LEAVE'
+                          ? 'View Only • Manager Approval Required'
+                          : 'View Only • Admin Approval Required'}
+                      </span>
+                    )}
                   </div>
                 )}
               </div>

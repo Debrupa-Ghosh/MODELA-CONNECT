@@ -1,23 +1,22 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
+import { canUserApproveRequest } from '../types';
 import {
   Terminal,
   ShieldCheck,
   CheckCircle2,
   Mail,
   Briefcase,
-  Fingerprint,
   Lock
 } from 'lucide-react';
 
 export const AdminNexusPage: React.FC = () => {
-  const { pendingUsers, approveUserRequest, rejectUserRequest } = useAuth();
+  const { pendingUsers, approveUserRequest, rejectUserRequest, currentUser } = useAuth();
   const { staffRequests, updateStaffRequestStatus, showToast } = useApp();
 
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [processingStaffId, setProcessingStaffId] = useState<string | null>(null);
-  const [biometricThreshold, setBiometricThreshold] = useState(85);
   const [ipWhitelist, setIpWhitelist] = useState('192.168.1.0/24\n10.0.0.0/16');
 
   const pendingStaffRequests = staffRequests.filter(r => r.status === 'PENDING');
@@ -231,22 +230,32 @@ export const AdminNexusPage: React.FC = () => {
                   </span>
                 </div>
 
-                <div className="pt-2 flex items-center justify-end gap-2">
-                  <button
-                    disabled={processingStaffId === req.id}
-                    onClick={() => handleDenyStaffRequest(req.id, req.title)}
-                    className="px-3 py-1.5 rounded-lg bg-rose-950/60 hover:bg-rose-900/60 text-rose-300 border border-rose-800/60 text-xs font-bold transition-colors cursor-pointer"
-                  >
-                    Deny Requisition
-                  </button>
-                  <button
-                    disabled={processingStaffId === req.id}
-                    onClick={() => handleAuthorizeStaffRequest(req.id, req.title)}
-                    className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition-all flex items-center gap-1 cursor-pointer"
-                  >
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    Authorize Requisition
-                  </button>
+                <div className="pt-2 flex items-center justify-end gap-2 flex-wrap">
+                  {canUserApproveRequest(currentUser?.role, req.type) ? (
+                    <>
+                      <button
+                        disabled={processingStaffId === req.id}
+                        onClick={() => handleDenyStaffRequest(req.id, req.title)}
+                        className="px-3 py-1.5 rounded-lg bg-rose-950/60 hover:bg-rose-900/60 text-rose-300 border border-rose-800/60 text-xs font-bold transition-colors cursor-pointer"
+                      >
+                        Deny Requisition
+                      </button>
+                      <button
+                        disabled={processingStaffId === req.id}
+                        onClick={() => handleAuthorizeStaffRequest(req.id, req.title)}
+                        className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition-all flex items-center gap-1 cursor-pointer"
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        Authorize Requisition
+                      </button>
+                    </>
+                  ) : (
+                    <span className="text-[11px] font-mono text-amber-400/90 bg-[#2A1B02] border border-[#B45309]/60 px-2.5 py-1 rounded-lg">
+                      {req.type === 'LEAVE'
+                        ? 'VIEW ONLY • MANAGER CLEARANCE REQUIRED'
+                        : 'VIEW ONLY • ADMIN CLEARANCE REQUIRED'}
+                    </span>
+                  )}
                 </div>
               </div>
             ))}
@@ -254,32 +263,28 @@ export const AdminNexusPage: React.FC = () => {
         )}
       </div>
 
-      {/* Security Policies & Biometrics Controls (Dark Navy Boxes) */}
+      {/* Security Policies & Network Controls (Dark Navy Boxes) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Biometric Threshold Slider */}
+        {/* Enterprise Session Verification Policy */}
         <div className="p-5 rounded-2xl bg-[#0B1528] border border-[#1E293B] shadow-xl space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Fingerprint className="w-4 h-4 text-emerald-400" />
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
               <h3 className="font-bold text-sm text-white">
-                Facial AI Confidence Threshold
+                Enterprise Session Verification Policy
               </h3>
             </div>
             <span className="font-mono font-bold text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400">
-              {biometricThreshold}% Match Required
+              STRICT ENFORCEMENT
             </span>
           </div>
           <p className="text-xs text-slate-400">
-            Minimum biometric confidence score required to auto-validate kiosk attendance check-ins without supervisor override.
+            Real-time identity verification token lifecycle and cross-enclave RBAC authorization guard for authorized workforce accounts.
           </p>
-          <input
-            type="range"
-            min="70"
-            max="99"
-            value={biometricThreshold}
-            onChange={e => setBiometricThreshold(Number(e.target.value))}
-            className="w-full accent-emerald-500 cursor-pointer"
-          />
+          <div className="p-3 bg-[#080E1C] rounded-xl border border-[#1E293B] flex items-center justify-between text-xs font-mono">
+            <span className="text-slate-400">STATUS:</span>
+            <span className="text-emerald-400 font-bold">SYNCHRONIZED ACTIVE</span>
+          </div>
         </div>
 
         {/* IP Range Whitelist */}

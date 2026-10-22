@@ -11,17 +11,22 @@ import {
   Mail,
   AlertCircle,
   Trash2,
-  X
+  X,
+  Edit2,
+  Check
 } from 'lucide-react';
 
 export const UserManagementPage: React.FC = () => {
-  const { pendingUsers, approvedUsers, approveUserRequest, rejectUserRequest, updateUserRole, deleteUser, refreshUsers } = useAuth();
-  const { showToast } = useApp();
+  const { pendingUsers, approvedUsers, approveUserRequest, rejectUserRequest, updateUserRole, deleteUser, refreshUsers, updateUserEmployeeId, isSuperAdmin, hasFullAccess } = useAuth();
+  const { showToast, deleteEmployee, updateEmployee } = useApp();
 
   const [activeTab, setActiveTab] = useState<'SIGNUP_QUEUE' | 'APPROVED_USERS'>('SIGNUP_QUEUE');
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [editingEmpIdUserId, setEditingEmpIdUserId] = useState<string | null>(null);
+  const [editEmpIdVal, setEditEmpIdVal] = useState('');
+  const [isSavingEmpId, setIsSavingEmpId] = useState(false);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -54,6 +59,29 @@ export const UserManagementPage: React.FC = () => {
     showToast('Request Rejected', `Signup request for ${targetIdentifier} was rejected.`, 'info');
   };
 
+  const handleSaveEmpId = async (u: User) => {
+    const cleanNew = editEmpIdVal.trim().toUpperCase();
+    if (!cleanNew) {
+      showToast('Validation Error', 'Employee ID cannot be empty.', 'error');
+      return;
+    }
+    setIsSavingEmpId(true);
+    try {
+      await updateEmployee(u.employeeId || u.id, {
+        id: cleanNew,
+        email: u.email,
+        firstName: (u.name || '').trim().split(/\s+/)[0] || 'Staff',
+        designation: u.designation,
+        department: u.department
+      });
+      await updateUserEmployeeId(u.id, cleanNew);
+      setEditingEmpIdUserId(null);
+      showToast('ID Updated', `Employee ID updated to ${cleanNew} for ${u.name || u.email}.`);
+    } finally {
+      setIsSavingEmpId(false);
+    }
+  };
+
   const handleDeleteApprovedUser = (user: User) => {
     setUserToDelete(user);
   };
@@ -64,6 +92,9 @@ export const UserManagementPage: React.FC = () => {
     const nameDisplay = target.name?.trim() || target.email;
     setUserToDelete(null);
     await deleteUser(target.id);
+    if (target.employeeId || target.email) {
+      await deleteEmployee(target.employeeId || target.id, target.email);
+    }
     showToast('Record Removed', `Successfully removed ${nameDisplay} from Approved Users and Employees page.`, 'info');
   };
 
@@ -340,8 +371,59 @@ export const UserManagementPage: React.FC = () => {
                         ))}
                       </select>
                     </td>
-                    <td className="py-4 px-6 font-mono text-sky-400 text-xs font-bold">
-                      {u.employeeId || 'MOD-AUTH'}
+                    <td className="py-4 px-6">
+                      {editingEmpIdUserId === u.id ? (
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="text"
+                            value={editEmpIdVal}
+                            onChange={e => setEditEmpIdVal(e.target.value.toUpperCase().replace(/\s+/g, ''))}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') handleSaveEmpId(u);
+                              if (e.key === 'Escape') setEditingEmpIdUserId(null);
+                            }}
+                            autoFocus
+                            placeholder="e.g. MOD000"
+                            className="w-24 px-2 py-1 bg-[#001E3D] border border-[#00E5FF] rounded-lg font-mono text-xs font-bold text-[#00E5FF] outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleSaveEmpId(u)}
+                            disabled={isSavingEmpId}
+                            className="p-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer"
+                            title="Save ID"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingEmpIdUserId(null)}
+                            className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"
+                            title="Cancel"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 group">
+                          <span className="font-mono text-sky-400 text-xs font-bold">
+                            {u.employeeId || 'MOD-AUTH'}
+                          </span>
+                          {(isSuperAdmin || hasFullAccess) && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingEmpIdUserId(u.id);
+                                setEditEmpIdVal(u.employeeId || '');
+                              }}
+                              className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-[#00E5FF] rounded transition-opacity cursor-pointer"
+                              title="Edit Employee ID"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </td>
                     <td className="py-4 px-6">
                       <span className="bg-[#042F20] border border-[#065F46] text-[#34D399] font-bold text-[11px] px-2.5 py-0.5 rounded-full inline-flex items-center gap-1.5">

@@ -15,7 +15,7 @@ export const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children })
 
       {/* Main content wrapper shifted by the sidebar width */}
       <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 relative z-10 ${
-        isSidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'
+        isSidebarCollapsed ? 'pl-20' : 'pl-64'
       }`}>
         <Navbar />
 

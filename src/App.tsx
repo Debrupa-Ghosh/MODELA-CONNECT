@@ -8,8 +8,6 @@ import { DashboardPage } from './pages/DashboardPage';
 import { UserManagementPage } from './pages/UserManagementPage';
 import { RequestsPage } from './pages/RequestsPage';
 import { EmployeesPage } from './pages/EmployeesPage';
-import { AttendancePage } from './pages/AttendancePage';
-import { FacialVerificationPage } from './pages/FacialVerificationPage';
 import { PayrollPage } from './pages/PayrollPage';
 import { OnboardingPage } from './pages/OnboardingPage';
 import { ReportsPage } from './pages/ReportsPage';
@@ -30,37 +28,12 @@ const RequireAuth: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return <AppLayout>{children}</AppLayout>;
 };
 
-// Route guard: Super Admin, Executive Director, and HR Manager have all access. Employee has limited access.
+// Route guard: Verified users can access and view application pages
 const RequireFullAccess: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { hasFullAccess, currentUser } = useAuth();
+  const { currentUser } = useAuth();
 
   if (!currentUser || currentUser.status !== 'APPROVED') {
     return <Navigate to="/login" replace />;
-  }
-
-  if (!hasFullAccess) {
-    return (
-      <AppLayout>
-        <div className="max-w-2xl mx-auto my-12 p-8 bg-[#0B1528] border border-[#1E2E4E] rounded-3xl text-center space-y-4 shadow-2xl text-white font-sans animate-in fade-in">
-          <div className="w-12 h-12 mx-auto rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30">
-            <ShieldAlert className="w-6 h-6" />
-          </div>
-          <h2 className="text-xl font-bold tracking-tight">Access Restricted • Operational Enclave</h2>
-          <p className="text-slate-300 text-xs sm:text-sm leading-relaxed max-w-md mx-auto">
-            You are logged in with the <strong>Employee</strong> role, which has limited self-service access.
-            This module is reserved for <strong>Super Admin</strong>, <strong>Executive Director</strong>, and <strong>HR Manager</strong>.
-          </p>
-          <div className="pt-2">
-            <Link
-              to="/dashboard"
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition-all shadow-md cursor-pointer"
-            >
-              <span>Return to Employee Dashboard</span>
-            </Link>
-          </div>
-        </div>
-      </AppLayout>
-    );
   }
 
   return <AppLayout>{children}</AppLayout>;
@@ -142,23 +115,9 @@ export default function App() {
               }
             />
 
-            {/* Attendance & Biometric Kiosk (Available to verified users) */}
-            <Route
-              path="/attendance"
-              element={
-                <RequireAuth>
-                  <AttendancePage />
-                </RequireAuth>
-              }
-            />
-            <Route
-              path="/facial-verification"
-              element={
-                <RequireAuth>
-                  <FacialVerificationPage />
-                </RequireAuth>
-              }
-            />
+            {/* Removed Attendance & Facial Verification pages: redirect to dashboard */}
+            <Route path="/attendance" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/facial-verification" element={<Navigate to="/dashboard" replace />} />
 
             {/* Restricted to Super Admin, Executive Director, and HR Manager */}
             <Route

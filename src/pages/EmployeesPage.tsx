@@ -30,12 +30,16 @@ import {
 
 export const EmployeesPage: React.FC = () => {
   const { employees, addEmployee, bulkAddEmployees, updateEmployee, deleteEmployee, showToast } = useApp();
-  const { hasFullAccess, isSuperAdmin, isExecutiveDirector, isHRManager, currentUser } = useAuth();
+  const { deleteUser, hasFullAccess, isSuperAdmin, isExecutiveDirector, isHRManager, currentUser } = useAuth();
 
   const canManageEmployees =
+    hasFullAccess ||
     isSuperAdmin ||
     isHRManager ||
     currentUser?.role === 'SUPER_ADMIN' ||
+    currentUser?.role === 'DIRECTOR' ||
+    currentUser?.role === 'HR' ||
+    currentUser?.role === 'MANAGER' ||
     currentUser?.role === 'HR_MANAGER' ||
     isExecutiveDirector;
 
@@ -453,6 +457,9 @@ export const EmployeesPage: React.FC = () => {
     const targetEmail = employeeToDelete.email;
     const displayName = [employeeToDelete.firstName, employeeToDelete.lastName].filter(Boolean).join(' ') || targetEmail || targetId;
     await deleteEmployee(targetId, targetEmail);
+    if (targetEmail || targetId) {
+      await deleteUser(targetEmail || targetId);
+    }
     setEmployeeToDelete(null);
     if (selectedDossierEmp?.id === targetId) setSelectedDossierEmp(null);
     if (editingEmp?.id === targetId) setEditingEmp(null);

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { collection, doc, onSnapshot, setDoc, deleteDoc, updateDoc, getDocs } from 'firebase/firestore';
+import { collection, doc, onSnapshot, setDoc, deleteDoc, updateDoc, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import {
   Employee,
@@ -8,9 +8,11 @@ import {
   PayrollRecord,
   AuditLog,
   OnboardingCandidate,
-  RequestStatus
+  RequestStatus,
+  User
 } from '../types';
 import {
+  INITIAL_USERS,
   INITIAL_EMPLOYEES,
   INITIAL_STAFF_REQUESTS,
   INITIAL_ATTENDANCE,
@@ -19,7 +21,16 @@ import {
   INITIAL_ONBOARDING
 } from '../data/initialData';
 import { useAuth } from './AuthContext';
-import { getDeletedRegistry, recordDeletedRecord, isRecordDeleted } from '../utils/syncRegistry';
+import {
+  getDeletedRegistry,
+  recordDeletedRecord,
+  removeDeletedRecord,
+  isRecordDeleted,
+  recordCustomEmpId,
+  resolveEmpId,
+  SYNC_REGISTRY_DOC_ID,
+  persistSyncRegistryToFirestore
+} from '../utils/syncRegistry';
 
 const cleanFirestoreData = <T extends Record<string, any>>(obj: T): T => {
   const result: any = Array.isArray(obj) ? [] : {};
@@ -105,20 +116,61 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          currentList = parsed.filter(e => !isRecordDeleted(e.id, e.email));
+          currentList = parsed
+            .filter(e => !isRecordDeleted(e.id, e.email))
+            .map(e => ({
+              ...e,
+              id: resolveEmpId(e.email, e.id) || e.id
+            }));
         }
       }
     } catch {}
 
     if (currentList.length === 0) {
-      currentList = INITIAL_EMPLOYEES.filter(e => !isRecordDeleted(e.id, e.email));
+      currentList = INITIAL_EMPLOYEES.filter(e => !isRecordDeleted(e.id, e.email)).map(e => ({
+        ...e,
+        id: resolveEmpId(e.email, e.id) || e.id
+      }));
     }
 
-    // Explicit requirement: Add Modela Tech, Marcus Vance also in the Employees page
-    // Ensure both are present if they haven't been deleted by the user!
+    // Ensure Sushoovan Das (Super Admin MOD001), Modela Tech, and Marcus Vance are always in the Employees page
+    const sushoovanEmployee: Employee = {
+      id: resolveEmpId("sushovand@modelatech.com", "MOD001") || "MOD001",
+      firstName: "Sushoovan",
+      lastName: "Das",
+      email: "sushovand@modelatech.com",
+      joiningDate: "2024-01-15",
+      designation: "Executive Director & Super Admin",
+      phone: "+1 (555) 234-5678",
+      department: "Executive Office",
+      status: "ACTIVE",
+      location: "San Francisco HQ",
+      compensation: { basic: 85000, allowances: 25000 },
+      pan: "DASSV1989K",
+      bankAccount: "815801500111",
+      avatar: "https://ui-avatars.com/api/?name=Sushoovan+Das&background=3b82f6&color=fff"
+    };
+
+    const isTonyStark = (firstName?: string, lastName?: string, email?: string, id?: string): boolean => {
+      const full = `${firstName || ''} ${lastName || ''}`.trim().toLowerCase();
+      const em = (email || '').trim().toLowerCase();
+      const i = (id || '').trim().toLowerCase();
+      return (
+        full.includes('tony stark') ||
+        (full.includes('tony') && full.includes('stark')) ||
+        em.includes('tonystark') ||
+        em.includes('tony.stark') ||
+        (em.includes('tony') && em.includes('stark')) ||
+        i.includes('tonystark')
+      );
+    };
+
+    currentList = currentList.filter(e => !isTonyStark(e.firstName, e.lastName, e.email, e.id));
+
     const requiredEmployees: Employee[] = [
+      sushoovanEmployee,
       {
-        id: "MOD000",
+        id: resolveEmpId("modelatech2026@gmail.com", "MOD000") || "MOD000",
         firstName: "Modela",
         lastName: "Tech",
         email: "modelatech2026@gmail.com",
@@ -132,7 +184,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         avatar: "https://ui-avatars.com/api/?name=Modela+Tech&background=0284c7&color=fff"
       },
       {
-        id: "MOD003",
+        id: resolveEmpId("marcus.vance@modela.io", "MOD003") || "MOD003",
         firstName: "Marcus",
         lastName: "Vance",
         email: "marcus.vance@modela.io",
@@ -144,12 +196,53 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         location: "New York Regional Office",
         compensation: { basic: 48000, allowances: 14000 },
         avatar: "https://ui-avatars.com/api/?name=Marcus+Vance&background=6366f1&color=fff"
+      },
+      {
+        id: resolveEmpId("ghoshdebrupa005@gmail.com", "MOD007") || "MOD007",
+        firstName: "Debrupa",
+        lastName: "Ghosh",
+        email: "ghoshdebrupa005@gmail.com",
+        joiningDate: "2024-06-01",
+        designation: "Full Stack Engineer",
+        phone: "+1 (555) 345-6789",
+        department: "Engineering",
+        status: "ACTIVE",
+        location: "San Francisco HQ",
+        compensation: { basic: 50000, allowances: 14000 },
+        pan: "ITHPK8827F",
+        bankAccount: "815801500344",
+        avatar: "https://ui-avatars.com/api/?name=Debrupa+Ghosh&background=0284c7&color=fff"
+      },
+      {
+        id: resolveEmpId("surupa008@gmail.com", "MOD011") || "MOD011",
+        firstName: "Debrupa",
+        lastName: "Ghosh",
+        email: "surupa008@gmail.com",
+        joiningDate: "2026-10-22",
+        designation: "Staff Candidate",
+        phone: "",
+        department: "General Staff",
+        status: "ACTIVE",
+        location: "San Francisco HQ",
+        compensation: { basic: 50000, allowances: 15000 },
+        avatar: "https://ui-avatars.com/api/?name=Debrupa+Ghosh&background=0284c7&color=fff"
       }
     ];
 
+    const nonApprovedUserEmails = new Set(
+      users
+        .filter(u => u.status !== 'APPROVED' && u.email)
+        .map(u => u.email.toLowerCase().trim())
+    );
+
+    currentList = currentList.filter(
+      e => !(e.email && nonApprovedUserEmails.has(e.email.toLowerCase().trim()))
+    );
+
     requiredEmployees.forEach(reqEmp => {
       const isDel = isRecordDeleted(reqEmp.id, reqEmp.email);
-      if (!isDel) {
+      const isPendingOrUnapproved = Boolean(reqEmp.email && nonApprovedUserEmails.has(reqEmp.email.toLowerCase().trim()));
+      if (!isDel && !isPendingOrUnapproved) {
         const exists = currentList.some(
           e => e.id.toLowerCase() === reqEmp.id.toLowerCase() || (Boolean(e.email && reqEmp.email) && e.email!.toLowerCase() === reqEmp.email!.toLowerCase())
         );
@@ -159,11 +252,56 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     });
 
+    // Merge in any approved users from localStorage or initial dataset so they appear immediately
     try {
-      localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(currentList));
+      const savedUsers = localStorage.getItem('modela_users_v2');
+      const usersArray = savedUsers ? JSON.parse(savedUsers) : INITIAL_USERS;
+      if (Array.isArray(usersArray)) {
+        usersArray
+          .filter((u: any) => u.status === 'APPROVED' && u.email && !isRecordDeleted(u.id, u.email, u.name))
+          .forEach((u: any) => {
+            if (isTonyStark(u.name, '', u.email, u.employeeId)) return;
+            const empId = resolveEmpId(u.email, u.employeeId || u.id) || u.employeeId || u.id;
+            const exists = currentList.some(
+              e => (e.id && e.id.toLowerCase() === empId.toLowerCase()) ||
+                   (e.email && e.email.toLowerCase() === u.email.toLowerCase())
+            );
+            if (!exists) {
+              const parts = (u.name || '').trim().split(/\s+/);
+              currentList.push({
+                id: empId,
+                firstName: parts[0] || (u.name || '').trim() || 'Staff',
+                lastName: parts.slice(1).join(' ') || '',
+                joiningDate: new Date().toISOString().split('T')[0],
+                phone: '',
+                email: u.email,
+                designation: u.designation || (u.role === 'SUPER_ADMIN' ? 'Executive Director & Super Admin' : 'Enterprise Staff'),
+                department: u.department || (u.role === 'SUPER_ADMIN' ? 'Executive Office' : 'General Staff'),
+                status: 'ACTIVE',
+                location: 'San Francisco HQ',
+                compensation: u.role === 'SUPER_ADMIN' ? { basic: 95000, allowances: 30000 } : { basic: 50000, allowances: 15000 },
+                avatar: u.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || u.email)}&background=0284c7&color=fff`
+              });
+            }
+          });
+      }
     } catch {}
 
-    return currentList;
+    // Deduplicate by email and ensure custom EMP ID is applied
+    const dedupMap = new Map<string, Employee>();
+    currentList.forEach(e => {
+      if (isTonyStark(e.firstName, e.lastName, e.email, e.id)) return;
+      const key = e.email ? e.email.toLowerCase().trim() : e.id.toUpperCase().trim();
+      const resolvedId = resolveEmpId(e.email, e.id) || e.id;
+      dedupMap.set(key, { ...e, id: resolvedId });
+    });
+    const finalInitialList = Array.from(dedupMap.values());
+
+    try {
+      localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(finalInitialList));
+    } catch {}
+
+    return finalInitialList;
   });
 
   // Listen to new employee addition events (e.g. from new signup requests)
@@ -172,18 +310,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const customEvent = event as CustomEvent<Employee>;
       if (customEvent.detail) {
         setEmployees(prev => {
-          if (prev.some(e => e.id === customEvent.detail.id || (customEvent.detail.email && e.email?.toLowerCase() === customEvent.detail.email.toLowerCase()))) {
-            return prev;
-          }
-          return [customEvent.detail, ...prev];
+          const filtered = prev.filter(
+            e =>
+              e.id.toLowerCase() !== customEvent.detail.id.toLowerCase() &&
+              (!customEvent.detail.email || !e.email || e.email.toLowerCase() !== customEvent.detail.email.toLowerCase())
+          );
+          const next = [customEvent.detail, ...filtered];
+          try {
+            localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(next));
+          } catch {}
+          return next;
         });
+        syncEmployeeToPayroll(customEvent.detail);
       }
     };
     window.addEventListener('modela_employee_added', handleEmployeeAdded);
     return () => window.removeEventListener('modela_employee_added', handleEmployeeAdded);
   }, []);
 
-  // Cross-context deletion sync: remove employee when deleted from Approved Users Directory
+  // Cross-context deletion sync: remove employee when deleted from Approved Users Directory or remote sync registry
   useEffect(() => {
     const handleEmployeeDeleted = (event: Event) => {
       const customEvent = event as CustomEvent<{ id?: string; email?: string }>;
@@ -192,6 +337,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const next = prev.filter(e => {
           if (id && (e.id.toLowerCase() === id.toLowerCase() || e.id === id)) return false;
           if (email && e.email && e.email.toLowerCase() === email.toLowerCase()) return false;
+          if (isRecordDeleted(e.id, e.email, resolveEmpId(e.email, e.id))) return false;
           return true;
         });
         try {
@@ -200,11 +346,69 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return next;
       });
     };
+
+    const handleSyncRegistryUpdated = () => {
+      setEmployees(prev => {
+        const next = prev
+          .filter(e => !isRecordDeleted(e.id, e.email, resolveEmpId(e.email, e.id)))
+          .map(e => ({
+            ...e,
+            id: resolveEmpId(e.email, e.id) || e.id
+          }));
+        try {
+          localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+    };
+
     window.addEventListener('modela_employee_deleted', handleEmployeeDeleted);
-    return () => window.removeEventListener('modela_employee_deleted', handleEmployeeDeleted);
+    window.addEventListener('modela_sync_registry_updated', handleSyncRegistryUpdated);
+    return () => {
+      window.removeEventListener('modela_employee_deleted', handleEmployeeDeleted);
+      window.removeEventListener('modela_sync_registry_updated', handleSyncRegistryUpdated);
+    };
   }, []);
 
-  // Synchronize any approved users from AuthContext to employees directory
+  // Cross-context EMP ID change listener: immediately update personnel ID in AppContext
+  useEffect(() => {
+    const handleEmpIdChanged = (event: Event) => {
+      const customEvent = event as CustomEvent<{ oldId?: string; newId?: string; email?: string }>;
+      const { oldId, newId, email } = customEvent.detail || {};
+      if (!newId) return;
+      const cleanNew = newId.trim().toUpperCase();
+      const cleanOld = oldId ? oldId.trim().toUpperCase() : '';
+      const cleanEmail = email ? email.trim().toLowerCase() : '';
+
+      recordCustomEmpId(cleanEmail, cleanOld, cleanNew);
+
+      setEmployees(prev => {
+        const target = prev.find(
+          e => (cleanOld && e.id.toUpperCase() === cleanOld) || (cleanEmail && e.email?.toLowerCase() === cleanEmail)
+        );
+        if (!target) return prev;
+
+        const updatedTarget: Employee = { ...target, id: cleanNew };
+        const next = [
+          updatedTarget,
+          ...prev.filter(
+            e => (cleanOld ? e.id.toUpperCase() !== cleanOld : true) &&
+                 e.id.toUpperCase() !== cleanNew &&
+                 (cleanEmail ? (!e.email || e.email.toLowerCase() !== cleanEmail) : true)
+          )
+        ];
+        try {
+          localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+    };
+
+    window.addEventListener('modela_employee_id_changed', handleEmpIdChanged);
+    return () => window.removeEventListener('modela_employee_id_changed', handleEmpIdChanged);
+  }, []);
+
+  // Synchronize any newly approved users from AuthContext to employees directory and ensure their 12-month payroll exists
   useEffect(() => {
     if (!users || users.length === 0) return;
     const approved = users.filter(u => u.status === 'APPROVED' && u.email);
@@ -215,51 +419,45 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const nextList = [...prev];
 
       approved.forEach(u => {
-        if (!u.email) return;
-        if (isRecordDeleted(u.id, u.email, u.employeeId)) return;
+        if (!u.email || u.id === SYNC_REGISTRY_DOC_ID || u.email === 'sync@system.internal') return;
+        const resolvedUserId = resolveEmpId(u.email, u.employeeId);
+        if (isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolvedUserId)) return;
 
-        const exists = nextList.some(
-          e => (Boolean(u.employeeId) && e.id.toLowerCase() === u.employeeId!.toLowerCase()) ||
+        const existingIdx = nextList.findIndex(
+          e => (Boolean(resolvedUserId) && e.id.toLowerCase() === resolvedUserId!.toLowerCase()) ||
                (Boolean(e.email) && e.email!.toLowerCase() === u.email.toLowerCase())
         );
 
-        if (!exists) {
+        if (existingIdx === -1) {
           const parts = (u.name || '').trim().split(/\s+/);
-          const empId = u.employeeId || `MOD${String(nextList.length + 1).padStart(3, '0')}`;
+          const empId = resolvedUserId || `MOD${String(nextList.length + 1).padStart(3, '0')}`;
           const newEmp: Employee = {
             id: empId,
-            firstName: parts[0] || '',
+            firstName: parts[0] || (u.name || '').trim() || 'Staff',
             lastName: parts.slice(1).join(' ') || '',
             joiningDate: new Date().toISOString().split('T')[0],
             phone: '',
             email: u.email,
-            designation: u.designation || 'Enterprise Staff',
-            department: u.department || 'General Staff',
+            designation: u.designation || (u.role === 'SUPER_ADMIN' ? 'Executive Director & Super Admin' : 'Enterprise Staff'),
+            department: u.department || (u.role === 'SUPER_ADMIN' ? 'Executive Office' : 'General Staff'),
             status: 'ACTIVE',
             location: 'San Francisco HQ',
-            compensation: { basic: 50000, allowances: 15000 },
+            compensation: u.role === 'SUPER_ADMIN' ? { basic: 95000, allowances: 30000 } : { basic: 50000, allowances: 15000 },
             avatar: u.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || u.email)}&background=0284c7&color=fff`
           };
           nextList.unshift(newEmp);
           changed = true;
-        } else if (u.name) {
-          const matchIndex = nextList.findIndex(
-            e => (Boolean(u.employeeId) && e.id.toLowerCase() === u.employeeId!.toLowerCase()) ||
-                 (Boolean(e.email) && e.email!.toLowerCase() === u.email.toLowerCase())
-          );
-          if (matchIndex >= 0) {
-            const parts = u.name.trim().split(/\s+/);
-            const fName = parts[0] || '';
-            const lName = parts.slice(1).join(' ') || '';
-            if (nextList[matchIndex].firstName !== fName || nextList[matchIndex].lastName !== lName) {
-              nextList[matchIndex] = {
-                ...nextList[matchIndex],
-                firstName: fName,
-                lastName: lName
-              };
-              changed = true;
-            }
-          }
+
+          // Persist newly approved user to Firestore employees collection
+          setDoc(doc(db, 'employees', empId), cleanFirestoreData(newEmp), { merge: true }).catch(() => {});
+          fetch('/api/employees', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newEmp)
+          }).catch(() => {});
+        } else if (resolvedUserId && nextList[existingIdx].id !== resolvedUserId) {
+          nextList[existingIdx] = { ...nextList[existingIdx], id: resolvedUserId };
+          changed = true;
         }
       });
 
@@ -270,6 +468,48 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return nextList;
       }
       return prev;
+    });
+
+    // Ensure every approved user has all 12 months (Jan-Oct PAID, Nov-Dec UNPAID) in payroll
+    const allMonths = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    approved.forEach(u => {
+      if (!u.email || u.id === SYNC_REGISTRY_DOC_ID || u.email === 'sync@system.internal') return;
+      const resolvedUserId = (resolveEmpId(u.email, u.employeeId) || u.employeeId || '').trim().toUpperCase();
+      if (!resolvedUserId || isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolvedUserId)) return;
+      if (resolvedUserId === 'MOD007' || resolvedUserId === 'MOD008' || resolvedUserId === 'MOD0090' || resolvedUserId === 'MOD01') return;
+
+      const parts = (u.name || '').trim().split(/\s+/);
+      const empObj: Employee = {
+        id: resolvedUserId,
+        firstName: parts[0] || (u.name || '').trim() || 'Staff',
+        lastName: parts.slice(1).join(' ') || '',
+        joiningDate: new Date().toISOString().split('T')[0],
+        phone: '',
+        email: u.email,
+        designation: u.designation || (u.role === 'SUPER_ADMIN' ? 'Executive Director & Super Admin' : 'Enterprise Staff'),
+        department: u.department || (u.role === 'SUPER_ADMIN' ? 'Executive Office' : 'General Staff'),
+        status: 'ACTIVE',
+        location: 'San Francisco HQ',
+        compensation: u.role === 'SUPER_ADMIN' ? { basic: 95000, allowances: 30000 } : { basic: 50000, allowances: 15000 },
+        avatar: u.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || u.email)}&background=0284c7&color=fff`
+      };
+
+      const fullName = `${empObj.firstName} ${empObj.lastName}`.trim() || empObj.id;
+      const personKey = getPayrollPersonKey({ employeeName: fullName, employeeId: empObj.id });
+      const existingMonthsCount = allMonths.filter(m =>
+        payroll.some(
+          p =>
+            p.month?.toLowerCase() === m.toLowerCase() &&
+            Number(p.year) === 2026 &&
+            (p.employeeId?.toUpperCase() === resolvedUserId || getPayrollPersonKey(p) === personKey)
+        )
+      ).length;
+      if (existingMonthsCount < 12) {
+        syncEmployeeToPayroll(empObj, undefined, 2026);
+      }
     });
   }, [users]);
 
@@ -320,24 +560,177 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return lower === 'november' || lower === 'december' || lower === 'nov' || lower === 'dec';
   };
 
+  const BLOCKED_PAYROLL_DOC_IDS = new Set([
+    'PAY-2026-OCT-MOD',
+    'PAY-2026-OCT-MOD0',
+    'PAY-2026-OCT-MOD00',
+    'PAY-2026-OCT-MOD000',
+    'PAY-2026-OCT-MOD0001',
+    'PAY-2026-OCT-MOD100',
+    'PAY-2026-OCT-MOD01',
+    'PAY-2026-OCT-MOD0090',
+    'PAY-2026-OCT-MOD008',
+    'PAY-2026-09-04',
+    'PAY-2026-10-04',
+    'PAY-2026-SEP-MOD007',
+    'PAY-2026-OCT-MOD007',
+    'PAY-2026-NOV-MOD007',
+    'PAY-2026-DEC-MOD007',
+    'PAY-2026-OCT-MOD001'
+  ]);
+
+  const isExcludedPayrollRecord = (p: Partial<PayrollRecord>): boolean => {
+    if (!p) return true;
+    const docId = String(p.id || '').trim().toUpperCase();
+    const empId = String(p.employeeId || '').trim().toUpperCase();
+    const empName = String(p.employeeName || '').trim().toLowerCase();
+
+    if (BLOCKED_PAYROLL_DOC_IDS.has(docId)) return true;
+
+    // Exclude EMP ID MOD007, legacy MOD008/MOD0090, Tony Stark, and Piu Roy salary slips
+    if (
+      empName.includes('tony stark') ||
+      (empName.includes('tony') && empName.includes('stark')) ||
+      empName.includes('piu roy') ||
+      (empName.includes('piu') && empName.includes('roy')) ||
+      empId === 'MOD007' ||
+      empId === 'MOD0090' ||
+      empId === 'MOD008' ||
+      docId === 'PAY-2026-09-04' ||
+      docId === 'PAY-2026-10-04' ||
+      docId.includes('MOD007') ||
+      docId.includes('MOD0090') ||
+      docId.includes('MOD008') ||
+      docId.includes('TONY') ||
+      docId.includes('STARK') ||
+      docId.includes('PIU')
+    ) {
+      return true;
+    }
+
+    // Exclude old intermediate MOD01 record (keep MOD011 for Debrupa Ghosh surupa008@gmail.com!)
+    if (empId === 'MOD01' || docId.endsWith('-MOD01')) {
+      return true;
+    }
+
+    // Exclude intermediate/duplicate Modela Tech IDs (MOD, MOD0, MOD00, MOD0001, MOD100)
+    if (
+      empName === 'modela tech' &&
+      (empId === 'MOD' || empId === 'MOD0' || empId === 'MOD00' || empId === 'MOD0001' || empId === 'MOD100')
+    ) {
+      return true;
+    }
+
+    return false;
+  };
+
+  const getPayrollPersonKey = (p: Partial<PayrollRecord>): string => {
+    const nameLower = String(p.employeeName || '').trim().toLowerCase();
+    const empIdUpper = String(p.employeeId || '').trim().toUpperCase();
+    const docIdUpper = String(p.id || '').trim().toUpperCase();
+
+    if (nameLower === 'modela tech') {
+      return 'modela-tech';
+    }
+    if (nameLower === 'sushoovan das') {
+      return 'sushoovan-das';
+    }
+    if (nameLower === 'debrupa ghosh') {
+      const surupaResolved = (resolveEmpId('surupa008@gmail.com', 'MOD011') || 'MOD011').toUpperCase();
+      if (
+        empIdUpper === 'MOD011' ||
+        empIdUpper === surupaResolved ||
+        docIdUpper.endsWith('-MOD011') ||
+        docIdUpper.endsWith(`-${surupaResolved}`)
+      ) {
+        return 'debrupa-ghosh-surupa008';
+      }
+      return 'debrupa-ghosh-primary';
+    }
+    return empIdUpper ? `id-${empIdUpper}` : `name-${nameLower}`;
+  };
+
   const enforceMonthPayrollRules = (records: PayrollRecord[]): PayrollRecord[] => {
-    return records.map(p => {
-      const isNovDec = isNovDecMonth(p.month);
-      const targetStatus: 'PAID' | 'UNPAID' = isNovDec ? 'UNPAID' : 'PAID';
-      if (p.status !== targetStatus) {
-        return {
+    const filtered = records.filter(p => !isExcludedPayrollRecord(p));
+
+    // Deduplicate so each distinct employee has at most 1 payslip per (month, year)
+    const cyclePersonMap = new Map<string, PayrollRecord>();
+
+    filtered.forEach(rawP => {
+      const isNovDec = isNovDecMonth(rawP.month);
+      const personKey = getPayrollPersonKey(rawP);
+      const defaultStatus: 'PAID' | 'UNPAID' = isNovDec ? 'UNPAID' : 'PAID';
+
+      let finalStatus: 'PAID' | 'UNPAID' =
+        rawP.status === 'PAID' || rawP.status === 'UNPAID' ? rawP.status : defaultStatus;
+
+      if (personKey === 'debrupa-ghosh-surupa008' && isNovDec && !rawP.manualStatusOverride) {
+        finalStatus = 'UNPAID';
+      }
+
+      let p: PayrollRecord = {
+        ...rawP,
+        status: finalStatus,
+        paymentDate: finalStatus === 'PAID' ? (rawP.paymentDate || `${rawP.year}-01-01`) : '',
+        disbursedBy: finalStatus === 'PAID' ? (rawP.disbursedBy || 'System Master Disburser') : ''
+      };
+
+      if (personKey === 'modela-tech') {
+        const resolvedId = resolveEmpId('modelatech2026@gmail.com', p.employeeId) || p.employeeId;
+        p = {
           ...p,
-          status: targetStatus,
-          paymentDate: targetStatus === 'PAID' ? (p.paymentDate || `${p.year}-01-01`) : '',
-          disbursedBy: targetStatus === 'PAID' ? (p.disbursedBy || 'System Master Disburser') : ''
+          employeeId: resolvedId,
+          basicSalary: 95000,
+          allowances: 30000,
+          grossSalary: 125000,
+          netSalary: 125000 - (p.deductions || 3700)
+        };
+      } else if (personKey === 'debrupa-ghosh-surupa008') {
+        const resolvedId = resolveEmpId('surupa008@gmail.com', p.employeeId || 'MOD011') || 'MOD011';
+        p = {
+          ...p,
+          employeeId: resolvedId
+        };
+      } else if (personKey === 'debrupa-ghosh-primary') {
+        const resolvedId = resolveEmpId('ghoshdebrupa005@gmail.com', p.employeeId || 'MOD007') || 'MOD007';
+        p = {
+          ...p,
+          employeeId: resolvedId
+        };
+      } else if (personKey === 'sushoovan-das') {
+        const resolvedId = resolveEmpId('sushovand@modelatech.com', p.employeeId || 'MOD001') || 'MOD001';
+        p = {
+          ...p,
+          employeeId: resolvedId
         };
       }
-      return p;
+
+      const cycleKey = `${(p.month || '').trim().toLowerCase()}-${p.year}-${personKey}`;
+      const existing = cyclePersonMap.get(cycleKey);
+
+      if (!existing) {
+        cyclePersonMap.set(cycleKey, p);
+      } else {
+        const isPCanonical = /^PAY-\d{4}-\d{2}-\d{2}$/.test(p.id);
+        const isExCanonical = /^PAY-\d{4}-\d{2}-\d{2}$/.test(existing.id);
+        const pMatchesResolvedId = p.id.toUpperCase().endsWith(`-${p.employeeId.toUpperCase()}`);
+        const exMatchesResolvedId = existing.id.toUpperCase().endsWith(`-${existing.employeeId.toUpperCase()}`);
+
+        if (p.manualStatusOverride && !existing.manualStatusOverride) {
+          cyclePersonMap.set(cycleKey, p);
+        } else if (
+          !existing.manualStatusOverride &&
+          ((isPCanonical && !isExCanonical) || (!isExCanonical && pMatchesResolvedId && !exMatchesResolvedId))
+        ) {
+          cyclePersonMap.set(cycleKey, p);
+        }
+      }
     });
+
+    return Array.from(cyclePersonMap.values());
   };
 
   // Persist payroll in localStorage and sync with Firestore database
-  // Requirement 3: jan to october mark all paid, nov to december mark all of them unpaid
   const [payroll, setPayroll] = useState<PayrollRecord[]>(() => {
     let list: PayrollRecord[] = INITIAL_PAYROLL;
     try {
@@ -345,7 +738,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          list = parsed;
+          list = [...parsed, ...INITIAL_PAYROLL];
         }
       }
     } catch {}
@@ -383,6 +776,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Real-time Firestore synchronization for employees across all devices
   useEffect(() => {
     let isSubscribed = true;
+
     const unsub = onSnapshot(
       collection(db, 'employees'),
       async snapshot => {
@@ -391,7 +785,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           try {
             for (const emp of INITIAL_EMPLOYEES) {
               if (!isRecordDeleted(emp.id, emp.email)) {
-                await setDoc(doc(db, 'employees', emp.id), emp);
+                const resolvedId = resolveEmpId(emp.email, emp.id) || emp.id;
+                await setDoc(doc(db, 'employees', resolvedId), cleanFirestoreData({ ...emp, id: resolvedId }));
               }
             }
           } catch (e) {
@@ -400,20 +795,191 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           return;
         }
 
-        const remoteEmployees: Employee[] = [];
+        const remoteDocs: { docId: string; data: Employee }[] = [];
         snapshot.forEach(docSnap => {
           const data = docSnap.data() as Employee;
-          if (data && data.id && !isRecordDeleted(data.id, data.email)) {
-            remoteEmployees.push(data);
+          if (!data || !data.id) return;
+          const fullName = `${data.firstName || ''} ${data.lastName || ''}`.trim().toLowerCase();
+          const lowerEmail = (data.email || '').trim().toLowerCase();
+          const isPiu =
+            fullName.includes('piu roy') ||
+            (fullName.includes('piu') && fullName.includes('roy')) ||
+            lowerEmail.includes('piuroy') ||
+            lowerEmail.includes('piu.roy');
+          if (isPiu) {
+            ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'].forEach(mCode => {
+              deleteDoc(doc(db, 'payroll', `PAY-2026-${mCode}-${data.id.toUpperCase()}`)).catch(() => {});
+            });
+          }
+          if (
+            fullName.includes('tony stark') ||
+            (fullName.includes('tony') && fullName.includes('stark')) ||
+            lowerEmail.includes('tonystark') ||
+            lowerEmail.includes('tony.stark') ||
+            isRecordDeleted(docSnap.id, data.id, data.email, resolveEmpId(data.email, data.id))
+          ) {
+            // Permanently delete deleted employee or Tony Stark from Firestore employees database
+            deleteDoc(doc(db, 'employees', docSnap.id)).catch(() => {});
+            return;
+          }
+          remoteDocs.push({ docId: docSnap.id, data });
+        });
+
+        // 1. Authoritative Map: remote employees currently stored in Firestore database
+        // Keyed by person email (or uppercase ID if no email) to strictly guarantee 1 person = 1 employee
+        // If duplicate docs exist for the same email (e.g. old ID doc vs new ID doc), pick the most recently updated / custom resolved ID and delete the stale duplicate!
+        const personMap = new Map<string, Employee>();
+        const personDocIdMap = new Map<string, string>();
+        const seenIds = new Set<string>();
+
+        remoteDocs.forEach(({ docId, data: e }) => {
+          const cleanEmail = e.email ? e.email.toLowerCase().trim() : '';
+          const upperId = e.id.toUpperCase().trim();
+          const key = cleanEmail || upperId;
+          const existing = personMap.get(key);
+
+          const eUpdatedAt = String((e as any).updatedAt || '');
+          if (eUpdatedAt && cleanEmail) {
+            recordCustomEmpId(cleanEmail, undefined, upperId);
+          }
+
+          if (!existing) {
+            const resolvedId = cleanEmail ? (resolveEmpId(cleanEmail, upperId) || upperId) : upperId;
+            personMap.set(key, { ...e, id: resolvedId });
+            personDocIdMap.set(key, docId);
+            seenIds.add(resolvedId);
+          } else {
+            const exUpdatedAt = String((existing as any).updatedAt || '');
+            const preferredId = cleanEmail ? resolveEmpId(cleanEmail) : undefined;
+            const eMatchesPreferred = preferredId && upperId === preferredId;
+            const exMatchesPreferred = preferredId && existing.id.toUpperCase() === preferredId;
+
+            const shouldReplace =
+              (eUpdatedAt && (!exUpdatedAt || eUpdatedAt > exUpdatedAt)) ||
+              (eMatchesPreferred && !exMatchesPreferred);
+
+            if (shouldReplace) {
+              const oldDocId = personDocIdMap.get(key);
+              if (oldDocId && oldDocId !== docId) {
+                deleteDoc(doc(db, 'employees', oldDocId)).catch(() => {});
+              }
+              const resolvedId = cleanEmail ? (resolveEmpId(cleanEmail, upperId) || upperId) : upperId;
+              personMap.set(key, { ...existing, ...e, id: resolvedId });
+              personDocIdMap.set(key, docId);
+              seenIds.add(resolvedId);
+            } else {
+              // Current doc is stale duplicate of existing; clean it up from Firestore
+              if (docId !== personDocIdMap.get(key)) {
+                deleteDoc(doc(db, 'employees', docId)).catch(() => {});
+              }
+            }
           }
         });
 
-        if (remoteEmployees.length > 0) {
-          setEmployees(remoteEmployees);
-          try {
-            localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(remoteEmployees));
-          } catch {}
-        }
+        // 2. Initial baseline personnel (ONLY added if this person does NOT already exist in live database, is NOT deleted, and is NOT in PENDING status)
+        INITIAL_EMPLOYEES.filter(
+          e => !isRecordDeleted(e.id, e.email, resolveEmpId(e.email, e.id))
+        ).forEach(initEmp => {
+          const cleanEmail = initEmp.email ? initEmp.email.toLowerCase().trim() : '';
+          const resolvedInitId = (resolveEmpId(cleanEmail, initEmp.id) || initEmp.id).toUpperCase().trim();
+
+          if (cleanEmail && users.some(u => u.email?.toLowerCase().trim() === cleanEmail && u.status !== 'APPROVED')) {
+            return;
+          }
+
+          // If this person already exists in live database (even under an edited EMP ID), DO NOT add initial record!
+          if ((cleanEmail && personMap.has(cleanEmail)) || seenIds.has(resolvedInitId)) {
+            return;
+          }
+
+          personMap.set(cleanEmail || resolvedInitId, { ...initEmp, id: resolvedInitId });
+          seenIds.add(resolvedInitId);
+        });
+
+        // 3. Approved users from AuthContext / User Management
+        let savedUsersList: User[] = [];
+        try {
+          const rawU = localStorage.getItem('modela_users_v2');
+          if (rawU) {
+            const parsed = JSON.parse(rawU);
+            if (Array.isArray(parsed)) savedUsersList = parsed;
+          }
+        } catch {}
+
+        const allApprovedMap = new Map<string, User>();
+        users
+          .filter(
+            u =>
+              u.status === 'APPROVED' &&
+              u.email &&
+              u.id !== SYNC_REGISTRY_DOC_ID &&
+              u.email !== 'sync@system.internal' &&
+              !isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolveEmpId(u.email, u.employeeId))
+          )
+          .forEach(u => allApprovedMap.set(u.email.toLowerCase().trim(), u));
+        savedUsersList
+          .filter(
+            u =>
+              u.status === 'APPROVED' &&
+              u.email &&
+              u.id !== SYNC_REGISTRY_DOC_ID &&
+              u.email !== 'sync@system.internal' &&
+              !isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolveEmpId(u.email, u.employeeId))
+          )
+          .forEach(u => {
+            if (!allApprovedMap.has(u.email.toLowerCase().trim())) {
+              allApprovedMap.set(u.email.toLowerCase().trim(), u);
+            }
+          });
+
+        allApprovedMap.forEach(u => {
+          const cleanEmail = u.email.toLowerCase().trim();
+          const targetEmp = personMap.get(cleanEmail);
+
+          if (targetEmp) {
+            // Ensure custom resolved EMP ID is respected without letting stale initial user state overwrite Firestore
+            const resolvedId = resolveEmpId(cleanEmail, targetEmp.id) || targetEmp.id;
+            if (targetEmp.id !== resolvedId) {
+              targetEmp.id = resolvedId;
+            }
+            // Also notify AuthContext if targetEmp.id in Firestore is newer than u.employeeId
+            if (u.employeeId !== targetEmp.id) {
+              window.dispatchEvent(
+                new CustomEvent('modela_employee_id_changed', {
+                  detail: { oldId: u.employeeId, newId: targetEmp.id, email: cleanEmail }
+                })
+              );
+            }
+          } else {
+            // New approved user not yet in directory
+            const parts = (u.name || '').trim().split(/\s+/);
+            const empId = (resolveEmpId(cleanEmail, u.employeeId || u.id) || u.employeeId || u.id).toUpperCase().trim();
+            if (isRecordDeleted(empId, cleanEmail, u.id, u.uid)) return;
+            const newEmp: Employee = {
+              id: empId,
+              firstName: parts[0] || (u.name || '').trim() || 'Staff',
+              lastName: parts.slice(1).join(' ') || '',
+              joiningDate: new Date().toISOString().split('T')[0],
+              phone: '',
+              email: u.email,
+              designation: u.designation || (u.role === 'SUPER_ADMIN' ? 'Executive Director & Super Admin' : 'Enterprise Staff'),
+              department: u.department || (u.role === 'SUPER_ADMIN' ? 'Executive Office' : 'General Staff'),
+              status: 'ACTIVE',
+              location: 'San Francisco HQ',
+              compensation: u.role === 'SUPER_ADMIN' ? { basic: 95000, allowances: 30000 } : { basic: 50000, allowances: 15000 },
+              avatar: u.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || u.email)}&background=0284c7&color=fff`
+            };
+            personMap.set(cleanEmail, newEmp);
+          }
+        });
+
+        const mergedEmployees = Array.from(personMap.values()).filter(
+          e => !isRecordDeleted(e.id, e.email, resolveEmpId(e.email, e.id))
+        );
+        setEmployees(mergedEmployees);
+        try {
+          localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(mergedEmployees));
+        } catch {}
       },
       err => {
         console.warn('Firestore employees sync notice:', err);
@@ -521,6 +1087,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Real-time Firestore synchronization for payroll ledger records across all devices
   useEffect(() => {
+    // Proactively delete duplicate Modela Tech & Debrupa Ghosh payslips and Aditi Chakraborty's payslip from Firestore
+    BLOCKED_PAYROLL_DOC_IDS.forEach(badId => {
+      deleteDoc(doc(db, 'payroll', badId)).catch(() => {});
+    });
+
     let isSubscribed = true;
     const unsub = onSnapshot(
       collection(db, 'payroll'),
@@ -538,21 +1109,178 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           return;
         }
 
-        const remotePayroll: PayrollRecord[] = [];
+        const validDocs: { docId: string; data: PayrollRecord }[] = [];
         snapshot.forEach(docSnap => {
           const data = docSnap.data() as PayrollRecord;
-          if (data && data.id) {
-            remotePayroll.push(data);
+          if (!data || !data.id || isExcludedPayrollRecord(data) || BLOCKED_PAYROLL_DOC_IDS.has(docSnap.id.toUpperCase())) {
+            // Permanently remove excluded / duplicate payslips from Firestore database
+            deleteDoc(doc(db, 'payroll', docSnap.id)).catch(() => {});
+            return;
+          }
+          validDocs.push({ docId: docSnap.id, data });
+        });
+
+        // Deduplicate per (month, year, person) and delete any extra duplicate documents from Firestore database
+        const cycleWinnerMap = new Map<string, { docId: string; data: PayrollRecord }>();
+        validDocs.forEach(({ docId, data }) => {
+          const personKey = getPayrollPersonKey(data);
+          const cycleKey = `${(data.month || '').trim().toLowerCase()}-${data.year}-${personKey}`;
+          const existing = cycleWinnerMap.get(cycleKey);
+
+          if (!existing) {
+            cycleWinnerMap.set(cycleKey, { docId, data });
+          } else {
+            const isNewCanonical = /^PAY-\d{4}-\d{2}-\d{2}$/.test(data.id);
+            const isExCanonical = /^PAY-\d{4}-\d{2}-\d{2}$/.test(existing.data.id);
+            const preferredEmpId =
+              personKey === 'modela-tech'
+                ? resolveEmpId('modelatech2026@gmail.com', data.employeeId)
+                : personKey === 'debrupa-ghosh-surupa008'
+                ? resolveEmpId('surupa008@gmail.com', data.employeeId || 'MOD011')
+                : personKey === 'debrupa-ghosh-primary'
+                ? resolveEmpId('ghoshdebrupa005@gmail.com', data.employeeId || 'MOD007')
+                : undefined;
+
+            const newMatchesPreferred = preferredEmpId && data.id.toUpperCase().endsWith(`-${preferredEmpId.toUpperCase()}`);
+            const exMatchesPreferred = preferredEmpId && existing.data.id.toUpperCase().endsWith(`-${preferredEmpId.toUpperCase()}`);
+
+            const shouldReplace =
+              (isNewCanonical && !isExCanonical) ||
+              (!isExCanonical && newMatchesPreferred && !exMatchesPreferred) ||
+              (!isExCanonical && personKey === 'modela-tech' && data.basicSalary === 95000 && existing.data.basicSalary !== 95000);
+
+            if (shouldReplace) {
+              deleteDoc(doc(db, 'payroll', existing.docId)).catch(() => {});
+              cycleWinnerMap.set(cycleKey, { docId, data });
+            } else {
+              deleteDoc(doc(db, 'payroll', docId)).catch(() => {});
+            }
           }
         });
 
-        if (remotePayroll.length > 0) {
-          const normalized = enforceMonthPayrollRules(remotePayroll);
-          setPayroll(normalized);
-          try {
-            localStorage.setItem(STORAGE_KEYS.PAYROLL, JSON.stringify(normalized));
-          } catch {}
-        }
+        // Ensure required INITIAL_PAYROLL entries (especially Debrupa Ghosh surupa008@gmail.com for Oct, Nov, Dec) exist in Firestore
+        INITIAL_PAYROLL.forEach(initP => {
+          if (isExcludedPayrollRecord(initP)) return;
+          const personKey = getPayrollPersonKey(initP);
+          const cycleKey = `${(initP.month || '').trim().toLowerCase()}-${initP.year}-${personKey}`;
+          const existing = cycleWinnerMap.get(cycleKey);
+          if (!existing) {
+            const resolvedId =
+              personKey === 'debrupa-ghosh-surupa008'
+                ? resolveEmpId('surupa008@gmail.com', initP.employeeId || 'MOD011') || 'MOD011'
+                : initP.employeeId;
+            const seededRecord: PayrollRecord = { ...initP, employeeId: resolvedId };
+            cycleWinnerMap.set(cycleKey, { docId: seededRecord.id, data: seededRecord });
+            setDoc(doc(db, 'payroll', seededRecord.id), seededRecord, { merge: true }).catch(() => {});
+          }
+        });
+
+        // Ensure all approved users in User Management have their 12-month payroll (Jan-Oct PAID, Nov-Dec UNPAID) in Firestore
+        try {
+          const rawSavedUsers = localStorage.getItem('modela_users_v2');
+          const parsedSavedUsers: User[] = rawSavedUsers ? JSON.parse(rawSavedUsers) : [];
+          const combinedApprovedUsers = new Map<string, User>();
+          [...users, ...(Array.isArray(parsedSavedUsers) ? parsedSavedUsers : [])].forEach(u => {
+            if (
+              u &&
+              u.status === 'APPROVED' &&
+              u.email &&
+              u.id !== SYNC_REGISTRY_DOC_ID &&
+              u.email !== 'sync@system.internal'
+            ) {
+              const resolvedId = resolveEmpId(u.email, u.employeeId) || u.employeeId || '';
+              if (!isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolvedId)) {
+                combinedApprovedUsers.set(u.email.toLowerCase().trim(), { ...u, employeeId: resolvedId });
+              }
+            }
+          });
+
+          const allMonthsList = [
+            'January', 'February', 'March', 'April', 'May', 'June',
+            'July', 'August', 'September', 'October', 'November', 'December'
+          ];
+
+          combinedApprovedUsers.forEach(u => {
+            const empId = (u.employeeId || '').trim().toUpperCase();
+            if (!empId || empId === 'MOD007' || empId === 'MOD008' || empId === 'MOD0090' || empId === 'MOD01') return;
+            const fullName = (u.name || u.email.split('@')[0]).trim();
+            const isModelaUser = fullName.toLowerCase() === 'modela tech' || u.email.toLowerCase() === 'modelatech2026@gmail.com';
+            const isSushoovanUser = fullName.toLowerCase() === 'sushoovan das' || u.email.toLowerCase() === 'sushovand@modelatech.com';
+            const basic = isModelaUser ? 95000 : isSushoovanUser ? 85000 : 50000;
+            const allowances = isModelaUser ? 30000 : isSushoovanUser ? 25000 : 15000;
+            const deductions = 3700;
+            const grossSalary = basic + allowances;
+            const netSalary = grossSalary - deductions;
+
+            allMonthsList.forEach((m, idx) => {
+              const docId = `PAY-2026-${m.substring(0, 3).toUpperCase()}-${empId}`;
+              const candidateRecord: PayrollRecord = {
+                id: docId,
+                employeeId: empId,
+                employeeName: fullName,
+                month: m,
+                year: 2026,
+                basicSalary: basic,
+                allowances,
+                deductions,
+                grossSalary,
+                netSalary,
+                status: isNovDecMonth(m) ? 'UNPAID' : 'PAID',
+                paymentDate: isNovDecMonth(m) ? '' : `2026-${String(idx + 1).padStart(2, '0')}-01`,
+                disbursedBy: isNovDecMonth(m) ? '' : 'System Master Disburser',
+                lopDays: 0,
+                lopAmount: 0,
+                allowanceBreakdown: {
+                  hra: Math.round(allowances * 0.4),
+                  medical: Math.round(allowances * 0.15),
+                  special: Math.round(allowances * 0.35),
+                  internet: allowances - (Math.round(allowances * 0.4) + Math.round(allowances * 0.15) + Math.round(allowances * 0.35))
+                },
+                deductionBreakdown: {
+                  professionalTax: 200,
+                  pfContribution: 1800,
+                  groupHealthInsurance: 1700,
+                  lop: 0
+                }
+              };
+
+              if (isExcludedPayrollRecord(candidateRecord)) return;
+              const pKey = getPayrollPersonKey(candidateRecord);
+              const cycleKey = `${m.toLowerCase()}-2026-${pKey}`;
+              if (!cycleWinnerMap.has(cycleKey)) {
+                cycleWinnerMap.set(cycleKey, { docId: candidateRecord.id, data: candidateRecord });
+                setDoc(doc(db, 'payroll', candidateRecord.id), candidateRecord, { merge: true }).catch(() => {});
+              }
+            });
+          });
+        } catch {}
+
+        // Ensure Debrupa Ghosh (MOD011) November and December records in Firestore are UNPAID unless manually toggled
+        cycleWinnerMap.forEach((item, cycleKey) => {
+          const personKey = getPayrollPersonKey(item.data);
+          if (
+            personKey === 'debrupa-ghosh-surupa008' &&
+            isNovDecMonth(item.data.month) &&
+            !item.data.manualStatusOverride &&
+            item.data.status !== 'UNPAID'
+          ) {
+            const updatedRecord: PayrollRecord = {
+              ...item.data,
+              status: 'UNPAID',
+              paymentDate: '',
+              disbursedBy: ''
+            };
+            cycleWinnerMap.set(cycleKey, { docId: item.docId, data: updatedRecord });
+            setDoc(doc(db, 'payroll', item.docId), cleanFirestoreData(updatedRecord), { merge: true }).catch(() => {});
+          }
+        });
+
+        const remotePayroll = Array.from(cycleWinnerMap.values()).map(item => item.data);
+        const normalized = enforceMonthPayrollRules(remotePayroll.length > 0 ? remotePayroll : INITIAL_PAYROLL);
+        setPayroll(normalized);
+        try {
+          localStorage.setItem(STORAGE_KEYS.PAYROLL, JSON.stringify(normalized));
+        } catch {}
       },
       err => {
         console.warn('Firestore payroll sync notice:', err);
@@ -783,68 +1511,296 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateEmployee = async (id: string, updates: Partial<Employee>): Promise<boolean> => {
-    const existingEmp = employees.find(e => e.id === id);
-    const updatedFirstName = updates.firstName !== undefined ? updates.firstName : existingEmp?.firstName || '';
-    const updatedLastName = updates.lastName !== undefined ? updates.lastName : existingEmp?.lastName || '';
+    let existingEmp = employees.find(
+      e => e.id.toUpperCase() === id.toUpperCase() ||
+           (updates.email && e.email?.toLowerCase() === updates.email.toLowerCase())
+    );
+
+    if (!existingEmp && updates.email) {
+      const matchedUser = users.find(u => u.email.toLowerCase() === updates.email!.toLowerCase());
+      const nameParts = (matchedUser?.name || '').trim().split(/\s+/);
+      existingEmp = {
+        id: id.trim().toUpperCase(),
+        firstName: updates.firstName || nameParts[0] || 'Staff',
+        lastName: updates.lastName || nameParts.slice(1).join(' ') || '',
+        email: updates.email,
+        joiningDate: new Date().toISOString().split('T')[0],
+        phone: '',
+        designation: updates.designation || matchedUser?.designation || 'Enterprise Staff',
+        department: updates.department || matchedUser?.department || 'General Staff',
+        status: 'ACTIVE',
+        location: 'San Francisco HQ',
+        compensation: { basic: 50000, allowances: 15000 },
+        avatar: matchedUser?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(updates.email)}&background=0284c7&color=fff`
+      };
+    }
+
+    if (!existingEmp) return false;
+
+    const rawNewId = updates.id ? updates.id.trim().toUpperCase() : existingEmp.id.toUpperCase();
+    const isIdChanging = Boolean(rawNewId && rawNewId !== existingEmp.id.toUpperCase());
+
+    if (isIdChanging) {
+      // Validate uniqueness: check if another person (different email) already has rawNewId
+      const conflict = employees.some(
+        e => e.id.toUpperCase() === rawNewId &&
+             (!existingEmp.email || !e.email || e.email.toLowerCase() !== existingEmp.email.toLowerCase())
+      );
+      if (conflict) {
+        showToast('ID Conflict', `Employee ID ${rawNewId} is already assigned to another employee.`, 'error');
+        return false;
+      }
+    }
+
+    const finalId = rawNewId;
+    const oldEmpId = existingEmp.id;
+    const targetEmail = (existingEmp.email || updates.email || '').trim();
+    const updatedFirstName = updates.firstName !== undefined ? updates.firstName : existingEmp.firstName || '';
+    const updatedLastName = updates.lastName !== undefined ? updates.lastName : existingEmp.lastName || '';
     const fullName = `${updatedFirstName} ${updatedLastName}`.trim();
+    const now = new Date().toISOString();
+
+    // Ensure the new ID is never blocked in deleted registry and is recorded in custom EMP ID registry
+    removeDeletedRecord(finalId, targetEmail);
+    recordCustomEmpId(targetEmail, oldEmpId, finalId);
 
     const mergedEmp: Employee = {
-      ...(existingEmp || {}),
+      ...existingEmp,
       ...updates,
-      id
-    } as Employee;
+      id: finalId,
+      ...( { updatedAt: now } as any )
+    };
 
+    // 1. Immediately update in-memory and localStorage employees state without duplicates
     setEmployees(prev => {
-      const next = prev.map(e => (e.id === id ? mergedEmp : e));
+      const filtered = prev.filter(
+        e => e.id.toUpperCase() !== oldEmpId.toUpperCase() &&
+             e.id.toUpperCase() !== finalId.toUpperCase() &&
+             (!targetEmail || !e.email || e.email.toLowerCase() !== targetEmail.toLowerCase())
+      );
+      const next = [mergedEmp, ...filtered];
       try {
         localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(next));
       } catch {}
       return next;
     });
 
-    // Persist employee update to Firestore
-    const cleanEmp = cleanFirestoreData(mergedEmp);
-    setDoc(doc(db, 'employees', id), cleanEmp, { merge: true }).catch(err => {
+    // 2. Immediately notify AuthContext & update user state
+    window.dispatchEvent(
+      new CustomEvent('modela_employee_id_changed', {
+        detail: { oldId: oldEmpId, newId: finalId, email: targetEmail }
+      })
+    );
+
+    if (updateUserFromEmployee) {
+      updateUserFromEmployee(finalId, targetEmail, {
+        name: fullName || undefined,
+        department: updates.department !== undefined ? updates.department : existingEmp.department,
+        designation: updates.designation !== undefined ? updates.designation : existingEmp.designation
+      });
+    }
+
+    // 3. Persist to Firestore employees collection & clean up any old/duplicate documents for this person
+    try {
+      const cleanEmp = cleanFirestoreData(mergedEmp);
+      await setDoc(doc(db, 'employees', finalId), cleanEmp, { merge: true });
+
+      if (isIdChanging) {
+        if (oldEmpId !== finalId) {
+          await deleteDoc(doc(db, 'employees', oldEmpId)).catch(() => {});
+        }
+        if (oldEmpId.toUpperCase() !== finalId) {
+          await deleteDoc(doc(db, 'employees', oldEmpId.toUpperCase())).catch(() => {});
+        }
+      }
+
+      // Also scan Firestore employees collection to remove any other leftover documents with the same email or old ID
+      const allEmpDocs = await getDocs(collection(db, 'employees'));
+      for (const eDoc of allEmpDocs.docs) {
+        if (eDoc.id === finalId) continue;
+        const eData = eDoc.data();
+        const sameEmail = targetEmail && eData.email && String(eData.email).toLowerCase().trim() === targetEmail.toLowerCase();
+        const sameOldId = isIdChanging && (eDoc.id.toUpperCase() === oldEmpId.toUpperCase() || String(eData.id || '').toUpperCase() === oldEmpId.toUpperCase());
+        if (sameEmail || sameOldId) {
+          await deleteDoc(doc(db, 'employees', eDoc.id)).catch(() => {});
+        }
+      }
+    } catch (err) {
       console.warn('Firestore employee update error:', err);
-    });
+    }
+
+    // 4. Cascade ID change across all database collections & context states in real time
+    try {
+      const userDocs = await getDocs(collection(db, 'users'));
+      let updatedUserInFirestore = false;
+      for (const uDoc of userDocs.docs) {
+        const uData = uDoc.data();
+        const matches =
+          (oldEmpId && uData.employeeId?.toUpperCase() === oldEmpId.toUpperCase()) ||
+          (targetEmail && uData.email?.toLowerCase() === targetEmail.toLowerCase()) ||
+          (oldEmpId && uDoc.id.toUpperCase() === oldEmpId.toUpperCase());
+        if (matches) {
+          updatedUserInFirestore = true;
+          await setDoc(
+            doc(db, 'users', uDoc.id),
+            cleanFirestoreData({ ...uData, employeeId: finalId, updatedAt: now }),
+            { merge: true }
+          ).catch(() => {});
+        }
+      }
+
+      // If this user wasn't yet saved as a document in Firestore 'users', create/save it now so reload always has it
+      if (!updatedUserInFirestore && targetEmail) {
+        const matchedU =
+          users.find(u => u.email.toLowerCase() === targetEmail.toLowerCase()) ||
+          INITIAL_USERS.find(u => u.email.toLowerCase() === targetEmail.toLowerCase());
+        if (matchedU) {
+          await setDoc(
+            doc(db, 'users', matchedU.id),
+            cleanFirestoreData({ ...matchedU, employeeId: finalId, updatedAt: now }),
+            { merge: true }
+          ).catch(() => {});
+        }
+      }
+    } catch (e) {
+      console.warn('User employeeId update notice:', e);
+    }
+
+    if (isIdChanging) {
+      // B. Cascade update payroll records
+      setPayroll(prev => {
+        const updated = prev.map(p =>
+          (p.employeeId?.toUpperCase() === oldEmpId.toUpperCase() || (targetEmail && p.employeeId === targetEmail))
+            ? { ...p, employeeId: finalId }
+            : p
+        );
+        try {
+          localStorage.setItem(STORAGE_KEYS.PAYROLL, JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
+
+      try {
+        const payrollDocs = await getDocs(collection(db, 'payroll'));
+        for (const pDoc of payrollDocs.docs) {
+          const pData = pDoc.data();
+          if (pData.employeeId?.toUpperCase() === oldEmpId.toUpperCase()) {
+            const isCanonical = /^PAY-\d{4}-\d{2}-\d{2}$/.test(pDoc.id);
+            if (isCanonical) {
+              await updateDoc(doc(db, 'payroll', pDoc.id), { employeeId: finalId }).catch(() => {});
+            } else if (pDoc.id.toUpperCase() !== `PAY-${pData.year}-${String(pData.month || 'OCT').substring(0, 3).toUpperCase()}-${finalId}`) {
+              await deleteDoc(doc(db, 'payroll', pDoc.id)).catch(() => {});
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Payroll employeeId update notice:', e);
+      }
+
+      // C. Cascade update attendance records
+      setAttendance(prev => {
+        const updated = prev.map(a =>
+          a.employeeId?.toUpperCase() === oldEmpId.toUpperCase() ? { ...a, employeeId: finalId } : a
+        );
+        try {
+          localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
+
+      // D. Cascade update staff workflow requests
+      setStaffRequests(prev => {
+        const updated = prev.map(r =>
+          r.employeeId?.toUpperCase() === oldEmpId.toUpperCase() ? { ...r, employeeId: finalId } : r
+        );
+        try {
+          localStorage.setItem(STORAGE_KEYS.REQUESTS, JSON.stringify(updated));
+        } catch {}
+        return updated;
+      });
+
+      try {
+        const reqDocs = await getDocs(collection(db, 'requests'));
+        for (const rDoc of reqDocs.docs) {
+          const rData = rDoc.data();
+          if (rData.employeeId?.toUpperCase() === oldEmpId.toUpperCase()) {
+            await updateDoc(doc(db, 'requests', rDoc.id), { employeeId: finalId }).catch(() => {});
+          }
+        }
+      } catch (e) {
+        console.warn('Requests employeeId update notice:', e);
+      }
+
+      // E. Update Express server backend
+      fetch('/api/employees/update-id', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ oldId: oldEmpId, newId: finalId, employee: mergedEmp, email: targetEmail })
+      }).catch(() => {});
+    }
 
     // Auto-sync updated employee compensation to payroll page
     syncEmployeeToPayroll(mergedEmp);
 
-    if (updateUserFromEmployee) {
-      updateUserFromEmployee(id, existingEmp?.email || updates.email, {
-        name: fullName,
-        department: updates.department !== undefined ? updates.department : existingEmp?.department,
-        designation: updates.designation !== undefined ? updates.designation : existingEmp?.designation
-      });
-    }
-
-    addAuditLog('Employee Updated', 'Employees', `Updated record for ${id}${fullName ? ` (${fullName})` : ''}`, id);
-    showToast('Record Updated', `Employee ${id} profile has been updated.`);
+    addAuditLog(
+      'Employee Updated',
+      'Employees',
+      `Updated record for ${finalId}${isIdChanging ? ` (ID changed from ${oldEmpId})` : ''}${fullName ? ` (${fullName})` : ''}`,
+      finalId
+    );
+    showToast(
+      'Record Updated',
+      `Employee ID updated to ${finalId}${isIdChanging ? ` (changed from ${oldEmpId})` : ''} and synced across all pages in real time.`
+    );
     return true;
   };
 
   const deleteEmployee = async (id: string, emailParam?: string): Promise<boolean> => {
-    const target = employees.find(
-      e => e.id === id || (emailParam && e.email && e.email.toLowerCase() === emailParam.toLowerCase())
-    );
-    const targetEmail = target?.email || emailParam;
-    const targetId = target?.id || id;
+    const target =
+      employees.find(
+        e => e.id.toLowerCase() === id.toLowerCase() || (emailParam && e.email && e.email.toLowerCase() === emailParam.toLowerCase())
+      ) ||
+      INITIAL_EMPLOYEES.find(
+        e => e.id.toLowerCase() === id.toLowerCase() || (emailParam && e.email && e.email.toLowerCase() === emailParam.toLowerCase())
+      );
+
+    const targetEmail = (target?.email || emailParam || '').trim().toLowerCase();
+    const targetId = (target?.id || id).trim().toUpperCase();
+    const resolvedId = targetEmail || targetId ? resolveEmpId(targetEmail, targetId) : targetId;
     const targetName = target
       ? ([target.firstName, target.lastName].filter(Boolean).join(' ') || target.email || targetId)
       : targetId;
 
-    // Record in persistent deleted registry so it cannot be resurrected
-    recordDeletedRecord(targetId, targetEmail);
+    const extraIds: (string | undefined)[] = [];
+    if (targetEmail) {
+      INITIAL_USERS.forEach(iu => {
+        if (iu.email.toLowerCase().trim() === targetEmail) {
+          extraIds.push(iu.id, iu.uid, iu.employeeId);
+        }
+      });
+      INITIAL_EMPLOYEES.forEach(ie => {
+        if (ie.email && ie.email.toLowerCase().trim() === targetEmail) {
+          extraIds.push(ie.id);
+        }
+      });
+    }
 
-    // Delete from Firestore
-    deleteDoc(doc(db, 'employees', targetId)).catch(() => {});
+    // Record in persistent deleted registry and sync to Firestore SYNC-REGISTRY-GLOBAL
+    recordDeletedRecord(id, targetId, resolvedId, targetEmail, ...extraIds);
+    await persistSyncRegistryToFirestore();
+
+    const deletedKeySet = new Set(
+      [id, targetId, resolvedId, targetEmail, ...extraIds]
+        .filter(Boolean)
+        .map(s => String(s).toLowerCase().trim())
+    );
 
     setEmployees(prev => {
       const next = prev.filter(
         e =>
-          e.id !== targetId &&
-          (!targetEmail || !e.email || e.email.toLowerCase() !== targetEmail.toLowerCase())
+          !deletedKeySet.has(String(e.id || '').toLowerCase().trim()) &&
+          !deletedKeySet.has(String(e.email || '').toLowerCase().trim()) &&
+          !isRecordDeleted(e.id, e.email)
       );
       try {
         localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(next));
@@ -859,23 +1815,77 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const userList = JSON.parse(usersSaved);
         const nextUsers = userList.filter(
           (u: any) =>
-            (!targetEmail || !u.email || u.email.toLowerCase() !== targetEmail.toLowerCase()) &&
-            (!u.employeeId || u.employeeId.toLowerCase() !== targetId.toLowerCase()) &&
-            u.id !== targetId
+            !deletedKeySet.has(String(u.id || '').toLowerCase().trim()) &&
+            !deletedKeySet.has(String(u.uid || '').toLowerCase().trim()) &&
+            !deletedKeySet.has(String(u.email || '').toLowerCase().trim()) &&
+            !deletedKeySet.has(String(u.employeeId || '').toLowerCase().trim()) &&
+            !isRecordDeleted(u.id, u.uid, u.email, u.employeeId)
         );
         localStorage.setItem('modela_users_v2', JSON.stringify(nextUsers));
       }
     } catch {}
 
-    // Dispatch event so AuthContext updates users state immediately
+    // Dispatch events so AuthContext updates users state immediately
     window.dispatchEvent(
       new CustomEvent('modela_user_deleted', {
-        detail: { id: targetId, employeeId: targetId, email: targetEmail }
+        detail: { id: targetId, employeeId: resolvedId || targetId, email: targetEmail }
       })
     );
+    window.dispatchEvent(new CustomEvent('modela_sync_registry_updated'));
+
+    // Permanently delete all matching documents from Firestore 'employees' and 'users' collections
+    try {
+      const deletePromises: Promise<any>[] = [];
+      deletePromises.push(deleteDoc(doc(db, 'employees', targetId)).catch(() => {}));
+      if (resolvedId && resolvedId !== targetId) {
+        deletePromises.push(deleteDoc(doc(db, 'employees', resolvedId)).catch(() => {}));
+      }
+      if (targetEmail) {
+        deletePromises.push(
+          deleteDoc(doc(db, 'users', `REQ-${targetEmail.replace(/[^a-zA-Z0-9]/g, '_')}`)).catch(() => {})
+        );
+      }
+
+      const [allEmpsSnap, allUsersSnap] = await Promise.all([
+        getDocs(collection(db, 'employees')),
+        getDocs(collection(db, 'users'))
+      ]);
+
+      allEmpsSnap.forEach(d => {
+        const eData = d.data();
+        if (
+          deletedKeySet.has(d.id.toLowerCase().trim()) ||
+          deletedKeySet.has(String(eData.id || '').toLowerCase().trim()) ||
+          deletedKeySet.has(String(eData.email || '').toLowerCase().trim())
+        ) {
+          deletePromises.push(deleteDoc(doc(db, 'employees', d.id)).catch(() => {}));
+        }
+      });
+
+      allUsersSnap.forEach(d => {
+        if (d.id === SYNC_REGISTRY_DOC_ID) return;
+        const uData = d.data();
+        if (
+          deletedKeySet.has(d.id.toLowerCase().trim()) ||
+          deletedKeySet.has(String(uData.id || '').toLowerCase().trim()) ||
+          deletedKeySet.has(String(uData.uid || '').toLowerCase().trim()) ||
+          deletedKeySet.has(String(uData.email || '').toLowerCase().trim()) ||
+          deletedKeySet.has(String(uData.employeeId || '').toLowerCase().trim())
+        ) {
+          deletePromises.push(deleteDoc(doc(db, 'users', d.id)).catch(() => {}));
+        }
+      });
+
+      await Promise.all(deletePromises);
+    } catch (e) {
+      console.warn('Firestore employee/user delete scan notice:', e);
+    }
 
     try {
       fetch(`/api/employees/${encodeURIComponent(targetId)}`, { method: 'DELETE' }).catch(() => {});
+      if (resolvedId && resolvedId !== targetId) {
+        fetch(`/api/employees/${encodeURIComponent(resolvedId)}`, { method: 'DELETE' }).catch(() => {});
+      }
       if (targetEmail) {
         fetch(`/api/users/${encodeURIComponent(targetEmail)}`, { method: 'DELETE' }).catch(() => {});
       }
@@ -1062,7 +2072,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             ...p,
             status: 'PAID' as const,
             paymentDate: new Date().toISOString().split('T')[0],
-            disbursedBy: currentUser?.name || 'System Master Disburser'
+            disbursedBy: currentUser?.name || 'System Master Disburser',
+            manualStatusOverride: true
           };
           return updatedRecord;
         }
@@ -1079,7 +2090,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...existing,
       status: 'PAID' as const,
       paymentDate: new Date().toISOString().split('T')[0],
-      disbursedBy: currentUser?.name || 'System Master Disburser'
+      disbursedBy: currentUser?.name || 'System Master Disburser',
+      manualStatusOverride: true
     } : undefined);
 
     if (target) {
@@ -1098,15 +2110,59 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const syncEmployeeToPayroll = async (
     emp: Employee,
-    cycleMonth: string = 'October',
+    cycleMonth?: string,
     cycleYear: number = 2026
   ): Promise<PayrollRecord> => {
-    const basic = Number(emp.compensation?.basic) || 0;
+    const fullName = `${emp.firstName} ${emp.lastName}`.trim() || emp.id;
+    const lowerName = fullName.toLowerCase();
+    const lowerEmail = (emp.email || '').trim().toLowerCase();
+    const upperEmpId = (emp.id || '').trim().toUpperCase();
+
+    // Do not generate or sync payslips for MOD007, legacy MOD008/MOD0090, Tony Stark, Piu Roy, intermediate MOD01, or deleted employees
+    if (
+      lowerName.includes('tony stark') ||
+      (lowerName.includes('tony') && lowerName.includes('stark')) ||
+      lowerName.includes('piu roy') ||
+      (lowerName.includes('piu') && lowerName.includes('roy')) ||
+      upperEmpId === 'MOD007' ||
+      upperEmpId === 'MOD008' ||
+      upperEmpId === 'MOD0090' ||
+      upperEmpId === 'MOD01' ||
+      lowerEmail === 'ghoshdebrupa005@gmail.com' ||
+      lowerEmail.includes('tonystark') ||
+      lowerEmail.includes('tony.stark') ||
+      lowerEmail.includes('piuroy') ||
+      lowerEmail.includes('piu.roy') ||
+      isRecordDeleted(emp.id, emp.email)
+    ) {
+      return {} as PayrollRecord;
+    }
+
+    const ALL_MONTHS = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December'
+    ];
+    const targetMonths = cycleMonth ? [cycleMonth] : ALL_MONTHS;
+
+    const isModela = lowerName === 'modela tech' || lowerEmail === 'modelatech2026@gmail.com';
+    const basic = isModela ? 95000 : (Number(emp.compensation?.basic) || 50000);
     const hra = Number(emp.compensation?.allowanceBreakdown?.hra) || 0;
     const medical = Number(emp.compensation?.allowanceBreakdown?.medical) || 0;
     const special = Number(emp.compensation?.allowanceBreakdown?.special) || 0;
     const internet = Number(emp.compensation?.allowanceBreakdown?.internet) || 0;
-    const totalAllowances = hra + medical + special + internet || (Number(emp.compensation?.allowances) || 0);
+    const totalAllowances = isModela
+      ? 30000
+      : (hra + medical + special + internet || (Number(emp.compensation?.allowances) || 15000));
 
     const pt = Number(emp.compensation?.deductionBreakdown?.professionalTax) || 200;
     const pf = Number(emp.compensation?.deductionBreakdown?.pfContribution) || 1800;
@@ -1116,55 +2172,90 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const grossSalary = basic + totalAllowances;
     const baseNet = grossSalary - standardDeductions;
 
-    const recordId = `PAY-${cycleYear}-${cycleMonth.substring(0, 3).toUpperCase()}-${emp.id}`;
-    const existing = payroll.find(p => p.id === recordId || (p.employeeId === emp.id && p.month === cycleMonth && p.year === cycleYear));
+    const generatedRecords: PayrollRecord[] = [];
+    const oldIdsToDelete: string[] = [];
 
-    const lopDays = existing?.lopDays || 0;
-    const lopAmount = +( (baseNet / 30) * lopDays ).toFixed(2);
-    const totalDeductions = standardDeductions + lopAmount;
-    const netSalary = +(grossSalary - totalDeductions).toFixed(2);
+    targetMonths.forEach(m => {
+      const monthIdx = ALL_MONTHS.findIndex(item => item.toLowerCase() === m.toLowerCase());
+      const monthNumberStr = String((monthIdx >= 0 ? monthIdx : new Date().getMonth()) + 1).padStart(2, '0');
+      const defaultRecordId = `PAY-${cycleYear}-${m.substring(0, 3).toUpperCase()}-${emp.id}`;
+      const targetPersonKey = getPayrollPersonKey({ employeeName: fullName, employeeId: emp.id, id: defaultRecordId });
+      const existing = payroll.find(
+        p =>
+          p.month?.toLowerCase() === m.toLowerCase() &&
+          Number(p.year) === Number(cycleYear) &&
+          (p.id === defaultRecordId ||
+            p.employeeId?.toUpperCase() === upperEmpId ||
+            getPayrollPersonKey(p) === targetPersonKey)
+      );
 
-    const updatedPayroll: PayrollRecord = {
-      id: existing?.id || recordId,
-      employeeId: emp.id,
-      employeeName: `${emp.firstName} ${emp.lastName}`.trim() || emp.id,
-      month: existing?.month || cycleMonth,
-      year: existing?.year || cycleYear,
-      basicSalary: basic,
-      allowances: totalAllowances,
-      deductions: totalDeductions,
-      grossSalary,
-      netSalary,
-      status: existing?.status || 'PAID',
-      paymentDate: existing?.paymentDate || `${cycleYear}-${String(new Date().getMonth() + 1).padStart(2, '0')}-01`,
-      disbursedBy: existing?.disbursedBy || 'System Master Disburser',
-      lopDays,
-      lopAmount,
-      pan: emp.pan || existing?.pan,
-      bankAccount: emp.bankAccount || existing?.bankAccount,
-      allowanceBreakdown: {
-        hra: hra || Math.round(totalAllowances * 0.4),
-        medical: medical || Math.round(totalAllowances * 0.15),
-        special: special || Math.round(totalAllowances * 0.35),
-        internet: internet || Math.max(0, totalAllowances - Math.round(totalAllowances * 0.9))
-      },
-      deductionBreakdown: {
-        professionalTax: pt,
-        pfContribution: pf,
-        groupHealthInsurance: health,
-        lop: lopAmount
+      const isCanonicalExisting = existing && /^PAY-\d{4}-\d{2}-\d{2}$/.test(existing.id);
+      const finalRecordId = isCanonicalExisting ? existing!.id : defaultRecordId;
+      if (existing && existing.id !== finalRecordId) {
+        oldIdsToDelete.push(existing.id);
       }
-    };
+
+      const lopDays = existing?.lopDays || 0;
+      const lopAmount = +((baseNet / 30) * lopDays).toFixed(2);
+      const totalDeductions = standardDeductions + lopAmount;
+      const netSalary = +(grossSalary - totalDeductions).toFixed(2);
+
+      const isNovDec = isNovDecMonth(m);
+      const defaultStatus: 'PAID' | 'UNPAID' = isNovDec ? 'UNPAID' : 'PAID';
+      const finalStatus: 'PAID' | 'UNPAID' = existing?.manualStatusOverride
+        ? (existing.status === 'UNPAID' ? 'UNPAID' : 'PAID')
+        : defaultStatus;
+
+      const updatedPayroll: PayrollRecord = {
+        id: finalRecordId,
+        employeeId: emp.id,
+        employeeName: fullName,
+        month: existing?.month || m,
+        year: existing?.year || cycleYear,
+        basicSalary: basic,
+        allowances: totalAllowances,
+        deductions: totalDeductions,
+        grossSalary,
+        netSalary,
+        status: finalStatus,
+        paymentDate: finalStatus === 'PAID' ? (existing?.paymentDate || `${cycleYear}-${monthNumberStr}-01`) : '',
+        disbursedBy: finalStatus === 'PAID' ? (existing?.disbursedBy || 'System Master Disburser') : '',
+        lopDays,
+        lopAmount,
+        pan: emp.pan || existing?.pan,
+        bankAccount: emp.bankAccount || existing?.bankAccount,
+        ...(existing?.manualStatusOverride ? { manualStatusOverride: true } : {}),
+        allowanceBreakdown: {
+          hra: hra || Math.round(totalAllowances * 0.4),
+          medical: medical || Math.round(totalAllowances * 0.15),
+          special: special || Math.round(totalAllowances * 0.35),
+          internet: internet || Math.max(0, totalAllowances - Math.round(totalAllowances * 0.9))
+        },
+        deductionBreakdown: {
+          professionalTax: pt,
+          pfContribution: pf,
+          groupHealthInsurance: health,
+          lop: lopAmount
+        }
+      };
+
+      generatedRecords.push(updatedPayroll);
+    });
+
+    const targetMonthSet = new Set(targetMonths.map(m => m.toLowerCase()));
+    const samplePersonKey = getPayrollPersonKey({ employeeName: fullName, employeeId: emp.id });
 
     setPayroll(prev => {
-      const idx = prev.findIndex(p => p.id === updatedPayroll.id);
-      let next: PayrollRecord[];
-      if (idx >= 0) {
-        next = [...prev];
-        next[idx] = updatedPayroll;
-      } else {
-        next = [updatedPayroll, ...prev];
-      }
+      const filtered = prev.filter(
+        p =>
+          !(
+            p.month &&
+            targetMonthSet.has(p.month.toLowerCase()) &&
+            Number(p.year) === Number(cycleYear) &&
+            (p.employeeId?.toUpperCase() === upperEmpId || getPayrollPersonKey(p) === samplePersonKey)
+          )
+      );
+      const next = enforceMonthPayrollRules([...generatedRecords, ...filtered]);
       try {
         localStorage.setItem(STORAGE_KEYS.PAYROLL, JSON.stringify(next));
       } catch {}
@@ -1172,13 +2263,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     try {
-      const cleanDoc = cleanFirestoreData(updatedPayroll);
-      await setDoc(doc(db, 'payroll', updatedPayroll.id), cleanDoc, { merge: true });
+      for (const oldId of oldIdsToDelete) {
+        await deleteDoc(doc(db, 'payroll', oldId)).catch(() => {});
+      }
+      await Promise.all(
+        generatedRecords.map(rec => {
+          const cleanDoc = cleanFirestoreData(rec);
+          return setDoc(doc(db, 'payroll', rec.id), cleanDoc, { merge: true }).catch(() => {});
+        })
+      );
     } catch (e) {
       console.warn('Firestore payroll write error:', e);
     }
 
-    return updatedPayroll;
+    return generatedRecords.find(r => r.month.toLowerCase() === 'october') || generatedRecords[0] || ({} as PayrollRecord);
   };
 
   const updatePayrollRecord = async (
@@ -1268,35 +2366,61 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const togglePayrollStatus = async (id: string, fallbackRecord?: PayrollRecord): Promise<boolean> => {
     // 1. Synchronously find existing record or fallback
-    const existing = payroll.find(p => p.id === id) || fallbackRecord;
+    const targetPersonKey = fallbackRecord ? getPayrollPersonKey(fallbackRecord) : '';
+    const existing =
+      payroll.find(
+        p =>
+          p.id === id ||
+          (fallbackRecord &&
+            p.month?.toLowerCase() === fallbackRecord.month?.toLowerCase() &&
+            Number(p.year) === Number(fallbackRecord.year) &&
+            getPayrollPersonKey(p) === targetPersonKey)
+      ) || fallbackRecord;
     if (!existing) {
       return false;
     }
 
-    // Requirement 1: HR can't change the status paid to unpaid
-    const isSuperAdminOrExec =
+    const canManagePayrollStatus =
       currentUser?.role === 'SUPER_ADMIN' ||
+      currentUser?.role === 'DIRECTOR' ||
       currentUser?.role === 'EXECUTIVE_DIRECTOR' ||
+      currentUser?.role === 'HR' ||
+      currentUser?.role === 'HR_MANAGER' ||
+      currentUser?.role === 'MANAGER' ||
       currentUser?.email === 'sushovand@modelatech.com' ||
       currentUser?.email === 'sushoovandas@gmail.com' ||
       currentUser?.email === 'modelatech2026@gmail.com';
 
-    if (existing.status === 'PAID' && !isSuperAdminOrExec && currentUser?.role === 'HR_MANAGER') {
-      showToast('Action Restricted', 'HR Managers cannot change status from PAID to UNPAID. Super Admin clearance required.', 'error');
+    if (!canManagePayrollStatus) {
+      showToast('Action Restricted', 'Only Super Admin, Director, HR, or Manager can update payroll status.', 'error');
       return false;
     }
 
     const nextStatus: 'PAID' | 'UNPAID' = existing.status === 'PAID' ? 'UNPAID' : 'PAID';
     const paymentDate = nextStatus === 'PAID' ? (existing.paymentDate || new Date().toISOString().split('T')[0]) : '';
+    const disbursedBy = nextStatus === 'PAID' ? (currentUser?.name || 'System Master Disburser') : '';
+    const canonicalDocId = existing.id || id;
     const updatedRecord: PayrollRecord = {
       ...existing,
+      id: canonicalDocId,
       status: nextStatus,
-      paymentDate
+      paymentDate,
+      disbursedBy,
+      manualStatusOverride: true
     };
+
+    const recordPersonKey = getPayrollPersonKey(updatedRecord);
 
     // 2. Update React state
     setPayroll(prev => {
-      const idx = prev.findIndex(p => p.id === id);
+      const idx = prev.findIndex(
+        p =>
+          p.id === canonicalDocId ||
+          p.id === id ||
+          (p.month?.toLowerCase() === updatedRecord.month?.toLowerCase() &&
+            Number(p.year) === Number(updatedRecord.year) &&
+            getPayrollPersonKey(p) === recordPersonKey)
+      );
       let next: PayrollRecord[];
       if (idx >= 0) {
         next = [...prev];
@@ -1315,7 +2439,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const currentSaved = localStorage.getItem(STORAGE_KEYS.PAYROLL);
       let list: PayrollRecord[] = currentSaved ? JSON.parse(currentSaved) : [];
       if (!Array.isArray(list)) list = [];
-      const i = list.findIndex(p => p.id === id);
+      const i = list.findIndex(
+        p =>
+          p.id === canonicalDocId ||
+          p.id === id ||
+          (p.month?.toLowerCase() === updatedRecord.month?.toLowerCase() &&
+            Number(p.year) === Number(updatedRecord.year) &&
+            getPayrollPersonKey(p) === recordPersonKey)
+      );
       if (i >= 0) {
         list[i] = updatedRecord;
       } else {
@@ -1327,7 +2458,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // 4. Persist to Firestore database
     try {
       const cleanDoc = cleanFirestoreData(updatedRecord);
-      await setDoc(doc(db, 'payroll', id), cleanDoc, { merge: true });
+      await setDoc(doc(db, 'payroll', canonicalDocId), cleanDoc, { merge: true });
+      if (id !== canonicalDocId) {
+        await setDoc(doc(db, 'payroll', id), cleanDoc, { merge: true });
+      }
     } catch (e) {
       console.warn('Firestore toggle payroll status error:', e);
     }

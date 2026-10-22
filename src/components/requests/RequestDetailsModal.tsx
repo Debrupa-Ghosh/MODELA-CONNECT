@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
+import { canUserApproveRequest } from '../../types';
 import {
   X,
   CheckCircle2,
@@ -21,7 +22,7 @@ import {
 
 export const RequestDetailsModal: React.FC = () => {
   const { selectedStaffRequest, isDetailsModalOpen, closeRequestDetails, updateStaffRequestStatus, showToast } = useApp();
-  const { isAdmin } = useAuth();
+  const { isAdmin, currentUser, hasFullAccess } = useAuth();
   const [rejectReason, setRejectReason] = useState('');
   const [showRejectForm, setShowRejectForm] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -292,26 +293,36 @@ export const RequestDetailsModal: React.FC = () => {
               Close
             </button>
 
-            {req.status === 'PENDING' && isAdmin && (
+            {req.status === 'PENDING' && (hasFullAccess || isAdmin) && (
               <>
-                {!showRejectForm && (
-                  <button
-                    onClick={() => setShowRejectForm(true)}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-rose-950/50 hover:bg-rose-900/60 text-rose-300 border border-rose-800/80 transition-colors cursor-pointer"
-                  >
-                    <XCircle className="w-3.5 h-3.5" />
-                    Reject Request
-                  </button>
-                )}
+                {canUserApproveRequest(currentUser?.role, req.type) ? (
+                  <>
+                    {!showRejectForm && (
+                      <button
+                        onClick={() => setShowRejectForm(true)}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl bg-rose-950/50 hover:bg-rose-900/60 text-rose-300 border border-rose-800/80 transition-colors cursor-pointer"
+                      >
+                        <XCircle className="w-3.5 h-3.5" />
+                        Reject Request
+                      </button>
+                    )}
 
-                <button
-                  onClick={handleApprove}
-                  disabled={isProcessing}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-md transition-all cursor-pointer"
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  {isProcessing ? 'Approving...' : 'Approve Request'}
-                </button>
+                    <button
+                      onClick={handleApprove}
+                      disabled={isProcessing}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-md transition-all cursor-pointer"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      {isProcessing ? 'Approving...' : 'Approve Request'}
+                    </button>
+                  </>
+                ) : (
+                  <div className="text-xs text-amber-400 bg-amber-950/40 border border-amber-800/80 px-3 py-1.5 rounded-xl font-medium">
+                    {req.type === 'LEAVE'
+                      ? 'View Only • Only Manager can approve Leave Requests'
+                      : 'View Only • Administrative Approval Required'}
+                  </div>
+                )}
               </>
             )}
           </div>

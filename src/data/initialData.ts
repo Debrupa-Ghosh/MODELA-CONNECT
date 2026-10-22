@@ -12,8 +12,8 @@ export const INITIAL_USERS: User[] = [
     employeeId: "MOD000",
     designation: "Executive Director & Super Admin",
     department: "Executive Office",
-    requestedAt: "2026-09-20T08:00:00.000Z",
-    reviewedAt: "2026-09-20T08:00:00.000Z",
+    requestedAt: "2026-09-20T08:44:15.481Z",
+    reviewedAt: "2026-09-20T08:44:35.660Z",
     reviewedBy: "System Root"
   },
   {
@@ -74,7 +74,7 @@ export const INITIAL_USERS: User[] = [
     department: "Engineering",
     requestedAt: "2026-10-02T06:37:31.931Z",
     reviewedAt: "2026-10-02T06:37:42.653Z",
-    reviewedBy: "modelatech2026@gmail.com"
+    reviewedBy: "Sushoovan Das"
   },
   // Pending signup verification requests (4 requests matching Image 3!)
   {
@@ -91,17 +91,34 @@ export const INITIAL_USERS: User[] = [
     notificationUnread: true
   },
   {
-    id: "USR-PENDING-01",
-    uid: "USR-PENDING-01",
+    id: "USR-ADITI-008",
+    uid: "USR-ADITI-008",
     name: "Aditi Chakraborty",
     email: "aditichakraborty2005@gmail.com",
     avatar_url: "https://ui-avatars.com/api/?name=Aditi+Chakraborty&background=f59e0b&color=fff",
-    status: "PENDING",
-    role: null,
-    department: "Quality Assurance",
+    status: "APPROVED",
+    role: "EMPLOYEE",
+    employeeId: "MOD008",
     designation: "QA Engineer Candidate",
+    department: "Quality Assurance",
     requestedAt: "2026-10-01T14:30:00.000Z",
-    notificationUnread: true
+    reviewedAt: "2026-10-01T14:35:00.000Z",
+    reviewedBy: "System Root"
+  },
+  {
+    id: "USR-SURUPA-011",
+    uid: "USR-SURUPA-011",
+    name: "Debrupa Ghosh",
+    email: "surupa008@gmail.com",
+    avatar_url: "https://ui-avatars.com/api/?name=Debrupa+Ghosh&background=0284c7&color=fff",
+    status: "APPROVED",
+    role: "EMPLOYEE",
+    employeeId: "MOD011",
+    designation: "Staff Candidate",
+    department: "General Staff",
+    requestedAt: "2026-10-22T08:00:00.000Z",
+    reviewedAt: "2026-10-22T08:05:00.000Z",
+    reviewedBy: "System Root"
   },
   {
     id: "USR-QYG6APLC",
@@ -144,7 +161,7 @@ export const INITIAL_EMPLOYEES: Employee[] = [
     status: "ACTIVE",
     location: "San Francisco HQ",
     compensation: { basic: 95000, allowances: 30000 },
-    pan: "MODTK2026F",
+    pan: "MODTK2026A",
     bankAccount: "815801500000",
     avatar: "https://ui-avatars.com/api/?name=Modela+Tech&background=0284c7&color=fff"
   },
@@ -163,6 +180,34 @@ export const INITIAL_EMPLOYEES: Employee[] = [
     pan: "DASSV1989K",
     bankAccount: "815801500111",
     avatar: "https://ui-avatars.com/api/?name=Sushoovan+Das&background=3b82f6&color=fff"
+  },
+  {
+    id: "MOD008",
+    firstName: "Aditi",
+    lastName: "Chakraborty",
+    email: "aditichakraborty2005@gmail.com",
+    joiningDate: "2026-10-01",
+    designation: "QA Engineer Candidate",
+    phone: "",
+    department: "Quality Assurance",
+    status: "ACTIVE",
+    location: "San Francisco HQ",
+    compensation: { basic: 50000, allowances: 15000 },
+    avatar: "https://ui-avatars.com/api/?name=Aditi+Chakraborty&background=f59e0b&color=fff"
+  },
+  {
+    id: "MOD011",
+    firstName: "Debrupa",
+    lastName: "Ghosh",
+    email: "surupa008@gmail.com",
+    joiningDate: "2026-10-22",
+    designation: "Staff Candidate",
+    phone: "",
+    department: "General Staff",
+    status: "ACTIVE",
+    location: "San Francisco HQ",
+    compensation: { basic: 50000, allowances: 15000 },
+    avatar: "https://ui-avatars.com/api/?name=Debrupa+Ghosh&background=0284c7&color=fff"
   },
   {
     id: "MOD003",
@@ -363,35 +408,6 @@ export const INITIAL_PAYROLL: PayrollRecord[] = [
     }
   },
   {
-    id: "PAY-2026-09-04",
-    employeeId: "MOD007",
-    employeeName: "Debrupa Ghosh",
-    month: "September",
-    year: 2026,
-    basicSalary: 50000,
-    allowances: 14000,
-    deductions: 3700,
-    grossSalary: 64000,
-    netSalary: 60300,
-    status: "PAID",
-    paymentDate: "2026-09-30",
-    disbursedBy: "System Master Disburser",
-    lopDays: 0,
-    lopAmount: 0,
-    allowanceBreakdown: {
-      hra: 6000,
-      medical: 2000,
-      special: 4500,
-      internet: 1500
-    },
-    deductionBreakdown: {
-      professionalTax: 200,
-      pfContribution: 1800,
-      groupHealthInsurance: 1700,
-      lop: 0
-    }
-  },
-  {
     id: "PAY-2026-10-01",
     employeeId: "MOD001",
     employeeName: "Sushoovan Das",
@@ -421,16 +437,16 @@ export const INITIAL_PAYROLL: PayrollRecord[] = [
     }
   },
   {
-    id: "PAY-2026-10-04",
-    employeeId: "MOD007",
+    id: "PAY-2026-OCT-MOD011",
+    employeeId: "MOD011",
     employeeName: "Debrupa Ghosh",
     month: "October",
     year: 2026,
     basicSalary: 50000,
-    allowances: 14000,
+    allowances: 15000,
     deductions: 3700,
-    grossSalary: 64000,
-    netSalary: 60300,
+    grossSalary: 65000,
+    netSalary: 61300,
     status: "PAID",
     paymentDate: "2026-10-15",
     disbursedBy: "System Master Disburser",
@@ -438,8 +454,66 @@ export const INITIAL_PAYROLL: PayrollRecord[] = [
     lopAmount: 0,
     allowanceBreakdown: {
       hra: 6000,
-      medical: 2000,
-      special: 4500,
+      medical: 2250,
+      special: 5250,
+      internet: 1500
+    },
+    deductionBreakdown: {
+      professionalTax: 200,
+      pfContribution: 1800,
+      groupHealthInsurance: 1700,
+      lop: 0
+    }
+  },
+  {
+    id: "PAY-2026-NOV-MOD011",
+    employeeId: "MOD011",
+    employeeName: "Debrupa Ghosh",
+    month: "November",
+    year: 2026,
+    basicSalary: 50000,
+    allowances: 15000,
+    deductions: 3700,
+    grossSalary: 65000,
+    netSalary: 61300,
+    status: "UNPAID",
+    paymentDate: "",
+    disbursedBy: "",
+    lopDays: 0,
+    lopAmount: 0,
+    allowanceBreakdown: {
+      hra: 6000,
+      medical: 2250,
+      special: 5250,
+      internet: 1500
+    },
+    deductionBreakdown: {
+      professionalTax: 200,
+      pfContribution: 1800,
+      groupHealthInsurance: 1700,
+      lop: 0
+    }
+  },
+  {
+    id: "PAY-2026-DEC-MOD011",
+    employeeId: "MOD011",
+    employeeName: "Debrupa Ghosh",
+    month: "December",
+    year: 2026,
+    basicSalary: 50000,
+    allowances: 15000,
+    deductions: 3700,
+    grossSalary: 65000,
+    netSalary: 61300,
+    status: "UNPAID",
+    paymentDate: "",
+    disbursedBy: "",
+    lopDays: 0,
+    lopAmount: 0,
+    allowanceBreakdown: {
+      hra: 6000,
+      medical: 2250,
+      special: 5250,
       internet: 1500
     },
     deductionBreakdown: {

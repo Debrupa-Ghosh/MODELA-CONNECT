@@ -16,15 +16,22 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
   onClose
 }) => {
   const { updateEmployee, showToast } = useApp();
-  const { isSuperAdmin, isHRManager, isExecutiveDirector, currentUser } = useAuth();
+  const { hasFullAccess, isSuperAdmin, isHRManager, isExecutiveDirector, currentUser } = useAuth();
 
   const canEditCompensation =
+    hasFullAccess ||
     isSuperAdmin ||
     isHRManager ||
     currentUser?.role === 'SUPER_ADMIN' ||
+    currentUser?.role === 'DIRECTOR' ||
+    currentUser?.role === 'HR' ||
+    currentUser?.role === 'MANAGER' ||
     currentUser?.role === 'HR_MANAGER' ||
     isExecutiveDirector;
 
+  const canEditEmployeeId = canEditCompensation;
+
+  const [employeeId, setEmployeeId] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [joiningDate, setJoiningDate] = useState('');
@@ -50,6 +57,7 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
 
   useEffect(() => {
     if (employee) {
+      setEmployeeId(employee.id || '');
       setFirstName(employee.firstName || '');
       setLastName(employee.lastName || '');
       setJoiningDate(employee.joiningDate || '');
@@ -114,7 +122,14 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    await updateEmployee(employee.id, {
+    const cleanNewId = employeeId.trim().toUpperCase();
+    if (!cleanNewId) {
+      showToast('Validation Error', 'Employee ID cannot be empty.', 'error');
+      return;
+    }
+
+    const isSuccess = await updateEmployee(employee.id, {
+      id: cleanNewId,
       firstName: firstName.trim(),
       lastName: lastName.trim(),
       joiningDate: joiningDate.trim(),
@@ -145,8 +160,9 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
       }
     });
 
-    showToast('Employee & Payroll Updated', `Updated profile and synchronized compensation for ${firstName || 'Employee'} (${employee.id}) to master payroll ledger.`);
-    onClose();
+    if (isSuccess) {
+      onClose();
+    }
   };
 
   return (
@@ -156,10 +172,24 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[#1E293B] pb-4">
           <div className="flex items-center gap-3">
-            <div className="bg-[#001E3D] border border-[#00558F] px-3 py-1.5 rounded-xl font-mono text-sm font-bold text-[#00E5FF]">
-              {employee.id}
-            </div>
             <div>
+              <label htmlFor="edit-emp-id-input" className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block mb-1">
+                Employee ID {canEditEmployeeId && <span className="text-[#00E5FF] font-semibold">(Editable)</span>}
+              </label>
+              <div className="flex items-center gap-1.5">
+                <input
+                  id="edit-emp-id-input"
+                  type="text"
+                  disabled={!canEditEmployeeId}
+                  value={employeeId}
+                  onChange={e => setEmployeeId(e.target.value.toUpperCase().replace(/\s+/g, ''))}
+                  placeholder="e.g. MOD000"
+                  className="w-28 px-3 py-1.5 bg-[#001E3D] border border-[#00558F] focus:border-[#00E5FF] focus:ring-1 focus:ring-[#00E5FF] rounded-xl font-mono text-sm font-bold text-[#00E5FF] tracking-wider outline-none disabled:opacity-60 uppercase shadow-inner"
+                  title="Super Admin or HR can edit the Employee ID"
+                />
+              </div>
+            </div>
+            <div className="pt-2">
               <h3 className="text-lg font-bold text-white">Edit Employee Profile</h3>
               <p className="text-xs text-slate-400">
                 Super Admin, Executive Director, or HR Manager clearance

@@ -1,21 +1,42 @@
-export type UserRole = 'SUPER_ADMIN' | 'EXECUTIVE_DIRECTOR' | 'HR_MANAGER' | 'EMPLOYEE';
+export type UserRole =
+  | 'SUPER_ADMIN'
+  | 'DIRECTOR'
+  | 'HR'
+  | 'MANAGER'
+  | 'EMPLOYEE'
+  | 'EXECUTIVE_DIRECTOR'
+  | 'HR_MANAGER';
 
 export const USER_ROLES: { role: UserRole; label: string; description: string }[] = [
   { role: 'SUPER_ADMIN', label: 'Super Admin', description: 'Full access to all systems, settings, and administration.' },
-  { role: 'EXECUTIVE_DIRECTOR', label: 'Executive Director', description: 'Full administrative access across all organizational enclaves.' },
-  { role: 'HR_MANAGER', label: 'HR Manager', description: 'Full access to human resources, workforce, and payroll management.' },
-  { role: 'EMPLOYEE', label: 'Employee', description: 'Limited self-service access to dashboard, requests, and attendance.' },
+  { role: 'DIRECTOR', label: 'Director', description: 'Full administrative access across all organizational enclaves.' },
+  { role: 'HR', label: 'HR', description: 'Full access to human resources, workforce, and payroll management.' },
+  { role: 'MANAGER', label: 'Manager', description: 'Full management access and approval authority for Leave Requests.' },
+  { role: 'EMPLOYEE', label: 'Employee', description: 'Limited self-service access to dashboard and personal requests.' },
 ];
+
+export function normalizeRole(role?: UserRole | string | null): 'SUPER_ADMIN' | 'DIRECTOR' | 'HR' | 'MANAGER' | 'EMPLOYEE' {
+  if (!role) return 'EMPLOYEE';
+  const r = role.toUpperCase().trim();
+  if (r === 'SUPER_ADMIN' || r === 'SUPER ADMIN') return 'SUPER_ADMIN';
+  if (r === 'DIRECTOR' || r === 'EXECUTIVE_DIRECTOR' || r === 'EXECUTIVE DIRECTOR') return 'DIRECTOR';
+  if (r === 'HR' || r === 'HR_MANAGER' || r === 'HR MANAGER') return 'HR';
+  if (r === 'MANAGER') return 'MANAGER';
+  return 'EMPLOYEE';
+}
 
 export function getRoleLabel(role?: UserRole | string | null): string {
   if (!role) return 'Employee';
-  switch (role) {
+  const norm = normalizeRole(role);
+  switch (norm) {
     case 'SUPER_ADMIN':
       return 'Super Admin';
-    case 'EXECUTIVE_DIRECTOR':
-      return 'Executive Director';
-    case 'HR_MANAGER':
-      return 'HR Manager';
+    case 'DIRECTOR':
+      return 'Director';
+    case 'HR':
+      return 'HR';
+    case 'MANAGER':
+      return 'Manager';
     case 'EMPLOYEE':
       return 'Employee';
     default:
@@ -24,7 +45,33 @@ export function getRoleLabel(role?: UserRole | string | null): string {
 }
 
 export function hasFullAccessRole(role?: UserRole | string | null): boolean {
-  return role === 'SUPER_ADMIN' || role === 'EXECUTIVE_DIRECTOR' || role === 'HR_MANAGER';
+  const norm = normalizeRole(role);
+  // Super Admin, Director, HR, Manager will have all access; only Employee will have limited access.
+  return norm === 'SUPER_ADMIN' || norm === 'DIRECTOR' || norm === 'HR' || norm === 'MANAGER';
+}
+
+/**
+ * Requirement 2:
+ * Only Leave Request can be approved by Manager but the request can be viewed by HR,Super Admin,Director.
+ */
+export function canUserApproveRequest(role?: UserRole | string | null, requestType?: StaffRequestType | string): boolean {
+  if (!role) return false;
+  const norm = normalizeRole(role);
+  const isLeave = (requestType || '').toUpperCase() === 'LEAVE';
+
+  // Manager can ONLY approve Leave Requests
+  if (norm === 'MANAGER') {
+    return isLeave;
+  }
+
+  // Super Admin, Director, HR can view Leave Requests, but CANNOT approve them (only Manager can approve Leave Requests).
+  // They can approve all other request types (Expense, Equipment, Shift, Travel, Training, etc.).
+  if (norm === 'SUPER_ADMIN' || norm === 'DIRECTOR' || norm === 'HR') {
+    return !isLeave;
+  }
+
+  // Employees have limited self-service access and cannot approve requests
+  return false;
 }
 
 export type UserStatus = 'APPROVED' | 'PENDING' | 'REJECTED';
@@ -172,6 +219,7 @@ export interface PayrollRecord {
   deductionBreakdown?: EmployeeDeductions & { lop?: number };
   pan?: string;
   bankAccount?: string;
+  manualStatusOverride?: boolean;
 }
 
 export interface AuditLog {

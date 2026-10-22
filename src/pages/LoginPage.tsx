@@ -14,7 +14,13 @@ export const LoginPage: React.FC = () => {
   // 'STEP_3_WAITING' -> Request Sent, Status: Pending
   const [step, setStep] = useState<'STEP_1_LANDING' | 'STEP_2_EMAIL_INPUT' | 'STEP_3_WAITING'>('STEP_1_LANDING');
 
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(() => {
+    try {
+      return localStorage.getItem('modela_pending_signup_email') || '';
+    } catch {
+      return '';
+    }
+  });
   const [fullName, setFullName] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -25,6 +31,27 @@ export const LoginPage: React.FC = () => {
       navigate('/dashboard', { replace: true });
     }
   }, [currentUser, navigate]);
+
+  // Real-time sync across devices: as soon as Admin accepts the request on another device,
+  // the live Firestore snapshot updates users, which immediately logs this device in!
+  React.useEffect(() => {
+    const savedPending = localStorage.getItem('modela_pending_signup_email');
+    const waitingEmail = step === 'STEP_3_WAITING' ? (email || savedPending) : savedPending;
+    if (!waitingEmail) return;
+    const clean = waitingEmail.trim().toLowerCase();
+
+    const matched = users.find(u => u.email?.toLowerCase() === clean);
+    if (matched && matched.status === 'APPROVED') {
+      try {
+        localStorage.removeItem('modela_pending_signup_email');
+      } catch {}
+      const ok = loginAs(clean);
+      if (ok) {
+        showToast('Access Approved', `Welcome ${matched.name || 'Staff'}! Your sign-up request has been accepted.`);
+        navigate('/dashboard', { replace: true });
+      }
+    }
+  }, [users, email, step, loginAs, navigate, showToast]);
 
   const handleGoogleClick = () => {
     setErrorMsg('');
@@ -45,39 +72,65 @@ export const LoginPage: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      // 1. Check if user already exists in the system
+      // 1. Check if user already exists in the active directory
       const existing = users.find(u => u.email.toLowerCase() === cleanEmail);
 
       if (existing) {
         if (existing.status === 'APPROVED') {
+          try {
+            localStorage.removeItem('modela_pending_signup_email');
+          } catch {}
           const success = loginAs(cleanEmail);
           if (success) {
             navigate('/dashboard', { replace: true });
             return;
           }
         } else if (existing.status === 'PENDING') {
-          // Status is PENDING -> Show Image 2: Request Sent (Status: Pending)
+          // Status is PENDING -> Show Request Sent (Status: Pending)
+          try {
+            localStorage.setItem('modela_pending_signup_email', cleanEmail);
+          } catch {}
           setStep('STEP_3_WAITING');
-          return;
-        } else if (existing.status === 'REJECTED') {
-          setErrorMsg('This account request has been rejected by security administration.');
           return;
         }
       }
 
-      // If new sign up request from a new mail id, require full name
+      // Direct Instant Access for default Super Admin Modela Tech if not in pending flow
+      if (cleanEmail === 'modelatech2026@gmail.com') {
+        try {
+          localStorage.removeItem('modela_pending_signup_email');
+        } catch {}
+        const ok = loginAs(cleanEmail);
+        if (ok) {
+          navigate('/dashboard', { replace: true });
+          return;
+        }
+      }
+
+      // If new sign up request (including a previously deleted user re-requesting access), require full name
       if (!cleanName) {
         setErrorMsg('Please enter your full name.');
         return;
       }
 
-      // 2. New sign up request from a new mail id -> Queued for review, shows Image 2!
+      // 2. Submit sign-up request -> Queued for review, transitions to STEP_3_WAITING!
+      try {
+        localStorage.setItem('modela_pending_signup_email', cleanEmail);
+      } catch {}
+
       const res = submitSignupRequest({
         email: cleanEmail,
         name: cleanName
       });
 
       if (res.success) {
+        if (res.isPending === false && res.user?.status === 'APPROVED') {
+          const ok = loginAs(cleanEmail);
+          if (ok) {
+            navigate('/dashboard', { replace: true });
+            return;
+          }
+        }
         setStep('STEP_3_WAITING');
       } else {
         setErrorMsg(res.message);
@@ -193,36 +246,37 @@ export const LoginPage: React.FC = () => {
         </div>
       )}
 
-      {/* STEP 3: WAITING FOR ADMIN APPROVAL (EXACT MATCH WITH IMAGE 2) */}
+      {/* STEP 3: WAITING FOR ADMIN APPROVAL (EXACT MATCH WITH REFERENCE IMAGE) */}
       {step === 'STEP_3_WAITING' && (
-        <div className="w-full max-w-[440px] bg-[#111A2E] border border-[#1E2D48] rounded-3xl p-8 sm:p-10 shadow-2xl text-center animate-in fade-in zoom-in-95 duration-150">
+        <div className="w-full max-w-[440px] bg-[#111A2E] border border-[#1E2D48] rounded-3xl p-8 sm:p-10 shadow-2xl flex flex-col items-center text-center animate-in fade-in zoom-in-95 duration-150">
           {/* Status: Pending Badge */}
-          <div className="flex justify-center mb-6">
-            <span className="px-4 py-1 rounded-full text-xs font-semibold border border-amber-500/80 text-amber-500 bg-[#241705]">
-              Status: Pending
-            </span>
+          <div className="inline-flex items-center justify-center px-4 py-1 rounded-full text-xs sm:text-sm font-semibold border border-[#B45309] text-[#F59E0B] bg-[#1F1404] select-none">
+            Status: Pending
           </div>
 
           {/* Heading */}
-          <h2 className="text-2xl sm:text-3xl font-bold text-white tracking-tight mb-3">
+          <h2 className="text-3xl font-extrabold text-white tracking-tight mt-6 mb-3">
             Request Sent
           </h2>
 
           {/* Subtext */}
-          <p className="text-slate-300 text-sm leading-relaxed max-w-[320px] mx-auto mb-8">
+          <p className="text-slate-300 text-sm sm:text-[15px] leading-relaxed max-w-[300px] mx-auto mb-8">
             Your request has been sent to the HR Admin. Please wait for approval.
           </p>
 
-          {/* Back to Login Button */}
+          {/* Single Back to Login Button */}
           <button
             type="button"
             onClick={() => {
+              try {
+                localStorage.removeItem('modela_pending_signup_email');
+              } catch {}
               setErrorMsg('');
               setEmail('');
               setFullName('');
               setStep('STEP_1_LANDING');
             }}
-            className="w-full py-3.5 px-4 bg-[#1E2D4A] hover:bg-[#25375A] text-white font-semibold rounded-xl text-sm transition-colors cursor-pointer shadow-sm"
+            className="w-full py-3.5 px-4 bg-[#1E2D4A] hover:bg-[#25375A] active:bg-[#18253E] text-white font-medium rounded-xl text-sm sm:text-base transition-colors cursor-pointer shadow-sm"
           >
             Back to Login
           </button>

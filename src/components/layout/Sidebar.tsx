@@ -38,22 +38,12 @@ export const Sidebar: React.FC = () => {
   const pendingStaffCount = staffRequests.filter(r => r.status === 'PENDING').length;
   const pendingUsersCount = pendingUsers.length;
 
-  // Limited access navigation for Employee role (Image 1)
+  // Limited access navigation for Employee role
   const employeeNavItems: NavItem[] = [
     {
       to: '/dashboard',
       label: 'Dashboard',
       icon: LayoutDashboard
-    },
-    {
-      to: '/attendance',
-      label: 'Attendance',
-      icon: CalendarCheck
-    },
-    {
-      to: '/facial-verification',
-      label: 'Facial Verification',
-      icon: ScanFace
     },
     {
       to: '/requests',
@@ -69,7 +59,7 @@ export const Sidebar: React.FC = () => {
     }
   ];
 
-  // Full access navigation for Super Admin, Executive Director, and HR Manager (Images 3 & 4)
+  // Full access navigation for Super Admin, Director, HR, and Manager
   const fullAccessNavItems: NavItem[] = [
     {
       to: '/dashboard',
@@ -94,16 +84,6 @@ export const Sidebar: React.FC = () => {
       to: '/onboarding',
       label: 'Onboarding',
       icon: UserPlus
-    },
-    {
-      to: '/attendance',
-      label: 'Attendance',
-      icon: CalendarCheck
-    },
-    {
-      to: '/facial-verification',
-      label: 'Facial Verification',
-      icon: ScanFace
     },
     {
       to: '/payroll',
@@ -133,10 +113,15 @@ export const Sidebar: React.FC = () => {
       icon: Terminal,
       badge: pendingUsersCount > 0 ? `${pendingUsersCount} Pending` : undefined,
       badgeStyle: 'bg-[#FACC15] text-slate-900 font-extrabold'
+    },
+    {
+      to: '/settings',
+      label: 'Settings',
+      icon: Settings
     }
   ];
 
-  const navItems = hasFullAccess ? fullAccessNavItems : employeeNavItems;
+  const navItems = fullAccessNavItems;
 
   const employeeId = currentUser?.employeeId || 'MOD000';
   const roleDisplay = getRoleLabel(currentUser?.role);

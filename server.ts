@@ -42,8 +42,8 @@ let users: ServerUser[] = [
     employeeId: "MOD000",
     designation: "Executive Director & Super Admin",
     department: "Executive Office",
-    requestedAt: "2026-09-20T08:00:00.000Z",
-    reviewedAt: "2026-09-20T08:00:00.000Z",
+    requestedAt: "2026-09-20T08:44:15.481Z",
+    reviewedAt: "2026-09-20T08:44:35.660Z",
     reviewedBy: "System Root"
   },
   {
@@ -89,20 +89,37 @@ let users: ServerUser[] = [
     department: "Engineering",
     requestedAt: "2026-10-02T06:37:31.931Z",
     reviewedAt: "2026-10-02T06:37:42.653Z",
-    reviewedBy: "modelatech2026@gmail.com"
+    reviewedBy: "Sushoovan Das"
   },
   {
-    id: "USR-PENDING-01",
-    uid: "USR-PENDING-01",
+    id: "USR-ADITI-008",
+    uid: "USR-ADITI-008",
     name: "Aditi Chakraborty",
     email: "aditichakraborty2005@gmail.com",
     avatar_url: "https://ui-avatars.com/api/?name=Aditi+Chakraborty&background=f59e0b&color=fff",
-    status: "PENDING",
-    role: null,
-    department: "Quality Assurance",
+    status: "APPROVED",
+    role: "EMPLOYEE",
+    employeeId: "MOD008",
     designation: "QA Engineer Candidate",
+    department: "Quality Assurance",
     requestedAt: "2026-10-01T14:30:00.000Z",
-    notificationUnread: true
+    reviewedAt: "2026-10-01T14:35:00.000Z",
+    reviewedBy: "System Root"
+  },
+  {
+    id: "USR-SURUPA-011",
+    uid: "USR-SURUPA-011",
+    name: "Debrupa Ghosh",
+    email: "surupa008@gmail.com",
+    avatar_url: "https://ui-avatars.com/api/?name=Debrupa+Ghosh&background=0284c7&color=fff",
+    status: "APPROVED",
+    role: "EMPLOYEE",
+    employeeId: "MOD011",
+    designation: "Staff Candidate",
+    department: "General Staff",
+    requestedAt: "2026-10-22T08:00:00.000Z",
+    reviewedAt: "2026-10-22T08:05:00.000Z",
+    reviewedBy: "System Root"
   },
   {
     id: "USR-QYG6APLC",
@@ -145,6 +162,32 @@ let employees = [
     status: "ACTIVE",
     location: "San Francisco HQ",
     compensation: { basic: 85000, allowances: 25000 }
+  },
+  {
+    id: "MOD008",
+    firstName: "Aditi",
+    lastName: "Chakraborty",
+    email: "aditichakraborty2005@gmail.com",
+    joiningDate: "2026-10-01",
+    designation: "QA Engineer Candidate",
+    phone: "",
+    department: "Quality Assurance",
+    status: "ACTIVE",
+    location: "San Francisco HQ",
+    compensation: { basic: 50000, allowances: 15000 }
+  },
+  {
+    id: "MOD011",
+    firstName: "Debrupa",
+    lastName: "Ghosh",
+    email: "surupa008@gmail.com",
+    joiningDate: "2026-10-22",
+    designation: "Staff Candidate",
+    phone: "",
+    department: "General Staff",
+    status: "ACTIVE",
+    location: "San Francisco HQ",
+    compensation: { basic: 50000, allowances: 15000 }
   },
   {
     id: "MOD003",
@@ -313,7 +356,12 @@ app.post('/api/users/request', (req: Request, res: Response) => {
   if (!newUser || !newUser.email) {
     return res.status(400).json({ success: false, message: 'Invalid payload' });
   }
-  const existing = users.find(u => u.email.toLowerCase() === newUser.email.toLowerCase());
+  const emailLower = newUser.email.toLowerCase().trim();
+  if (['sushovand@modelatech.com', 'sushoovandas@gmail.com', 'modelatech2026@gmail.com'].includes(emailLower)) {
+    const sa = users.find(u => u.email.toLowerCase() === emailLower);
+    return res.json({ success: true, user: sa || newUser, message: 'Super Admin active' });
+  }
+  const existing = users.find(u => u.email.toLowerCase() === emailLower);
   if (existing) {
     return res.status(400).json({ success: false, message: 'User already exists' });
   }
@@ -322,16 +370,22 @@ app.post('/api/users/request', (req: Request, res: Response) => {
 });
 
 app.post('/api/users/approve', (req: Request, res: Response) => {
-  const { userId, role, reviewer, remarks } = req.body;
+  const { userId, email, role, reviewer, remarks, employeeId } = req.body;
   users = users.map(u => {
-    if (u.id === userId || u.uid === userId) {
+    const isMatch =
+      u.id === userId ||
+      u.uid === userId ||
+      (email && u.email?.toLowerCase() === email.toLowerCase());
+
+    if (isMatch) {
       return {
         ...u,
         status: 'APPROVED',
         role: role || 'EMPLOYEE',
+        employeeId: employeeId || u.employeeId,
         reviewedAt: new Date().toISOString(),
         reviewedBy: reviewer || 'Super Admin',
-        remarks: remarks || `Approved with role ${role}`
+        remarks: remarks || `Approved with role ${role || 'EMPLOYEE'}`
       };
     }
     return u;
@@ -376,6 +430,25 @@ app.post('/api/employees', (req: Request, res: Response) => {
   const newEmp = req.body;
   employees.unshift(newEmp);
   res.json({ success: true, employee: newEmp });
+});
+
+app.post('/api/employees/update-id', (req: Request, res: Response) => {
+  const { oldId, newId, employee, email } = req.body;
+  if (!newId) {
+    return res.status(400).json({ success: false, message: 'Invalid payload' });
+  }
+  const cleanEmail = email ? email.toLowerCase().trim() : (employee?.email ? employee.email.toLowerCase().trim() : '');
+  employees = employees.map(e =>
+    (e.id === oldId || (cleanEmail && e.email?.toLowerCase() === cleanEmail))
+      ? { ...(employee || e), id: newId }
+      : e
+  );
+  users = users.map(u =>
+    (u.employeeId === oldId || (cleanEmail && u.email?.toLowerCase() === cleanEmail))
+      ? { ...u, employeeId: newId }
+      : u
+  );
+  res.json({ success: true });
 });
 
 app.delete('/api/employees/:id', (req: Request, res: Response) => {

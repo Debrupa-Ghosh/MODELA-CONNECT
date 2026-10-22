@@ -39,17 +39,21 @@ const YEARS = Array.from({ length: 11 }, (_, i) => 2026 + i); // 2026 to 2036
 
 export const PayrollPage: React.FC = () => {
   const { payroll, employees, showToast, updatePayrollRecord, togglePayrollStatus } = useApp();
-  const { isSuperAdmin, isHRManager, isExecutiveDirector, currentUser } = useAuth();
-
-  const isSuperAdminOrExec =
-    isSuperAdmin ||
-    currentUser?.role === 'SUPER_ADMIN' ||
-    isExecutiveDirector;
+  const { isSuperAdmin, isDirector, isExecutiveDirector, isHR, isHRManager, isManager, currentUser, approvedUsers } = useAuth();
 
   const canEditPayroll =
-    isSuperAdminOrExec ||
+    isSuperAdmin ||
+    isDirector ||
+    isExecutiveDirector ||
+    isHR ||
     isHRManager ||
-    currentUser?.role === 'HR_MANAGER';
+    isManager ||
+    currentUser?.role === 'SUPER_ADMIN' ||
+    currentUser?.role === 'DIRECTOR' ||
+    currentUser?.role === 'EXECUTIVE_DIRECTOR' ||
+    currentUser?.role === 'HR' ||
+    currentUser?.role === 'HR_MANAGER' ||
+    currentUser?.role === 'MANAGER';
 
   // Filter state for months and years (2026-2036)
   const [selectedMonth, setSelectedMonth] = useState<string>('October');
@@ -70,30 +74,125 @@ export const PayrollPage: React.FC = () => {
   // Build unified payroll ledger for the selected cycle (combining stored records and active employees)
   const cycleRecords = useMemo(() => {
     const list: PayrollRecord[] = [];
-    const processedEmpIds = new Set<string>();
+    const processedPersonKeys = new Set<string>();
     const isNovDec = selectedMonth.toLowerCase() === 'november' || selectedMonth.toLowerCase() === 'december';
 
-    // 1. First add any existing stored payroll records for this month and year
+    const blockedDocIds = new Set([
+      'PAY-2026-OCT-MOD',
+      'PAY-2026-OCT-MOD0',
+      'PAY-2026-OCT-MOD00',
+      'PAY-2026-OCT-MOD000',
+      'PAY-2026-OCT-MOD0001',
+      'PAY-2026-OCT-MOD100',
+      'PAY-2026-OCT-MOD01',
+      'PAY-2026-OCT-MOD0090',
+      'PAY-2026-OCT-MOD008',
+      'PAY-2026-09-04',
+      'PAY-2026-10-04',
+      'PAY-2026-SEP-MOD007',
+      'PAY-2026-OCT-MOD007',
+      'PAY-2026-NOV-MOD007',
+      'PAY-2026-DEC-MOD007',
+      'PAY-2026-OCT-MOD001'
+    ]);
+
+    const isExcluded = (name?: string, empId?: string, docId?: string, email?: string) => {
+      const n = (name || '').trim().toLowerCase();
+      const id = (empId || '').trim().toUpperCase();
+      const dId = (docId || '').trim().toUpperCase();
+      const em = (email || '').trim().toLowerCase();
+
+      if (dId && blockedDocIds.has(dId)) return true;
+      if (
+        n.includes('tony stark') ||
+        (n.includes('tony') && n.includes('stark')) ||
+        n.includes('piu roy') ||
+        (n.includes('piu') && n.includes('roy')) ||
+        id === 'MOD007' ||
+        id === 'MOD008' ||
+        id === 'MOD0090' ||
+        dId === 'PAY-2026-09-04' ||
+        dId === 'PAY-2026-10-04' ||
+        dId.includes('MOD007') ||
+        dId.includes('MOD008') ||
+        dId.includes('MOD0090') ||
+        em === 'ghoshdebrupa005@gmail.com' ||
+        em.includes('tonystark') ||
+        em.includes('tony.stark') ||
+        em.includes('piuroy') ||
+        em.includes('piu.roy') ||
+        (em.includes('piu') && em.includes('roy')) ||
+        dId.includes('TONY') ||
+        dId.includes('STARK') ||
+        dId.includes('PIU')
+      ) {
+        return true;
+      }
+      if (id === 'MOD01' || dId.endsWith('-MOD01')) {
+        return true;
+      }
+      if (
+        n === 'modela tech' &&
+        (id === 'MOD' || id === 'MOD0' || id === 'MOD00' || id === 'MOD0001' || id === 'MOD100')
+      ) {
+        return true;
+      }
+      return false;
+    };
+
+    const getPersonKey = (name?: string, empId?: string, docId?: string, email?: string): string => {
+      const n = (name || '').trim().toLowerCase();
+      const id = (empId || '').trim().toUpperCase();
+      const dId = (docId || '').trim().toUpperCase();
+      const em = (email || '').trim().toLowerCase();
+
+      if (n === 'modela tech' || em === 'modelatech2026@gmail.com') return 'modela-tech';
+      if (n === 'sushoovan das' || em === 'sushovand@modelatech.com') return 'sushoovan-das';
+      if (n === 'debrupa ghosh') {
+        if (em === 'surupa008@gmail.com' || id === 'MOD011' || dId.endsWith('-MOD011')) {
+          return 'debrupa-ghosh-surupa008';
+        }
+        if (em === 'ghoshdebrupa005@gmail.com' || id === 'MOD007' || dId === 'PAY-2026-10-04' || dId === 'PAY-2026-09-04') {
+          return 'debrupa-ghosh-primary';
+        }
+        return `debrupa-ghosh-${id || em}`;
+      }
+      return id ? `id-${id}` : `name-${n}`;
+    };
+
+    // 1. First add any existing stored payroll records for this month and year (strictly 1 per distinct person)
     payroll.forEach(p => {
       const matchMonth = Boolean(p.month && selectedMonth && p.month.toLowerCase() === selectedMonth.toLowerCase());
       const matchYear = Number(p.year) === Number(selectedYear);
       if (matchMonth && matchYear) {
-        list.push(p);
-        if (p.employeeId) {
-          processedEmpIds.add(p.employeeId.toLowerCase());
+        if (isExcluded(p.employeeName, p.employeeId, p.id)) return;
+
+        const pKey = getPersonKey(p.employeeName, p.employeeId, p.id);
+        if (processedPersonKeys.has(pKey)) {
+          return;
         }
+
+        list.push(p);
+        processedPersonKeys.add(pKey);
       }
     });
 
     // 2. For any active employee without a stored record for this cycle, dynamically compute their row
-    // Rule: Jan to Oct mark all PAID, Nov to Dec mark all UNPAID
     employees.forEach(emp => {
-      if (!processedEmpIds.has(emp.id.toLowerCase()) && emp.status === 'ACTIVE') {
-        const basic = Number(emp.compensation?.basic) || 50000;
-        const hra = Number(emp.compensation?.allowanceBreakdown?.hra) || Math.round((emp.compensation?.allowances || 15000) * 0.4);
-        const medical = Number(emp.compensation?.allowanceBreakdown?.medical) || Math.round((emp.compensation?.allowances || 15000) * 0.15);
-        const special = Number(emp.compensation?.allowanceBreakdown?.special) || Math.round((emp.compensation?.allowances || 15000) * 0.35);
-        const internet = Number(emp.compensation?.allowanceBreakdown?.internet) || Math.max(0, (emp.compensation?.allowances || 15000) - (hra + medical + special));
+      const empFullName = `${emp.firstName} ${emp.lastName}`.trim() || emp.id;
+      if (isExcluded(empFullName, emp.id, undefined, emp.email)) return;
+
+      const pKey = getPersonKey(empFullName, emp.id, undefined, emp.email);
+      if (!processedPersonKeys.has(pKey) && emp.status === 'ACTIVE') {
+        processedPersonKeys.add(pKey);
+
+        const isModela = pKey === 'modela-tech';
+        const basic = isModela ? 95000 : (Number(emp.compensation?.basic) || 50000);
+        const rawAllowances = isModela ? 30000 : (Number(emp.compensation?.allowances) || 15000);
+        const hra = Number(emp.compensation?.allowanceBreakdown?.hra) || Math.round(rawAllowances * 0.4);
+        const medical = Number(emp.compensation?.allowanceBreakdown?.medical) || Math.round(rawAllowances * 0.15);
+        const special = Number(emp.compensation?.allowanceBreakdown?.special) || Math.round(rawAllowances * 0.35);
+        const internet = Number(emp.compensation?.allowanceBreakdown?.internet) || Math.max(0, rawAllowances - (hra + medical + special));
         const totalAllowances = hra + medical + special + internet;
 
         const pt = Number(emp.compensation?.deductionBreakdown?.professionalTax) || 200;
@@ -112,7 +211,60 @@ export const PayrollPage: React.FC = () => {
         list.push({
           id: `PAY-${selectedYear}-${selectedMonth.substring(0, 3).toUpperCase()}-${emp.id}`,
           employeeId: emp.id,
-          employeeName: `${emp.firstName} ${emp.lastName}`.trim() || emp.id,
+          employeeName: empFullName,
+          month: selectedMonth,
+          year: selectedYear,
+          basicSalary: basic,
+          allowances: totalAllowances,
+          deductions: standardDeductions,
+          grossSalary,
+          netSalary,
+          status: defaultCycleStatus,
+          paymentDate,
+          disbursedBy: defaultCycleStatus === 'PAID' ? 'System Master Disburser' : '',
+          lopDays: 0,
+          lopAmount: 0,
+          allowanceBreakdown: { hra, medical, special, internet },
+          deductionBreakdown: { professionalTax: pt, pfContribution: pf, groupHealthInsurance: health, lop: 0 }
+        });
+      }
+    });
+
+    // 3. Ensure any approved user in User Management is also visible even if employee sync is still in flight
+    (approvedUsers || []).forEach(u => {
+      const empId = (u.employeeId || '').trim().toUpperCase();
+      const userFullName = (u.name || u.email?.split('@')[0] || empId).trim();
+      if (!empId || isExcluded(userFullName, empId, undefined, u.email)) return;
+
+      const pKey = getPersonKey(userFullName, empId, undefined, u.email);
+      if (!processedPersonKeys.has(pKey)) {
+        processedPersonKeys.add(pKey);
+
+        const isModela = pKey === 'modela-tech';
+        const isSushoovan = pKey === 'sushoovan-das';
+        const basic = isModela ? 95000 : isSushoovan ? 85000 : 50000;
+        const totalAllowances = isModela ? 30000 : isSushoovan ? 25000 : 15000;
+        const hra = Math.round(totalAllowances * 0.4);
+        const medical = Math.round(totalAllowances * 0.15);
+        const special = Math.round(totalAllowances * 0.35);
+        const internet = Math.max(0, totalAllowances - (hra + medical + special));
+
+        const pt = 200;
+        const pf = 1800;
+        const health = 1700;
+        const standardDeductions = pt + pf + health;
+        const grossSalary = basic + totalAllowances;
+        const netSalary = grossSalary - standardDeductions;
+
+        const defaultCycleStatus: 'PAID' | 'UNPAID' = isNovDec ? 'UNPAID' : 'PAID';
+        const paymentDate = defaultCycleStatus === 'PAID'
+          ? `${selectedYear}-${String(MONTHS.indexOf(selectedMonth) + 1).padStart(2, '0')}-01`
+          : '';
+
+        list.push({
+          id: `PAY-${selectedYear}-${selectedMonth.substring(0, 3).toUpperCase()}-${empId}`,
+          employeeId: empId,
+          employeeName: userFullName,
           month: selectedMonth,
           year: selectedYear,
           basicSalary: basic,
@@ -132,7 +284,7 @@ export const PayrollPage: React.FC = () => {
     });
 
     return list;
-  }, [payroll, employees, selectedMonth, selectedYear]);
+  }, [payroll, employees, approvedUsers, selectedMonth, selectedYear]);
 
   // Filtered by status
   const filteredRecords = useMemo(() => {
@@ -194,18 +346,9 @@ export const PayrollPage: React.FC = () => {
     showToast('LOP Updated', `Recalculated deductions & net compensation for ${p.employeeName} (${parsedDays} LOP days).`);
   };
 
-  // Requirement 1: HR can't change the status paid to unpaid
   const handleToggleStatus = async (p: PayrollRecord, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!canEditPayroll) return;
-    if (p.status === 'PAID' && !isSuperAdminOrExec) {
-      showToast(
-        'Action Restricted',
-        'HR Managers cannot change status from PAID to UNPAID. Super Admin clearance required.',
-        'error'
-      );
-      return;
-    }
     await togglePayrollStatus(p.id, p);
   };
 
@@ -499,17 +642,13 @@ export const PayrollPage: React.FC = () => {
                           title={
                             !canEditPayroll
                               ? undefined
-                              : isPaid && !isSuperAdminOrExec
-                              ? "HR cannot revert PAID status to UNPAID (Super Admin clearance required)"
                               : isPaid
-                              ? "Click to revert to UNPAID (Super Admin clearance)"
+                              ? "Click to revert to UNPAID"
                               : "Click to mark as PAID"
                           }
                           className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold transition-all ${
                             !canEditPayroll
                               ? 'cursor-default'
-                              : isPaid && !isSuperAdminOrExec
-                              ? 'cursor-not-allowed opacity-90'
                               : 'cursor-pointer hover:scale-105'
                           } ${
                             isPaid
@@ -531,7 +670,7 @@ export const PayrollPage: React.FC = () => {
                         </button>
                       </td>
 
-                      {/* PaySlip column: ONLY shown when status is PAID! */}
+                      {/* PaySlip column */}
                       {hasPaidRecords && (
                         <td className="py-3.5 px-4 text-right">
                           {isPaid ? (
