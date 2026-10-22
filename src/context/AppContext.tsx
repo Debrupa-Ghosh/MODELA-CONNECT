@@ -1277,6 +1277,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const isSuperAdminOrExec =
       currentUser?.role === 'SUPER_ADMIN' ||
       currentUser?.role === 'EXECUTIVE_DIRECTOR' ||
+      currentUser?.email === 'sushovand@modelatech.com' ||
       currentUser?.email === 'sushoovandas@gmail.com' ||
       currentUser?.email === 'modelatech2026@gmail.com';
 

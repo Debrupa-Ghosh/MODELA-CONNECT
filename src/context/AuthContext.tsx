@@ -156,6 +156,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           map.set(u.email.toLowerCase(), { ...map.get(u.email.toLowerCase()), ...u });
         });
 
+        // Ensure designated Super Admin accounts are ALWAYS preserved as APPROVED SUPER_ADMIN
+        const superAdmins = ['sushovand@modelatech.com', 'sushoovandas@gmail.com', 'modelatech2026@gmail.com'];
+        superAdmins.forEach(email => {
+          const u = map.get(email.toLowerCase());
+          if (u) {
+            u.role = 'SUPER_ADMIN';
+            u.status = 'APPROVED';
+          }
+        });
+
         const updatedUsers = Array.from(map.values());
         setUsers(updatedUsers);
         try {
@@ -166,6 +176,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.warn('Firestore real-time sync notification:', error);
       }
     );
+
+    // Sync Super Admin credentials to Firestore
+    setDoc(
+      doc(db, 'users', 'USR-Q94BIIQ5'),
+      {
+        id: 'USR-Q94BIIQ5',
+        uid: 'USR-Q94BIIQ5',
+        name: 'Sushoovan Das',
+        email: 'sushovand@modelatech.com',
+        avatar_url: 'https://ui-avatars.com/api/?name=Sushoovan+Das&background=3b82f6&color=fff',
+        status: 'APPROVED',
+        role: 'SUPER_ADMIN',
+        employeeId: 'MOD001',
+        designation: 'Executive Director & Super Admin',
+        department: 'Executive Office',
+        requestedAt: '2026-09-20T08:44:15.481Z',
+        reviewedAt: '2026-09-20T08:44:35.660Z',
+        reviewedBy: 'System Root'
+      },
+      { merge: true }
+    ).catch(() => {});
+
+    setDoc(
+      doc(db, 'employees', 'MOD001'),
+      {
+        id: 'MOD001',
+        firstName: 'Sushoovan',
+        lastName: 'Das',
+        email: 'sushovand@modelatech.com',
+        designation: 'Executive Director & Super Admin'
+      },
+      { merge: true }
+    ).catch(() => {});
 
     return () => {
       isSubscribed = false;
@@ -199,7 +242,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const currentUser = users.find(u => u.email.toLowerCase() === currentEmail?.toLowerCase() && u.status === 'APPROVED') || null;
 
-  const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN';
+  const isSuperAdmin =
+    currentUser?.role === 'SUPER_ADMIN' ||
+    currentUser?.email?.toLowerCase() === 'sushovand@modelatech.com' ||
+    currentUser?.email?.toLowerCase() === 'sushoovandas@gmail.com' ||
+    currentUser?.email?.toLowerCase() === 'modelatech2026@gmail.com';
   const isExecutiveDirector = currentUser?.role === 'EXECUTIVE_DIRECTOR';
   const isHRManager = currentUser?.role === 'HR_MANAGER';
   const isEmployee = currentUser?.role === 'EMPLOYEE';
@@ -212,7 +259,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const approvedUsers = users.filter(u => u.status === 'APPROVED');
 
   const loginAs = (email: string): boolean => {
-    const target = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    const clean = email.toLowerCase().trim();
+    const target = users.find(u => u.email.toLowerCase() === clean);
+    if (clean === 'sushovand@modelatech.com' || clean === 'sushoovandas@gmail.com' || clean === 'modelatech2026@gmail.com') {
+      if (target) {
+        target.status = 'APPROVED';
+        target.role = 'SUPER_ADMIN';
+      }
+      setCurrentEmail(clean);
+      try {
+        sessionStorage.setItem('modela_active_session_email', clean);
+      } catch {}
+      return true;
+    }
     if (target) {
       if (target.status !== 'APPROVED') {
         return false;
@@ -265,6 +324,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // If accepted only then added to Employees page and will get access like Employees role get.
   const submitSignupRequest = (data: { email: string; name?: string; department?: string; designation?: string }) => {
     const cleanEmail = data.email.trim().toLowerCase();
+
+    if (cleanEmail === 'sushovand@modelatech.com' || cleanEmail === 'sushoovandas@gmail.com' || cleanEmail === 'modelatech2026@gmail.com') {
+      const isSushoovan = cleanEmail.includes('sushoovan') || cleanEmail.includes('sushovand');
+      const saUser: User = {
+        id: isSushoovan ? "USR-Q94BIIQ5" : "USR-SUPERADMIN-01",
+        uid: isSushoovan ? "USR-Q94BIIQ5" : "USR-SUPERADMIN-01",
+        name: isSushoovan ? "Sushoovan Das" : "Modela Tech",
+        email: cleanEmail,
+        avatar_url: `https://ui-avatars.com/api/?name=${encodeURIComponent(isSushoovan ? 'Sushoovan Das' : 'Modela Tech')}&background=3b82f6&color=fff`,
+        status: "APPROVED",
+        role: "SUPER_ADMIN",
+        employeeId: isSushoovan ? "MOD001" : "MOD000",
+        designation: "Executive Director & Super Admin",
+        department: "Executive Office",
+        requestedAt: "2026-09-20T08:44:15.481Z",
+        reviewedAt: "2026-09-20T08:44:35.660Z",
+        reviewedBy: "System Root"
+      };
+      setUsers(prev => [saUser, ...prev.filter(u => u.email.toLowerCase() !== cleanEmail)]);
+      setDoc(doc(db, 'users', saUser.id), saUser, { merge: true }).catch(() => {});
+      setCurrentEmail(cleanEmail);
+      try {
+        sessionStorage.setItem('modela_active_session_email', cleanEmail);
+      } catch {}
+      return {
+        success: true,
+        isPending: false,
+        message: 'Super Admin access granted.',
+        user: saUser
+      };
+    }
+
     const existing = users.find(u => u.email.toLowerCase() === cleanEmail);
 
     if (existing) {
