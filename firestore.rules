@@ -1,0 +1,70 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net: default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128;
+    }
+
+    function isValidUser(data) {
+      return data.id is string &&
+             data.email is string &&
+             data.status in ['PENDING', 'APPROVED', 'REJECTED'];
+    }
+
+    function isValidEmployee(data) {
+      return data.id is string &&
+             data.firstName is string;
+    }
+
+    function isValidStaffRequest(data) {
+      return data.id is string &&
+             data.title is string &&
+             data.status in ['PENDING', 'APPROVED', 'REJECTED'];
+    }
+
+    // Users Collection (Accounts & Sign-Up Requests)
+    match /users/{userId} {
+      allow read: if true;
+      allow create: if isValidId(userId) && isValidUser(request.resource.data);
+      allow update: if isValidId(userId) && isValidUser(request.resource.data);
+      allow delete: if isValidId(userId);
+    }
+
+    // Employees Collection (Workforce Directory)
+    match /employees/{employeeId} {
+      allow read: if true;
+      allow create: if isValidId(employeeId) && isValidEmployee(request.resource.data);
+      allow update: if isValidId(employeeId) && isValidEmployee(request.resource.data);
+      allow delete: if isValidId(employeeId);
+    }
+
+    // Staff Requests Collection
+    match /requests/{requestId} {
+      allow read: if true;
+      allow create: if isValidId(requestId) && isValidStaffRequest(request.resource.data);
+      allow update: if isValidId(requestId) && isValidStaffRequest(request.resource.data);
+      allow delete: if isValidId(requestId);
+    }
+
+    // Payroll Collection
+    match /payroll/{payrollId} {
+      allow read: if true;
+      allow create: if isValidId(payrollId);
+      allow update: if isValidId(payrollId);
+      allow delete: if isValidId(payrollId);
+    }
+
+    // Audit Logs Collection
+    match /auditLogs/{logId} {
+      allow read: if true;
+      allow create: if isValidId(logId) && request.resource.data.action is string;
+      allow update: if false;
+      allow delete: if false;
+    }
+  }
+}

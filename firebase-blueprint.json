@@ -1,0 +1,132 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "System user with role and approval status for workforce management access",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "uid": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "format": "email", "maxLength": 256 },
+        "avatar_url": { "type": "string", "maxLength": 1024 },
+        "status": { "type": "string", "enum": ["PENDING", "APPROVED", "REJECTED"] },
+        "role": { "type": "string", "enum": ["SUPER_ADMIN", "EXECUTIVE_DIRECTOR", "HR_MANAGER", "EMPLOYEE", "NONE", ""] },
+        "employeeId": { "type": "string", "maxLength": 64 },
+        "designation": { "type": "string", "maxLength": 128 },
+        "department": { "type": "string", "maxLength": 128 },
+        "requestedAt": { "type": "string", "maxLength": 64 },
+        "reviewedAt": { "type": "string", "maxLength": 64 },
+        "reviewedBy": { "type": "string", "maxLength": 256 },
+        "remarks": { "type": "string", "maxLength": 512 },
+        "notificationUnread": { "type": "boolean" }
+      },
+      "required": ["id", "email", "status"]
+    },
+    "Employee": {
+      "title": "Employee",
+      "description": "Verified organization employee directory record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64 },
+        "firstName": { "type": "string", "maxLength": 128 },
+        "lastName": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "format": "email", "maxLength": 256 },
+        "joiningDate": { "type": "string", "maxLength": 64 },
+        "designation": { "type": "string", "maxLength": 128 },
+        "phone": { "type": "string", "maxLength": 64 },
+        "department": { "type": "string", "maxLength": 128 },
+        "status": { "type": "string", "enum": ["ACTIVE", "ON_LEAVE", "TERMINATED"] },
+        "location": { "type": "string", "maxLength": 128 },
+        "avatar": { "type": "string", "maxLength": 1024 },
+        "pan": { "type": "string", "maxLength": 64 },
+        "bankAccount": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "firstName"]
+    },
+    "StaffRequest": {
+      "title": "StaffRequest",
+      "description": "Staff leave, equipment, expense, or shift adjustment requests",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "employeeId": { "type": "string", "maxLength": 64 },
+        "employeeName": { "type": "string", "maxLength": 128 },
+        "employeeEmail": { "type": "string", "format": "email", "maxLength": 256 },
+        "department": { "type": "string", "maxLength": 128 },
+        "designation": { "type": "string", "maxLength": 128 },
+        "type": { "type": "string", "enum": ["LEAVE", "EQUIPMENT", "EXPENSE", "SHIFT"] },
+        "title": { "type": "string", "maxLength": 256 },
+        "amountOrDays": { "type": "string", "maxLength": 128 },
+        "targetDates": { "type": "string", "maxLength": 128 },
+        "priority": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH", "URGENT"] },
+        "status": { "type": "string", "enum": ["PENDING", "APPROVED", "REJECTED"] },
+        "description": { "type": "string", "maxLength": 2048 },
+        "submittedAt": { "type": "string", "maxLength": 64 },
+        "supervisorName": { "type": "string", "maxLength": 128 },
+        "reviewedAt": { "type": "string", "maxLength": 64 },
+        "reviewedBy": { "type": "string", "maxLength": 256 },
+        "remarks": { "type": "string", "maxLength": 512 }
+      },
+      "required": ["id", "title", "status"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Immutable security and audit trails for operations within Modela Connect",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "timestamp": { "type": "string", "maxLength": 64 },
+        "action": { "type": "string", "maxLength": 128 },
+        "targetUser": { "type": "string", "maxLength": 256 },
+        "executedBy": { "type": "string", "maxLength": 256 },
+        "details": { "type": "string", "maxLength": 1024 },
+        "module": { "type": "string", "maxLength": 128 },
+        "result": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "timestamp", "action", "executedBy"]
+    },
+    "PayrollRecord": {
+      "title": "PayrollRecord",
+      "description": "Master payroll ledger records with allowances, deductions, and LOP calculation",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "employeeId": { "type": "string", "maxLength": 64 },
+        "employeeName": { "type": "string", "maxLength": 128 },
+        "month": { "type": "string", "maxLength": 32 },
+        "year": { "type": "number" },
+        "basicSalary": { "type": "number" },
+        "allowances": { "type": "number" },
+        "deductions": { "type": "number" },
+        "netSalary": { "type": "number" },
+        "status": { "type": "string", "enum": ["PAID", "UNPAID", "PROCESSING", "PENDING"] },
+        "pan": { "type": "string", "maxLength": 64 },
+        "bankAccount": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "employeeId", "month", "year", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Collection of all user accounts and pending sign up approval requests"
+    },
+    "/employees/{employeeId}": {
+      "schema": "Employee",
+      "description": "Collection of verified active employees"
+    },
+    "/requests/{requestId}": {
+      "schema": "StaffRequest",
+      "description": "Workflow staff requests submitted by team members"
+    },
+    "/auditLogs/{logId}": {
+      "schema": "AuditLog",
+      "description": "System audit and security event history"
+    },
+    "/payroll/{payrollId}": {
+      "schema": "PayrollRecord",
+      "description": "Monthly payroll disbursement ledger"
+    }
+  }
+}
