@@ -28,12 +28,16 @@ const RequireAuth: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return <AppLayout>{children}</AppLayout>;
 };
 
-// Route guard: Verified users can access and view application pages
+// Route guard: Restricted to Super Admin, Director, HR, and Manager (Employees only have access to Dashboard, Requests, and Settings)
 const RequireFullAccess: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser } = useAuth();
+  const { currentUser, hasFullAccess, isEmployee } = useAuth();
 
   if (!currentUser || currentUser.status !== 'APPROVED') {
     return <Navigate to="/login" replace />;
+  }
+
+  if (isEmployee || !hasFullAccess) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <AppLayout>{children}</AppLayout>;

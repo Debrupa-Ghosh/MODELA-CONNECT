@@ -121,7 +121,7 @@ export const Sidebar: React.FC = () => {
     }
   ];
 
-  const navItems = fullAccessNavItems;
+  const navItems = isEmployee || !hasFullAccess ? employeeNavItems : fullAccessNavItems;
 
   const employeeId = currentUser?.employeeId || 'MOD000';
   const roleDisplay = getRoleLabel(currentUser?.role);

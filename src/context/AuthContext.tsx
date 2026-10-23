@@ -633,9 +633,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isManager = normRole === 'MANAGER';
   const isEmployee = normRole === 'EMPLOYEE' && !isSuperAdmin;
 
-  // Ensure full navigation access across all application pages when clicked
-  const hasFullAccess = true;
-  const isAdmin = true;
+  // Super Admin, Director, HR, and Manager have full access; Employee only has access to Dashboard, Requests, and Settings
+  const hasFullAccess = Boolean(isSuperAdmin || isDirector || isHR || isManager);
+  const isAdmin = hasFullAccess;
 
   const pendingUsers = users.filter(u => u.status === 'PENDING');
   const approvedUsers = users.filter(u => u.status === 'APPROVED');
