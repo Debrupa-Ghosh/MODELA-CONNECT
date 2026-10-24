@@ -24,7 +24,7 @@ interface EmployeeDossierModalProps {
   employee: Employee | null;
   isOpen: boolean;
   onClose: () => void;
-  onEdit: (employee: Employee) => void;
+  onEdit?: (employee: Employee) => void;
   onDelete?: (employee: Employee) => void;
 }
 
@@ -129,13 +129,15 @@ export const EmployeeDossierModal: React.FC<EmployeeDossierModalProps> = ({
               </button>
             )}
 
-            <button
-              onClick={() => onEdit(employee)}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-950/50 transition-all cursor-pointer"
-            >
-              <Edit className="w-3.5 h-3.5" />
-              <span>Edit Profile</span>
-            </button>
+            {onEdit && (
+              <button
+                onClick={() => onEdit(employee)}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-950/50 transition-all cursor-pointer"
+              >
+                <Edit className="w-3.5 h-3.5" />
+                <span>Edit Profile</span>
+              </button>
+            )}
 
             <button
               onClick={onClose}

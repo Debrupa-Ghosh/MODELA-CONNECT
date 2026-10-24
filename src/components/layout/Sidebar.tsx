@@ -31,7 +31,7 @@ interface NavItem {
 }
 
 export const Sidebar: React.FC = () => {
-  const { currentUser, hasFullAccess, isEmployee, pendingUsers } = useAuth();
+  const { currentUser, hasFullAccess, isEmployee, isHR, isDirector, pendingUsers } = useAuth();
   const { staffRequests, isSidebarCollapsed, toggleSidebar } = useApp();
 
   const myPendingStaffCount = staffRequests.filter(r => r.status === 'PENDING' && isRequestOwnedByUser(r, currentUser)).length;
@@ -94,7 +94,7 @@ export const Sidebar: React.FC = () => {
       to: '/user-management',
       label: 'User management',
       icon: UserCheck,
-      badge: pendingUsersCount > 0 ? `${pendingUsersCount} Pending` : undefined,
+      badge: !isDirector && pendingUsersCount > 0 ? `${pendingUsersCount} Pending` : undefined,
       badgeStyle: 'bg-[#FACC15] text-slate-900 font-extrabold'
     },
     {
@@ -102,18 +102,15 @@ export const Sidebar: React.FC = () => {
       label: 'Reports',
       icon: BarChart3
     },
-    {
-      to: '/activity-logs',
-      label: 'Activity Logs',
-      icon: History
-    },
-    {
-      to: '/admin-nexus',
-      label: 'ADMIN NEXUS',
-      icon: Terminal,
-      badge: pendingUsersCount > 0 ? `${pendingUsersCount} Pending` : undefined,
-      badgeStyle: 'bg-[#FACC15] text-slate-900 font-extrabold'
-    },
+    ...(!isHR && !isDirector
+      ? [
+          {
+            to: '/activity-logs',
+            label: 'Activity Logs',
+            icon: History
+          }
+        ]
+      : []),
     {
       to: '/settings',
       label: 'Settings',

@@ -164,16 +164,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const [currentEmail, setCurrentEmail] = useState<string | null>(() => {
     try {
-      const persistentSaved = localStorage.getItem(STORAGE_KEY_ACTIVE_USER);
-      if (persistentSaved && !isRecordDeleted(persistentSaved)) {
-        return persistentSaved.trim().toLowerCase();
-      }
-      const sessionSaved = sessionStorage.getItem('modela_active_session_email');
-      if (sessionSaved && !isRecordDeleted(sessionSaved)) {
-        return sessionSaved.trim().toLowerCase();
-      }
+      localStorage.removeItem(STORAGE_KEY_ACTIVE_USER);
+      sessionStorage.removeItem('modela_active_session_email');
+      localStorage.removeItem('modela_pending_signup_email');
     } catch {
-      // fallback
+      // ignore storage errors
     }
     return null;
   });
@@ -273,21 +268,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn('Failed saving users to localStorage:', e);
     }
   }, [users]);
-
-  // Persist active user email across refreshes
-  useEffect(() => {
-    try {
-      if (currentEmail) {
-        localStorage.setItem(STORAGE_KEY_ACTIVE_USER, currentEmail);
-        sessionStorage.setItem('modela_active_session_email', currentEmail);
-      } else {
-        localStorage.removeItem(STORAGE_KEY_ACTIVE_USER);
-        sessionStorage.removeItem('modela_active_session_email');
-      }
-    } catch (e) {
-      console.warn('Failed saving active user email:', e);
-    }
-  }, [currentEmail]);
 
   // Real-time Firestore synchronization across all browsers and devices
   useEffect(() => {
@@ -620,18 +600,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [users, currentEmail]);
 
   const normRole = currentUser?.role ? normalizeRole(currentUser.role) : 'EMPLOYEE';
-  const isSuperAdmin =
-    normRole === 'SUPER_ADMIN' ||
-    currentUser?.email?.toLowerCase() === 'sushovand@modelatech.com' ||
-    currentUser?.email?.toLowerCase() === 'sushoovandas@gmail.com' ||
-    currentUser?.email?.toLowerCase() === 'modelatech2026@gmail.com' ||
-    currentUser?.email?.toLowerCase() === 'ghoshdebrupa005@gmail.com';
+  const isSuperAdmin = normRole === 'SUPER_ADMIN';
   const isDirector = normRole === 'DIRECTOR';
   const isExecutiveDirector = isDirector;
   const isHR = normRole === 'HR';
   const isHRManager = isHR;
   const isManager = normRole === 'MANAGER';
-  const isEmployee = normRole === 'EMPLOYEE' && !isSuperAdmin;
+  const isEmployee = normRole === 'EMPLOYEE';
 
   // Super Admin, Director, HR, and Manager have full access; Employee only has access to Dashboard, Requests, and Settings
   const hasFullAccess = Boolean(isSuperAdmin || isDirector || isHR || isManager);
@@ -648,12 +623,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         INITIAL_USERS.find(u => u.email.toLowerCase() === clean);
       if (target) {
         target.status = 'APPROVED';
-        target.role = 'SUPER_ADMIN';
+        target.role = target.role || 'SUPER_ADMIN';
       }
       setCurrentEmail(clean);
       try {
-        localStorage.setItem(STORAGE_KEY_ACTIVE_USER, clean);
-        sessionStorage.setItem('modela_active_session_email', clean);
         localStorage.removeItem('modela_pending_signup_email');
       } catch {}
       return true;
@@ -667,8 +640,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       setCurrentEmail(target.email);
       try {
-        localStorage.setItem(STORAGE_KEY_ACTIVE_USER, target.email);
-        sessionStorage.setItem('modela_active_session_email', target.email);
         localStorage.removeItem('modela_pending_signup_email');
       } catch {}
       return true;

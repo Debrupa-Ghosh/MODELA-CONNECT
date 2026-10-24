@@ -17,16 +17,24 @@ import {
 } from 'lucide-react';
 
 export const UserManagementPage: React.FC = () => {
-  const { pendingUsers, approvedUsers, approveUserRequest, rejectUserRequest, updateUserRole, deleteUser, refreshUsers, updateUserEmployeeId, isSuperAdmin, hasFullAccess } = useAuth();
+  const { pendingUsers, approvedUsers, approveUserRequest, rejectUserRequest, updateUserRole, deleteUser, refreshUsers, updateUserEmployeeId, isSuperAdmin, isDirector, hasFullAccess } = useAuth();
   const { showToast, deleteEmployee, updateEmployee } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'SIGNUP_QUEUE' | 'APPROVED_USERS'>('SIGNUP_QUEUE');
+  const [activeTab, setActiveTab] = useState<'SIGNUP_QUEUE' | 'APPROVED_USERS'>(
+    isDirector ? 'APPROVED_USERS' : 'SIGNUP_QUEUE'
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [editingEmpIdUserId, setEditingEmpIdUserId] = useState<string | null>(null);
   const [editEmpIdVal, setEditEmpIdVal] = useState('');
   const [isSavingEmpId, setIsSavingEmpId] = useState(false);
+
+  React.useEffect(() => {
+    if (isDirector && activeTab !== 'APPROVED_USERS') {
+      setActiveTab('APPROVED_USERS');
+    }
+  }, [isDirector, activeTab]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -47,6 +55,7 @@ export const UserManagementPage: React.FC = () => {
   };
 
   const handleRoleChange = async (userId: string, newRole: UserRole, userEmail: string) => {
+    if (isDirector) return;
     await updateUserRole(userId, newRole);
     showToast(
       'Role Updated',
@@ -134,6 +143,8 @@ export const UserManagementPage: React.FC = () => {
     (u.department && u.department.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
+  const currentTab = isDirector ? 'APPROVED_USERS' : activeTab;
+
   return (
     <div className="space-y-6 max-w-[1550px] mx-auto antialiased font-sans text-white">
       
@@ -144,12 +155,16 @@ export const UserManagementPage: React.FC = () => {
             <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-white">
               User Management &amp; Access Control
             </h1>
-            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#2A1B02] border border-[#B45309]/80 text-[#FBBF24]">
-              {pendingUsers.length} Pending
-            </span>
+            {!isDirector && (
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#2A1B02] border border-[#B45309]/80 text-[#FBBF24]">
+                {pendingUsers.length} Pending
+              </span>
+            )}
           </div>
           <p className="text-xs text-slate-400">
-            Identity verification queue, mail ID access authorizations, and enterprise RBAC access permissions.
+            {isDirector
+              ? 'Approved users directory and enterprise RBAC access permissions.'
+              : 'Identity verification queue, mail ID access authorizations, and enterprise RBAC access permissions.'}
           </p>
         </div>
 
@@ -175,7 +190,7 @@ export const UserManagementPage: React.FC = () => {
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder={
-              activeTab === 'SIGNUP_QUEUE'
+              currentTab === 'SIGNUP_QUEUE'
                 ? "Search pending sign-up requests by Name or Email..."
                 : "Search approved users by Name or Department..."
             }
@@ -193,27 +208,29 @@ export const UserManagementPage: React.FC = () => {
 
       {/* 3. Sub-Tabs Bar: Identity Sign-Up Requests and Approved Users Directory (Dark Navy Box) */}
       <div className="bg-[#0B1528] border border-[#1E293B] rounded-2xl p-1.5 flex items-center gap-1.5 overflow-x-auto shadow-sm text-xs">
-        <button
-          onClick={() => setActiveTab('SIGNUP_QUEUE')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === 'SIGNUP_QUEUE'
-              ? 'bg-[#2563EB] text-white shadow-md'
-              : 'text-slate-300 hover:text-white hover:bg-[#131E36]'
-          }`}
-        >
-          <Mail className="w-4 h-4 text-amber-400" />
-          <span>Identity Sign-Up Requests</span>
-          <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-            activeTab === 'SIGNUP_QUEUE' ? 'bg-[#1D4ED8] text-white' : 'bg-slate-800 text-slate-300'
-          }`}>
-            {pendingUsers.length}
-          </span>
-        </button>
+        {!isDirector && (
+          <button
+            onClick={() => setActiveTab('SIGNUP_QUEUE')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all cursor-pointer whitespace-nowrap ${
+              currentTab === 'SIGNUP_QUEUE'
+                ? 'bg-[#2563EB] text-white shadow-md'
+                : 'text-slate-300 hover:text-white hover:bg-[#131E36]'
+            }`}
+          >
+            <Mail className="w-4 h-4 text-amber-400" />
+            <span>Identity Sign-Up Requests</span>
+            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+              currentTab === 'SIGNUP_QUEUE' ? 'bg-[#1D4ED8] text-white' : 'bg-slate-800 text-slate-300'
+            }`}>
+              {pendingUsers.length}
+            </span>
+          </button>
+        )}
 
         <button
           onClick={() => setActiveTab('APPROVED_USERS')}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all cursor-pointer whitespace-nowrap ${
-            activeTab === 'APPROVED_USERS'
+            currentTab === 'APPROVED_USERS'
               ? 'bg-[#2563EB] text-white shadow-md'
               : 'text-slate-300 hover:text-white hover:bg-[#131E36]'
           }`}
@@ -221,15 +238,15 @@ export const UserManagementPage: React.FC = () => {
           <Users className="w-4 h-4" />
           <span>Approved Users Directory</span>
           <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-            activeTab === 'APPROVED_USERS' ? 'bg-[#1D4ED8] text-white' : 'bg-slate-800 text-slate-300'
+            currentTab === 'APPROVED_USERS' ? 'bg-[#1D4ED8] text-white' : 'bg-slate-800 text-slate-300'
           }`}>
             {approvedUsers.length}
           </span>
         </button>
       </div>
 
-      {/* 4. TAB 1: Identity Sign-Up Requests Queue (Matches image.png Exactly) */}
-      {activeTab === 'SIGNUP_QUEUE' && (
+      {/* 4. TAB 1: Identity Sign-Up Requests Queue (Hidden for Director role) */}
+      {!isDirector && currentTab === 'SIGNUP_QUEUE' && (
         <div className="space-y-5">
           {/* Identity Verification Queue Orange Notice Box */}
           <div className="p-4 rounded-2xl bg-[#261503]/85 border border-amber-800/80 text-xs text-amber-200 flex items-start gap-3 shadow-lg">
@@ -237,7 +254,7 @@ export const UserManagementPage: React.FC = () => {
             <div className="space-y-0.5">
               <p className="font-bold text-amber-300">Identity Verification Queue (Sign-Up Clearance)</p>
               <p className="text-[11px] text-amber-200/90 leading-relaxed">
-                New requests of mail ID for sign-up are routed here and to Admin Nexus for clearance. Approving a request verifies their Google mail credentials and provisions their role.
+                New requests of mail ID for sign-up are routed here for clearance. Approving a request verifies their Google mail credentials and provisions their role.
               </p>
             </div>
           </div>
@@ -331,7 +348,7 @@ export const UserManagementPage: React.FC = () => {
       )}
 
       {/* 5. TAB 2: Approved Users Directory (Dark Navy Box) */}
-      {activeTab === 'APPROVED_USERS' && (
+      {currentTab === 'APPROVED_USERS' && (
         <div className="bg-[#080E1C] rounded-2xl border border-[#1E293B] overflow-hidden shadow-xl">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
@@ -359,17 +376,23 @@ export const UserManagementPage: React.FC = () => {
                       {u.designation || 'Enterprise Staff'}
                     </td>
                     <td className="py-4 px-6">
-                      <select
-                        value={u.role || 'EMPLOYEE'}
-                        onChange={e => handleRoleChange(u.id, e.target.value as UserRole, u.email)}
-                        className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-[#0B1528] border border-blue-500/40 text-[#38BDF8] focus:outline-none focus:border-blue-400 cursor-pointer"
-                      >
-                        {USER_ROLES.map(r => (
-                          <option key={r.role} value={r.role} className="bg-[#080E1C] text-white">
-                            {r.label}
-                          </option>
-                        ))}
-                      </select>
+                      {isDirector ? (
+                        <span className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-[#0B1528] border border-blue-500/40 text-[#38BDF8] inline-block">
+                          {getRoleLabel(u.role || 'EMPLOYEE')}
+                        </span>
+                      ) : (
+                        <select
+                          value={u.role || 'EMPLOYEE'}
+                          onChange={e => handleRoleChange(u.id, e.target.value as UserRole, u.email)}
+                          className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-[#0B1528] border border-blue-500/40 text-[#38BDF8] focus:outline-none focus:border-blue-400 cursor-pointer"
+                        >
+                          {USER_ROLES.map(r => (
+                            <option key={r.role} value={r.role} className="bg-[#080E1C] text-white">
+                              {r.label}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                     </td>
                     <td className="py-4 px-6">
                       {editingEmpIdUserId === u.id ? (

@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
-  const { currentUser, hasFullAccess, logout } = useAuth();
+  const { currentUser, hasFullAccess, isHR, isDirector, logout } = useAuth();
   const { isDarkMode, toggleTheme } = useApp();
   const navigate = useNavigate();
 
@@ -142,7 +142,7 @@ export const Navbar: React.FC = () => {
               </div>
 
               {/* Footer Link */}
-              {hasFullAccess && (
+              {hasFullAccess && !isHR && !isDirector && (
                 <div className="pt-2 border-t border-[#1E293B] text-center">
                   <Link
                     to="/activity-logs"

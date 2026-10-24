@@ -14,29 +14,24 @@ export const LoginPage: React.FC = () => {
   // 'STEP_3_WAITING' -> Request Sent, Status: Pending
   const [step, setStep] = useState<'STEP_1_LANDING' | 'STEP_2_EMAIL_INPUT' | 'STEP_3_WAITING'>('STEP_1_LANDING');
 
-  const [email, setEmail] = useState(() => {
-    try {
-      return localStorage.getItem('modela_pending_signup_email') || '';
-    } catch {
-      return '';
-    }
-  });
+  const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // If already authenticated in this session, automatically forward to dashboard
+  // If already authenticated in this active session, forward to dashboard
   React.useEffect(() => {
     if (currentUser && currentUser.status === 'APPROVED') {
       navigate('/dashboard', { replace: true });
     }
   }, [currentUser, navigate]);
 
-  // Real-time sync across devices: as soon as Admin accepts the request on another device,
-  // the live Firestore snapshot updates users, which immediately logs this device in!
+  // Real-time sync across devices: while actively waiting on STEP_3_WAITING, as soon as Admin accepts the request,
+  // the live Firestore snapshot updates users, which immediately logs this session in!
   React.useEffect(() => {
+    if (step !== 'STEP_3_WAITING') return;
     const savedPending = localStorage.getItem('modela_pending_signup_email');
-    const waitingEmail = step === 'STEP_3_WAITING' ? (email || savedPending) : savedPending;
+    const waitingEmail = email || savedPending;
     if (!waitingEmail) return;
     const clean = waitingEmail.trim().toLowerCase();
 

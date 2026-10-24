@@ -30,18 +30,22 @@ import {
 
 export const EmployeesPage: React.FC = () => {
   const { employees, addEmployee, bulkAddEmployees, updateEmployee, deleteEmployee, showToast } = useApp();
-  const { deleteUser, hasFullAccess, isSuperAdmin, isExecutiveDirector, isHRManager, currentUser } = useAuth();
+  const { deleteUser, hasFullAccess, isSuperAdmin, isDirector, isExecutiveDirector, isHRManager, currentUser } = useAuth();
 
   const canManageEmployees =
-    hasFullAccess ||
-    isSuperAdmin ||
-    isHRManager ||
-    currentUser?.role === 'SUPER_ADMIN' ||
-    currentUser?.role === 'DIRECTOR' ||
-    currentUser?.role === 'HR' ||
-    currentUser?.role === 'MANAGER' ||
-    currentUser?.role === 'HR_MANAGER' ||
-    isExecutiveDirector;
+    !isDirector &&
+    !isExecutiveDirector &&
+    currentUser?.role !== 'DIRECTOR' &&
+    currentUser?.role !== 'EXECUTIVE_DIRECTOR' &&
+    Boolean(
+      hasFullAccess ||
+      isSuperAdmin ||
+      isHRManager ||
+      currentUser?.role === 'SUPER_ADMIN' ||
+      currentUser?.role === 'HR' ||
+      currentUser?.role === 'MANAGER' ||
+      currentUser?.role === 'HR_MANAGER'
+    );
 
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState<'id' | 'name' | 'joiningDate' | 'designation'>('id');
@@ -490,28 +494,28 @@ export const EmployeesPage: React.FC = () => {
           </p>
         </div>
 
-        {/* 3 Top Right Action Buttons (Matches Image 1 Exactly) */}
-        <div className="flex items-center gap-3 flex-wrap">
-          {/* Export CSV Button */}
-          <button
-            onClick={handleExportCSV}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-[#131E36] hover:bg-[#1E2E4E] border border-[#203050] text-slate-200 text-xs font-semibold rounded-xl shadow-xs transition-colors cursor-pointer"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Export CSV</span>
-          </button>
+        {/* 3 Top Right Action Buttons (Hidden for Director view-only role) */}
+        {canManageEmployees && (
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Export CSV Button */}
+            <button
+              onClick={handleExportCSV}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-[#131E36] hover:bg-[#1E2E4E] border border-[#203050] text-slate-200 text-xs font-semibold rounded-xl shadow-xs transition-colors cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Export CSV</span>
+            </button>
 
-          {/* Bulk Import CSV Button */}
-          <button
-            onClick={() => setIsImportModalOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-[#0C2340] hover:bg-[#13325C] border border-[#1D4ED8]/60 text-[#60A5FA] text-xs font-semibold rounded-xl shadow-xs transition-colors cursor-pointer"
-          >
-            <Upload className="w-3.5 h-3.5" />
-            <span>Bulk Import CSV</span>
-          </button>
+            {/* Bulk Import CSV Button */}
+            <button
+              onClick={() => setIsImportModalOpen(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-[#0C2340] hover:bg-[#13325C] border border-[#1D4ED8]/60 text-[#60A5FA] text-xs font-semibold rounded-xl shadow-xs transition-colors cursor-pointer"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span>Bulk Import CSV</span>
+            </button>
 
-          {/* Add New Employee Button */}
-          {canManageEmployees && (
+            {/* Add New Employee Button */}
             <button
               onClick={() => setIsAddModalOpen(true)}
               className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-blue-900/30 transition-all cursor-pointer"
@@ -519,12 +523,12 @@ export const EmployeesPage: React.FC = () => {
               <UserPlus className="w-4 h-4" />
               <span>Add New Employee</span>
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Notice if any newly signed-up employee has details pending */}
-      {pendingDetailsCount > 0 && (
+      {canManageEmployees && pendingDetailsCount > 0 && (
         <div className="p-4 rounded-2xl bg-[#261503]/85 border border-amber-800/80 text-xs text-amber-200 flex items-start justify-between gap-3 shadow-lg">
           <div className="flex items-start gap-3">
             <span className="text-amber-400 font-bold text-base mt-0.5">ℹ</span>
@@ -533,7 +537,7 @@ export const EmployeesPage: React.FC = () => {
                 New Sign-Up Accounts Pending Profile Completion ({pendingDetailsCount})
               </p>
               <p className="text-[11px] text-amber-200/90 leading-relaxed">
-                New user sign-ups are automatically assigned the Employee role. Name, DOJ, and Contact details remain blank until Super Admin, Executive Director, or HR Manager populates them using the <strong>Edit (Pencil)</strong> button.
+                New user sign-ups are automatically assigned the Employee role. Name, DOJ, and Contact details remain blank until Super Admin or HR Manager populates them using the <strong>Edit (Pencil)</strong> button.
               </p>
             </div>
           </div>
@@ -708,11 +712,11 @@ export const EmployeesPage: React.FC = () => {
                     >
                       <div className="flex items-center justify-end gap-2 text-slate-400">
                         {/* Quick add details badge if Name/DOJ/Contact is blank */}
-                        {(!emp.firstName?.trim() && !emp.lastName?.trim() && !emp.joiningDate?.trim()) && (
+                        {canManageEmployees && (!emp.firstName?.trim() && !emp.lastName?.trim() && !emp.joiningDate?.trim()) && (
                           <button
                             onClick={() => setEditingEmp(emp)}
                             className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-[11px] font-bold transition-colors cursor-pointer mr-1"
-                            title="Super Admin, Executive Director, or HR Manager: Add Name, DOJ, and Contact details"
+                            title="Add Name, DOJ, and Contact details"
                           >
                             <Edit2 className="w-3 h-3" />
                             <span>Add Details</span>
@@ -728,7 +732,7 @@ export const EmployeesPage: React.FC = () => {
                           <Eye className="w-4 h-4" />
                         </button>
 
-                        {/* Pencil: Edit Profile (Super Admin & HR Manager only) */}
+                        {/* Pencil: Edit Profile */}
                         {canManageEmployees && (
                           <button
                             onClick={() => setEditingEmp(emp)}
@@ -764,14 +768,22 @@ export const EmployeesPage: React.FC = () => {
         employee={selectedDossierEmp}
         isOpen={Boolean(selectedDossierEmp)}
         onClose={() => setSelectedDossierEmp(null)}
-        onEdit={emp => {
-          setSelectedDossierEmp(null);
-          setEditingEmp(emp);
-        }}
-        onDelete={emp => {
-          setSelectedDossierEmp(null);
-          handleDelete(emp);
-        }}
+        onEdit={
+          canManageEmployees
+            ? emp => {
+                setSelectedDossierEmp(null);
+                setEditingEmp(emp);
+              }
+            : undefined
+        }
+        onDelete={
+          canManageEmployees
+            ? emp => {
+                setSelectedDossierEmp(null);
+                handleDelete(emp);
+              }
+            : undefined
+        }
       />
 
       {/* Edit Employee Modal */}

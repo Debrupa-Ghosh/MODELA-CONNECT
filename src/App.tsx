@@ -12,10 +12,8 @@ import { PayrollPage } from './pages/PayrollPage';
 import { OnboardingPage } from './pages/OnboardingPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { ActivityLogsPage } from './pages/ActivityLogsPage';
-import { AdminNexusPage } from './pages/AdminNexusPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { LoginPage } from './pages/LoginPage';
-import { ShieldAlert } from 'lucide-react';
 
 // Route guard: Requires verified & approved user before granting access
 const RequireAuth: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -37,6 +35,21 @@ const RequireFullAccess: React.FC<{ children: React.ReactNode }> = ({ children }
   }
 
   if (isEmployee || !hasFullAccess) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <AppLayout>{children}</AppLayout>;
+};
+
+// Route guard: Activity Logs page is hidden for Employee, HR, and Director roles
+const RequireActivityLogsAccess: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { currentUser, hasFullAccess, isEmployee, isHR, isDirector } = useAuth();
+
+  if (!currentUser || currentUser.status !== 'APPROVED') {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (isEmployee || !hasFullAccess || isHR || isDirector) {
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -154,20 +167,14 @@ export default function App() {
             <Route
               path="/activity-logs"
               element={
-                <RequireFullAccess>
+                <RequireActivityLogsAccess>
                   <ActivityLogsPage />
-                </RequireFullAccess>
+                </RequireActivityLogsAccess>
               }
             />
 
-            <Route
-              path="/admin-nexus"
-              element={
-                <RequireFullAccess>
-                  <AdminNexusPage />
-                </RequireFullAccess>
-              }
-            />
+            {/* Removed Admin Nexus page: redirect to dashboard */}
+            <Route path="/admin-nexus" element={<Navigate to="/dashboard" replace />} />
 
             {/* Settings */}
             <Route

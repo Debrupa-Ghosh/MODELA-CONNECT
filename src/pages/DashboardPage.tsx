@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 
 export const DashboardPage: React.FC = () => {
-  const { currentUser, hasFullAccess } = useAuth();
+  const { currentUser, hasFullAccess, isHR, isDirector } = useAuth();
   const { employees, staffRequests, openRequestDetails, updateStaffRequestStatus } = useApp();
   const navigate = useNavigate();
 
@@ -554,13 +554,15 @@ export const DashboardPage: React.FC = () => {
         <div className="bg-[#0B132B] border border-[#1E293B] rounded-2xl p-6 shadow-sm space-y-4">
           <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
             <h2 className="text-sm font-bold text-white">Live Audit Stream</h2>
-            <Link
-              to="/activity-logs"
-              className="text-xs text-sky-400 hover:text-sky-300 font-semibold flex items-center gap-1"
-            >
-              <span>Full Ledger</span>
-              <span>→</span>
-            </Link>
+            {!isHR && !isDirector && (
+              <Link
+                to="/activity-logs"
+                className="text-xs text-sky-400 hover:text-sky-300 font-semibold flex items-center gap-1"
+              >
+                <span>Full Ledger</span>
+                <span>→</span>
+              </Link>
+            )}
           </div>
 
           <div className="space-y-4">

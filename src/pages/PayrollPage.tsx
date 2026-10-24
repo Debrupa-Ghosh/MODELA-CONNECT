@@ -42,18 +42,20 @@ export const PayrollPage: React.FC = () => {
   const { isSuperAdmin, isDirector, isExecutiveDirector, isHR, isHRManager, isManager, currentUser, approvedUsers } = useAuth();
 
   const canEditPayroll =
-    isSuperAdmin ||
-    isDirector ||
-    isExecutiveDirector ||
-    isHR ||
-    isHRManager ||
-    isManager ||
-    currentUser?.role === 'SUPER_ADMIN' ||
-    currentUser?.role === 'DIRECTOR' ||
-    currentUser?.role === 'EXECUTIVE_DIRECTOR' ||
-    currentUser?.role === 'HR' ||
-    currentUser?.role === 'HR_MANAGER' ||
-    currentUser?.role === 'MANAGER';
+    !isDirector &&
+    !isExecutiveDirector &&
+    currentUser?.role !== 'DIRECTOR' &&
+    currentUser?.role !== 'EXECUTIVE_DIRECTOR' &&
+    Boolean(
+      isSuperAdmin ||
+      isHR ||
+      isHRManager ||
+      isManager ||
+      currentUser?.role === 'SUPER_ADMIN' ||
+      currentUser?.role === 'HR' ||
+      currentUser?.role === 'HR_MANAGER' ||
+      currentUser?.role === 'MANAGER'
+    );
 
   // Filter state for months and years (2026-2036)
   const [selectedMonth, setSelectedMonth] = useState<string>('October');
