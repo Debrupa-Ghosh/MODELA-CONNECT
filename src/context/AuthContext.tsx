@@ -273,6 +273,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     let isSubscribed = true;
 
+    deleteDoc(doc(db, 'users', 'USR-HR-MGR01')).catch(() => {});
+
     const unsub = onSnapshot(
       collection(db, 'users'),
       async snapshot => {
@@ -312,11 +314,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
           const lowerName = (item.name || '').trim().toLowerCase();
           const lowerEmail = (item.email || '').trim().toLowerCase();
+          const upperEmpId = (item.employeeId || '').trim().toUpperCase();
           if (
             (lowerName.includes('tony') && lowerName.includes('stark')) ||
             lowerName === 'tony stark' ||
+            lowerName.includes('marcus vance') ||
+            lowerName.includes('sourav ganguly') ||
+            lowerName.includes('pooja sharma') ||
             lowerEmail.includes('tonystark') ||
             lowerEmail.includes('tony.stark') ||
+            lowerEmail === 'marcus.vance@modela.io' ||
+            lowerEmail === 'sourav.ganguly@modela.io' ||
+            lowerEmail === 'pooja.sharma@modela.io' ||
+            upperEmpId === 'MOD003' ||
+            upperEmpId === 'MOD005' ||
+            upperEmpId === 'MOD006' ||
             isRecordDeleted(docSnap.id, item.id, item.uid, item.email, item.employeeId, resolveEmpId(item.email, item.employeeId))
           ) {
             deleteDoc(doc(db, 'users', docSnap.id)).catch(() => {});

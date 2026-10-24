@@ -190,19 +190,6 @@ let employees = [
     compensation: { basic: 50000, allowances: 15000 }
   },
   {
-    id: "MOD003",
-    firstName: "Marcus",
-    lastName: "Vance",
-    email: "marcus.vance@modela.io",
-    joiningDate: "2024-05-10",
-    designation: "HR Operations Manager",
-    phone: "+1 (555) 456-7890",
-    department: "Human Resources",
-    status: "ACTIVE",
-    location: "New York Regional Office",
-    compensation: { basic: 48000, allowances: 14000 }
-  },
-  {
     id: "MOD007",
     firstName: "Debrupa",
     lastName: "Ghosh",
@@ -214,32 +201,6 @@ let employees = [
     status: "ACTIVE",
     location: "San Francisco HQ",
     compensation: { basic: 50000, allowances: 14000 }
-  },
-  {
-    id: "MOD005",
-    firstName: "Sourav",
-    lastName: "Ganguly",
-    email: "sourav.ganguly@modela.io",
-    joiningDate: "2024-09-01",
-    designation: "Senior BIM Engineer",
-    phone: "+1 (555) 678-9012",
-    department: "Engineering",
-    status: "ACTIVE",
-    location: "San Francisco HQ",
-    compensation: { basic: 45000, allowances: 12000 }
-  },
-  {
-    id: "MOD006",
-    firstName: "Pooja",
-    lastName: "Sharma",
-    email: "pooja.sharma@modela.io",
-    joiningDate: "2024-10-15",
-    designation: "MEP Designer",
-    phone: "+1 (555) 789-0123",
-    department: "Design",
-    status: "ACTIVE",
-    location: "San Francisco HQ",
-    compensation: { basic: 42000, allowances: 11000 }
   }
 ];
 

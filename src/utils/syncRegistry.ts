@@ -17,6 +17,16 @@ const DEFAULT_DELETED_IDS = [
   'abc123',
   'tony stark',
   'tonystark',
+  'marcus vance',
+  'marcus.vance@modela.io',
+  'mod003',
+  'usr-hr-mgr01',
+  'sourav ganguly',
+  'sourav.ganguly@modela.io',
+  'mod005',
+  'pooja sharma',
+  'pooja.sharma@modela.io',
+  'mod006',
   'pay-2026-09-04',
   'pay-2026-10-04',
   'pay-2026-sep-mod007',
@@ -175,7 +185,21 @@ export const isRecordDeleted = (...identifiers: (string | undefined | null)[]): 
     if (!id) return false;
     const clean = id.toLowerCase().trim();
     if (!clean) return false;
-    if (clean.includes('tony stark') || clean.includes('tonystark') || clean.includes('tony.stark')) {
+    if (
+      clean.includes('tony stark') ||
+      clean.includes('tonystark') ||
+      clean.includes('tony.stark') ||
+      clean.includes('marcus vance') ||
+      clean.includes('marcus.vance') ||
+      clean.includes('sourav ganguly') ||
+      clean.includes('sourav.ganguly') ||
+      clean.includes('pooja sharma') ||
+      clean.includes('pooja.sharma') ||
+      clean === 'mod003' ||
+      clean === 'mod005' ||
+      clean === 'mod006' ||
+      clean === 'usr-hr-mgr01'
+    ) {
       return true;
     }
     return registry.has(clean);

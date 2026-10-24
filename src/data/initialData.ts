@@ -47,21 +47,6 @@ export const INITIAL_USERS: User[] = [
     reviewedBy: "System Root"
   },
   {
-    id: "USR-HR-MGR01",
-    uid: "USR-HR-MGR01",
-    name: "Marcus Vance",
-    email: "marcus.vance@modela.io",
-    avatar_url: "https://ui-avatars.com/api/?name=Marcus+Vance&background=6366f1&color=fff",
-    status: "APPROVED",
-    role: "HR_MANAGER",
-    employeeId: "MOD003",
-    designation: "HR Operations Manager",
-    department: "Human Resources",
-    requestedAt: "2026-09-22T10:00:00.000Z",
-    reviewedAt: "2026-09-22T10:05:00.000Z",
-    reviewedBy: "Sushoovan Das"
-  },
-  {
     id: "USR-OBOPA1GQ",
     uid: "USR-OBOPA1GQ",
     name: "Debrupa Ghosh",
@@ -210,22 +195,6 @@ export const INITIAL_EMPLOYEES: Employee[] = [
     avatar: "https://ui-avatars.com/api/?name=Debrupa+Ghosh&background=0284c7&color=fff"
   },
   {
-    id: "MOD003",
-    firstName: "Marcus",
-    lastName: "Vance",
-    email: "marcus.vance@modela.io",
-    joiningDate: "2024-05-10",
-    designation: "HR Operations Manager",
-    phone: "+1 (555) 456-7890",
-    department: "Human Resources",
-    status: "ACTIVE",
-    location: "New York Regional Office",
-    compensation: { basic: 48000, allowances: 14000 },
-    pan: "VNCMR1992P",
-    bankAccount: "815801500333",
-    avatar: "https://ui-avatars.com/api/?name=Marcus+Vance&background=6366f1&color=fff"
-  },
-  {
     id: "MOD007",
     firstName: "Debrupa",
     lastName: "Ghosh",
@@ -240,36 +209,6 @@ export const INITIAL_EMPLOYEES: Employee[] = [
     pan: "ITHPK8827F",
     bankAccount: "815801500344",
     avatar: "https://ui-avatars.com/api/?name=Debrupa+Ghosh&background=0284c7&color=fff"
-  },
-  {
-    id: "MOD005",
-    firstName: "Sourav",
-    lastName: "Ganguly",
-    email: "sourav.ganguly@modela.io",
-    joiningDate: "2024-09-01",
-    designation: "Senior BIM Engineer",
-    phone: "+1 (555) 678-9012",
-    department: "Engineering",
-    status: "ACTIVE",
-    location: "Kolkata Tech Hub",
-    compensation: { basic: 45000, allowances: 12000 },
-    pan: "GNGLS1972B",
-    bankAccount: "815801500555",
-    avatar: "https://ui-avatars.com/api/?name=Sourav+Ganguly&background=f59e0b&color=fff"
-  },
-  {
-    id: "MOD006",
-    firstName: "Pooja",
-    lastName: "Sharma",
-    email: "pooja.sharma@modela.io",
-    joiningDate: "2024-10-15",
-    designation: "MEP Designer",
-    phone: "+1 (555) 789-0123",
-    department: "Design",
-    status: "ACTIVE",
-    location: "San Francisco HQ",
-    compensation: { basic: 42000, allowances: 11000 },
-    avatar: "https://ui-avatars.com/api/?name=Pooja+Sharma&background=ec4899&color=fff"
   }
 ];
 

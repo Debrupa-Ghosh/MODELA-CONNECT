@@ -158,10 +158,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return (
         full.includes('tony stark') ||
         (full.includes('tony') && full.includes('stark')) ||
+        full.includes('marcus vance') ||
+        (full.includes('marcus') && full.includes('vance')) ||
+        full.includes('sourav ganguly') ||
+        (full.includes('sourav') && full.includes('ganguly')) ||
+        full.includes('pooja sharma') ||
+        (full.includes('pooja') && full.includes('sharma')) ||
         em.includes('tonystark') ||
         em.includes('tony.stark') ||
+        em.includes('marcus.vance') ||
+        em.includes('sourav.ganguly') ||
+        em.includes('pooja.sharma') ||
         (em.includes('tony') && em.includes('stark')) ||
-        i.includes('tonystark')
+        i.includes('tonystark') ||
+        i === 'mod003' ||
+        i === 'mod005' ||
+        i === 'mod006'
       );
     };
 
@@ -182,20 +194,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         location: "San Francisco HQ",
         compensation: { basic: 95000, allowances: 30000 },
         avatar: "https://ui-avatars.com/api/?name=Modela+Tech&background=0284c7&color=fff"
-      },
-      {
-        id: resolveEmpId("marcus.vance@modela.io", "MOD003") || "MOD003",
-        firstName: "Marcus",
-        lastName: "Vance",
-        email: "marcus.vance@modela.io",
-        joiningDate: "2024-05-10",
-        designation: "HR Operations Manager",
-        phone: "+1 (555) 456-7890",
-        department: "Human Resources",
-        status: "ACTIVE",
-        location: "New York Regional Office",
-        compensation: { basic: 48000, allowances: 14000 },
-        avatar: "https://ui-avatars.com/api/?name=Marcus+Vance&background=6366f1&color=fff"
       },
       {
         id: resolveEmpId("ghoshdebrupa005@gmail.com", "MOD007") || "MOD007",
@@ -479,7 +477,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!u.email || u.id === SYNC_REGISTRY_DOC_ID || u.email === 'sync@system.internal') return;
       const resolvedUserId = (resolveEmpId(u.email, u.employeeId) || u.employeeId || '').trim().toUpperCase();
       if (!resolvedUserId || isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolvedUserId)) return;
-      if (resolvedUserId === 'MOD007' || resolvedUserId === 'MOD008' || resolvedUserId === 'MOD0090' || resolvedUserId === 'MOD01') return;
+      if (resolvedUserId === 'MOD003' || resolvedUserId === 'MOD005' || resolvedUserId === 'MOD006' || resolvedUserId === 'MOD007' || resolvedUserId === 'MOD008' || resolvedUserId === 'MOD0090' || resolvedUserId === 'MOD01') return;
 
       const parts = (u.name || '').trim().split(/\s+/);
       const empObj: Employee = {
@@ -570,13 +568,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     'PAY-2026-OCT-MOD01',
     'PAY-2026-OCT-MOD0090',
     'PAY-2026-OCT-MOD008',
+    'PAY-2026-OCT-MOD003',
+    'PAY-2026-OCT-MOD005',
+    'PAY-2026-OCT-MOD006',
     'PAY-2026-09-04',
     'PAY-2026-10-04',
     'PAY-2026-SEP-MOD007',
     'PAY-2026-OCT-MOD007',
     'PAY-2026-NOV-MOD007',
     'PAY-2026-DEC-MOD007',
-    'PAY-2026-OCT-MOD001'
+    'PAY-2026-OCT-MOD001',
+    ...['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'].flatMap(m => [
+      `PAY-2026-${m}-MOD003`,
+      `PAY-2026-${m}-MOD005`,
+      `PAY-2026-${m}-MOD006`
+    ])
   ]);
 
   const isExcludedPayrollRecord = (p: Partial<PayrollRecord>): boolean => {
@@ -587,23 +593,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (BLOCKED_PAYROLL_DOC_IDS.has(docId)) return true;
 
-    // Exclude EMP ID MOD007, legacy MOD008/MOD0090, Tony Stark, and Piu Roy salary slips
+    // Exclude EMP ID MOD003, MOD005, MOD006, MOD007, legacy MOD008/MOD0090, Marcus Vance, Sourav Ganguly, Pooja Sharma, Tony Stark, and Piu Roy salary slips
     if (
       empName.includes('tony stark') ||
       (empName.includes('tony') && empName.includes('stark')) ||
       empName.includes('piu roy') ||
       (empName.includes('piu') && empName.includes('roy')) ||
+      empName.includes('marcus vance') ||
+      (empName.includes('marcus') && empName.includes('vance')) ||
+      empName.includes('sourav ganguly') ||
+      (empName.includes('sourav') && empName.includes('ganguly')) ||
+      empName.includes('pooja sharma') ||
+      (empName.includes('pooja') && empName.includes('sharma')) ||
+      empId === 'MOD003' ||
+      empId === 'MOD005' ||
+      empId === 'MOD006' ||
       empId === 'MOD007' ||
       empId === 'MOD0090' ||
       empId === 'MOD008' ||
       docId === 'PAY-2026-09-04' ||
       docId === 'PAY-2026-10-04' ||
+      docId.includes('MOD003') ||
+      docId.includes('MOD005') ||
+      docId.includes('MOD006') ||
       docId.includes('MOD007') ||
       docId.includes('MOD0090') ||
       docId.includes('MOD008') ||
       docId.includes('TONY') ||
       docId.includes('STARK') ||
-      docId.includes('PIU')
+      docId.includes('PIU') ||
+      docId.includes('MARCUS') ||
+      docId.includes('SOURAV') ||
+      docId.includes('POOJA')
     ) {
       return true;
     }
@@ -777,6 +798,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     let isSubscribed = true;
 
+    // Proactively delete Marcus Vance (MOD003), Sourav Ganguly (MOD005), and Pooja Sharma (MOD006) from Firestore employees collection
+    ['MOD003', 'MOD005', 'MOD006'].forEach(removedEmpId => {
+      deleteDoc(doc(db, 'employees', removedEmpId)).catch(() => {});
+    });
+
     const unsub = onSnapshot(
       collection(db, 'employees'),
       async snapshot => {
@@ -801,24 +827,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (!data || !data.id) return;
           const fullName = `${data.firstName || ''} ${data.lastName || ''}`.trim().toLowerCase();
           const lowerEmail = (data.email || '').trim().toLowerCase();
+          const upperId = (data.id || '').trim().toUpperCase();
+          const isRemovedEmployee =
+            fullName.includes('marcus vance') ||
+            (fullName.includes('marcus') && fullName.includes('vance')) ||
+            fullName.includes('sourav ganguly') ||
+            (fullName.includes('sourav') && fullName.includes('ganguly')) ||
+            fullName.includes('pooja sharma') ||
+            (fullName.includes('pooja') && fullName.includes('sharma')) ||
+            lowerEmail === 'marcus.vance@modela.io' ||
+            lowerEmail === 'sourav.ganguly@modela.io' ||
+            lowerEmail === 'pooja.sharma@modela.io' ||
+            upperId === 'MOD003' ||
+            upperId === 'MOD005' ||
+            upperId === 'MOD006';
           const isPiu =
             fullName.includes('piu roy') ||
             (fullName.includes('piu') && fullName.includes('roy')) ||
             lowerEmail.includes('piuroy') ||
             lowerEmail.includes('piu.roy');
-          if (isPiu) {
+          if (isPiu || isRemovedEmployee) {
             ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'].forEach(mCode => {
-              deleteDoc(doc(db, 'payroll', `PAY-2026-${mCode}-${data.id.toUpperCase()}`)).catch(() => {});
+              deleteDoc(doc(db, 'payroll', `PAY-2026-${mCode}-${upperId}`)).catch(() => {});
             });
           }
           if (
+            isRemovedEmployee ||
             fullName.includes('tony stark') ||
             (fullName.includes('tony') && fullName.includes('stark')) ||
             lowerEmail.includes('tonystark') ||
             lowerEmail.includes('tony.stark') ||
             isRecordDeleted(docSnap.id, data.id, data.email, resolveEmpId(data.email, data.id))
           ) {
-            // Permanently delete deleted employee or Tony Stark from Firestore employees database
+            // Permanently delete deleted employee, Marcus Vance, Sourav Ganguly, Pooja Sharma, or Tony Stark from Firestore employees database
             deleteDoc(doc(db, 'employees', docSnap.id)).catch(() => {});
             return;
           }
@@ -1202,7 +1243,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
           combinedApprovedUsers.forEach(u => {
             const empId = (u.employeeId || '').trim().toUpperCase();
-            if (!empId || empId === 'MOD007' || empId === 'MOD008' || empId === 'MOD0090' || empId === 'MOD01') return;
+            if (!empId || empId === 'MOD003' || empId === 'MOD005' || empId === 'MOD006' || empId === 'MOD007' || empId === 'MOD008' || empId === 'MOD0090' || empId === 'MOD01') return;
             const fullName = (u.name || u.email.split('@')[0]).trim();
             const isModelaUser = fullName.toLowerCase() === 'modela tech' || u.email.toLowerCase() === 'modelatech2026@gmail.com';
             const isSushoovanUser = fullName.toLowerCase() === 'sushoovan das' || u.email.toLowerCase() === 'sushovand@modelatech.com';
@@ -2118,17 +2159,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const lowerEmail = (emp.email || '').trim().toLowerCase();
     const upperEmpId = (emp.id || '').trim().toUpperCase();
 
-    // Do not generate or sync payslips for MOD007, legacy MOD008/MOD0090, Tony Stark, Piu Roy, intermediate MOD01, or deleted employees
+    // Do not generate or sync payslips for MOD003, MOD005, MOD006, MOD007, legacy MOD008/MOD0090, Marcus Vance, Sourav Ganguly, Pooja Sharma, Tony Stark, Piu Roy, intermediate MOD01, or deleted employees
     if (
       lowerName.includes('tony stark') ||
       (lowerName.includes('tony') && lowerName.includes('stark')) ||
       lowerName.includes('piu roy') ||
       (lowerName.includes('piu') && lowerName.includes('roy')) ||
+      lowerName.includes('marcus vance') ||
+      (lowerName.includes('marcus') && lowerName.includes('vance')) ||
+      lowerName.includes('sourav ganguly') ||
+      (lowerName.includes('sourav') && lowerName.includes('ganguly')) ||
+      lowerName.includes('pooja sharma') ||
+      (lowerName.includes('pooja') && lowerName.includes('sharma')) ||
+      upperEmpId === 'MOD003' ||
+      upperEmpId === 'MOD005' ||
+      upperEmpId === 'MOD006' ||
       upperEmpId === 'MOD007' ||
       upperEmpId === 'MOD008' ||
       upperEmpId === 'MOD0090' ||
       upperEmpId === 'MOD01' ||
       lowerEmail === 'ghoshdebrupa005@gmail.com' ||
+      lowerEmail === 'marcus.vance@modela.io' ||
+      lowerEmail === 'sourav.ganguly@modela.io' ||
+      lowerEmail === 'pooja.sharma@modela.io' ||
       lowerEmail.includes('tonystark') ||
       lowerEmail.includes('tony.stark') ||
       lowerEmail.includes('piuroy') ||

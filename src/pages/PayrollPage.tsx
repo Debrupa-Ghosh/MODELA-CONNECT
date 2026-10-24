@@ -89,6 +89,9 @@ export const PayrollPage: React.FC = () => {
       'PAY-2026-OCT-MOD01',
       'PAY-2026-OCT-MOD0090',
       'PAY-2026-OCT-MOD008',
+      'PAY-2026-OCT-MOD003',
+      'PAY-2026-OCT-MOD005',
+      'PAY-2026-OCT-MOD006',
       'PAY-2026-09-04',
       'PAY-2026-10-04',
       'PAY-2026-SEP-MOD007',
@@ -110,15 +113,33 @@ export const PayrollPage: React.FC = () => {
         (n.includes('tony') && n.includes('stark')) ||
         n.includes('piu roy') ||
         (n.includes('piu') && n.includes('roy')) ||
+        n.includes('marcus vance') ||
+        (n.includes('marcus') && n.includes('vance')) ||
+        n.includes('sourav ganguly') ||
+        (n.includes('sourav') && n.includes('ganguly')) ||
+        n.includes('pooja sharma') ||
+        (n.includes('pooja') && n.includes('sharma')) ||
+        id === 'MOD003' ||
+        id === 'MOD005' ||
+        id === 'MOD006' ||
         id === 'MOD007' ||
         id === 'MOD008' ||
         id === 'MOD0090' ||
         dId === 'PAY-2026-09-04' ||
         dId === 'PAY-2026-10-04' ||
+        dId.includes('MOD003') ||
+        dId.includes('MOD005') ||
+        dId.includes('MOD006') ||
         dId.includes('MOD007') ||
         dId.includes('MOD008') ||
         dId.includes('MOD0090') ||
         em === 'ghoshdebrupa005@gmail.com' ||
+        em === 'marcus.vance@modela.io' ||
+        em === 'sourav.ganguly@modela.io' ||
+        em === 'pooja.sharma@modela.io' ||
+        em.includes('marcus.vance') ||
+        em.includes('sourav.ganguly') ||
+        em.includes('pooja.sharma') ||
         em.includes('tonystark') ||
         em.includes('tony.stark') ||
         em.includes('piuroy') ||
@@ -126,7 +147,10 @@ export const PayrollPage: React.FC = () => {
         (em.includes('piu') && em.includes('roy')) ||
         dId.includes('TONY') ||
         dId.includes('STARK') ||
-        dId.includes('PIU')
+        dId.includes('PIU') ||
+        dId.includes('MARCUS') ||
+        dId.includes('SOURAV') ||
+        dId.includes('POOJA')
       ) {
         return true;
       }
