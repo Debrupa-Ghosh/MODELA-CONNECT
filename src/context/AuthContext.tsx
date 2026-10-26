@@ -125,37 +125,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
-    const modelaUser: User = {
-      id: "USR-SUPERADMIN-01",
-      uid: "USR-SUPERADMIN-01",
-      name: "Modela Tech",
-      email: "modelatech2026@gmail.com",
-      avatar_url: "https://ui-avatars.com/api/?name=Modela+Tech&background=0284c7&color=fff",
-      status: "APPROVED",
-      role: "SUPER_ADMIN",
-      employeeId: resolveEmpId("modelatech2026@gmail.com", "MOD000") || "MOD000",
-      designation: "Executive Director & Super Admin",
-      department: "Executive Office",
-      requestedAt: "2026-09-20T08:44:15.481Z",
-      reviewedAt: "2026-09-20T08:44:35.660Z",
-      reviewedBy: "System Root"
-    };
-
-    if (!isRecordDeleted('USR-SUPERADMIN-01', 'modelatech2026@gmail.com')) {
-      const mIdx = list.findIndex(u => u.email?.toLowerCase() === 'modelatech2026@gmail.com' || u.id === 'USR-SUPERADMIN-01');
-      if (mIdx >= 0) {
-        list[mIdx] = {
-          ...modelaUser,
-          ...list[mIdx],
-          status: 'APPROVED',
-          role: 'SUPER_ADMIN',
-          employeeId: resolveEmpId('modelatech2026@gmail.com', list[mIdx].employeeId || 'MOD000') || 'MOD000'
-        };
-      } else {
-        list.unshift(modelaUser);
-      }
-    }
-
     try {
       localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(list));
     } catch {}
@@ -273,7 +242,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     let isSubscribed = true;
 
-    deleteDoc(doc(db, 'users', 'USR-HR-MGR01')).catch(() => {});
+    [
+      'USR-HR-MGR01',
+      'USR-SUPERADMIN-01',
+      'USR-SUSHOOVAN-GMAIL',
+      'USR-OBOPA1GQ',
+      'USR-ADITI-008',
+      'REQ-modelatech2026_gmail_com',
+      'REQ-sushoovandas_gmail_com',
+      'REQ-ghoshdebrupa005_gmail_com',
+      'REQ-aditichakraborty2005_gmail_com',
+      'REQ-aditichakrabarty2005_gmail_com'
+    ].forEach(removedDocId => {
+      deleteDoc(doc(db, 'users', removedDocId)).catch(() => {});
+    });
 
     const unsub = onSnapshot(
       collection(db, 'users'),
@@ -326,9 +308,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             lowerEmail === 'marcus.vance@modela.io' ||
             lowerEmail === 'sourav.ganguly@modela.io' ||
             lowerEmail === 'pooja.sharma@modela.io' ||
+            lowerEmail === 'modelatech2026@gmail.com' ||
+            lowerEmail === 'sushoovandas@gmail.com' ||
+            lowerEmail === 'ghoshdebrupa005@gmail.com' ||
+            lowerEmail === 'aditichakraborty2005@gmail.com' ||
+            lowerEmail === 'aditichakrabarty2005@gmail.com' ||
+            upperEmpId === 'MOD000' ||
+            upperEmpId === 'MOD101' ||
             upperEmpId === 'MOD003' ||
             upperEmpId === 'MOD005' ||
             upperEmpId === 'MOD006' ||
+            upperEmpId === 'MOD007' ||
+            upperEmpId === 'MOD008' ||
+            upperEmpId === 'MOD102' ||
             isRecordDeleted(docSnap.id, item.id, item.uid, item.email, item.employeeId, resolveEmpId(item.email, item.employeeId))
           ) {
             deleteDoc(doc(db, 'users', docSnap.id)).catch(() => {});
@@ -409,35 +401,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             employeeId: curStatus === 'PENDING' ? curSushoovan?.employeeId : (resolveEmpId('sushovand@modelatech.com', curSushoovan?.employeeId || 'MOD001') || 'MOD001'),
             name: curSushoovan?.name || 'Sushoovan Das',
             designation: curSushoovan?.designation || 'Executive Director & Super Admin'
-          });
-        }
-
-        // Ensure Modela Tech is present in users map as APPROVED SUPER_ADMIN if not deleted
-        if (!isRecordDeleted('USR-SUPERADMIN-01', 'modelatech2026@gmail.com', 'MOD000', resolveEmpId('modelatech2026@gmail.com', 'MOD000'))) {
-          const modelaUser: User = {
-            id: "USR-SUPERADMIN-01",
-            uid: "USR-SUPERADMIN-01",
-            name: "Modela Tech",
-            email: "modelatech2026@gmail.com",
-            avatar_url: "https://ui-avatars.com/api/?name=Modela+Tech&background=0284c7&color=fff",
-            status: "APPROVED",
-            role: "SUPER_ADMIN",
-            employeeId: "MOD000",
-            designation: "Executive Director & Super Admin",
-            department: "Executive Office",
-            requestedAt: "2026-09-20T08:44:15.481Z",
-            reviewedAt: "2026-09-20T08:44:35.660Z",
-            reviewedBy: "System Root"
-          };
-          const curModela = map.get('modelatech2026@gmail.com');
-          map.set('modelatech2026@gmail.com', {
-            ...modelaUser,
-            ...(curModela || {}),
-            status: 'APPROVED',
-            role: 'SUPER_ADMIN',
-            employeeId: resolveEmpId('modelatech2026@gmail.com', curModela?.employeeId || 'MOD000') || 'MOD000',
-            name: curModela?.name || 'Modela Tech',
-            designation: curModela?.designation || 'Executive Director & Super Admin'
           });
         }
 
@@ -590,24 +553,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // 2. Initial static dataset fallback during rehydration
     const initialFound = INITIAL_USERS.find(u => u.email.toLowerCase() === clean && u.status === 'APPROVED');
     if (initialFound && !isRecordDeleted(initialFound.id, initialFound.email, initialFound.employeeId)) return initialFound;
-    // 3. Fallback for Super Admin Modela Tech
-    if (clean === 'modelatech2026@gmail.com') {
-      return {
-        id: "USR-SUPERADMIN-01",
-        uid: "USR-SUPERADMIN-01",
-        name: "Modela Tech",
-        email: "modelatech2026@gmail.com",
-        avatar_url: "https://ui-avatars.com/api/?name=Modela+Tech&background=0284c7&color=fff",
-        status: "APPROVED" as const,
-        role: "SUPER_ADMIN" as UserRole,
-        employeeId: "MOD000",
-        designation: "Executive Director & Super Admin",
-        department: "Executive Office",
-        requestedAt: "2026-09-20T08:44:15.481Z",
-        reviewedAt: "2026-09-20T08:44:35.660Z",
-        reviewedBy: "System Root"
-      };
-    }
     return null;
   }, [users, currentEmail]);
 
@@ -629,20 +574,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loginAs = (email: string): boolean => {
     const clean = email.toLowerCase().trim();
-    if (clean === 'modelatech2026@gmail.com') {
-      removeDeletedRecord('modelatech2026@gmail.com', 'mod000', 'usr-superadmin-01');
-      const target = users.find(u => u.email.toLowerCase() === clean) ||
-        INITIAL_USERS.find(u => u.email.toLowerCase() === clean);
-      if (target) {
-        target.status = 'APPROVED';
-        target.role = target.role || 'SUPER_ADMIN';
-      }
-      setCurrentEmail(clean);
-      try {
-        localStorage.removeItem('modela_pending_signup_email');
-      } catch {}
-      return true;
-    }
     if (isRecordDeleted(clean)) return false;
     const target = users.find(u => u.email.toLowerCase() === clean);
 
@@ -699,37 +630,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // If accepted only then added to Employees page and will get access like Employees role get.
   const submitSignupRequest = (data: { email: string; name?: string; department?: string; designation?: string }) => {
     const cleanEmail = data.email.trim().toLowerCase();
-
-    if (cleanEmail === 'modelatech2026@gmail.com') {
-      removeDeletedRecord('modelatech2026@gmail.com', 'mod000', 'usr-superadmin-01');
-      const saUser: User = {
-        id: "USR-SUPERADMIN-01",
-        uid: "USR-SUPERADMIN-01",
-        name: "Modela Tech",
-        email: cleanEmail,
-        avatar_url: `https://ui-avatars.com/api/?name=${encodeURIComponent('Modela Tech')}&background=3b82f6&color=fff`,
-        status: "APPROVED",
-        role: "SUPER_ADMIN",
-        employeeId: "MOD000",
-        designation: "Executive Director & Super Admin",
-        department: "Executive Office",
-        requestedAt: "2026-09-20T08:44:15.481Z",
-        reviewedAt: "2026-09-20T08:44:35.660Z",
-        reviewedBy: "System Root"
-      };
-      setUsers(prev => [saUser, ...prev.filter(u => u.email.toLowerCase() !== cleanEmail)]);
-      setDoc(doc(db, 'users', saUser.id), saUser, { merge: true }).catch(() => {});
-      setCurrentEmail(cleanEmail);
-      try {
-        sessionStorage.setItem('modela_active_session_email', cleanEmail);
-      } catch {}
-      return {
-        success: true,
-        isPending: false,
-        message: 'Super Admin access granted.',
-        user: saUser
-      };
-    }
 
     const existing = users.find(u => u.email.toLowerCase() === cleanEmail);
 

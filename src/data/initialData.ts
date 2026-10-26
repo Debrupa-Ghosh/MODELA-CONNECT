@@ -2,21 +2,6 @@ import { User, Employee, StaffWorkflowRequest, AttendanceRecord, PayrollRecord, 
 
 export const INITIAL_USERS: User[] = [
   {
-    id: "USR-SUPERADMIN-01",
-    uid: "USR-SUPERADMIN-01",
-    name: "Modela Tech",
-    email: "modelatech2026@gmail.com",
-    avatar_url: "https://ui-avatars.com/api/?name=Modela+Tech&background=0284c7&color=fff",
-    status: "APPROVED",
-    role: "SUPER_ADMIN",
-    employeeId: "MOD000",
-    designation: "Executive Director & Super Admin",
-    department: "Executive Office",
-    requestedAt: "2026-09-20T08:44:15.481Z",
-    reviewedAt: "2026-09-20T08:44:35.660Z",
-    reviewedBy: "System Root"
-  },
-  {
     id: "USR-Q94BIIQ5",
     uid: "USR-Q94BIIQ5",
     name: "Sushoovan Das",
@@ -31,37 +16,7 @@ export const INITIAL_USERS: User[] = [
     reviewedAt: "2026-09-20T08:44:35.660Z",
     reviewedBy: "System Root"
   },
-  {
-    id: "USR-SUSHOOVAN-GMAIL",
-    uid: "USR-SUSHOOVAN-GMAIL",
-    name: "Sushoovan Das",
-    email: "sushoovandas@gmail.com",
-    avatar_url: "https://ui-avatars.com/api/?name=Sushoovan+Das&background=3b82f6&color=fff",
-    status: "APPROVED",
-    role: "SUPER_ADMIN",
-    employeeId: "MOD001",
-    designation: "Executive Director & Super Admin",
-    department: "Executive Office",
-    requestedAt: "2026-09-20T08:44:15.481Z",
-    reviewedAt: "2026-09-20T08:44:35.660Z",
-    reviewedBy: "System Root"
-  },
-  {
-    id: "USR-OBOPA1GQ",
-    uid: "USR-OBOPA1GQ",
-    name: "Debrupa Ghosh",
-    email: "ghoshdebrupa005@gmail.com",
-    avatar_url: "https://ui-avatars.com/api/?name=Debrupa+Ghosh&background=0284c7&color=fff",
-    status: "APPROVED",
-    role: "EMPLOYEE",
-    employeeId: "MOD007",
-    designation: "Full Stack Engineer",
-    department: "Engineering",
-    requestedAt: "2026-10-02T06:37:31.931Z",
-    reviewedAt: "2026-10-02T06:37:42.653Z",
-    reviewedBy: "Sushoovan Das"
-  },
-  // Pending signup verification requests (4 requests matching Image 3!)
+  // Pending signup verification requests
   {
     id: "USR-PENDING-DEBRUPA",
     uid: "USR-PENDING-DEBRUPA",
@@ -74,21 +29,6 @@ export const INITIAL_USERS: User[] = [
     designation: "Full Stack Engineer Candidate",
     requestedAt: "2026-10-02T13:23:00.000Z",
     notificationUnread: true
-  },
-  {
-    id: "USR-ADITI-008",
-    uid: "USR-ADITI-008",
-    name: "Aditi Chakraborty",
-    email: "aditichakraborty2005@gmail.com",
-    avatar_url: "https://ui-avatars.com/api/?name=Aditi+Chakraborty&background=f59e0b&color=fff",
-    status: "APPROVED",
-    role: "EMPLOYEE",
-    employeeId: "MOD008",
-    designation: "QA Engineer Candidate",
-    department: "Quality Assurance",
-    requestedAt: "2026-10-01T14:30:00.000Z",
-    reviewedAt: "2026-10-01T14:35:00.000Z",
-    reviewedBy: "System Root"
   },
   {
     id: "USR-SURUPA-011",
@@ -135,22 +75,6 @@ export const INITIAL_USERS: User[] = [
 
 export const INITIAL_EMPLOYEES: Employee[] = [
   {
-    id: "MOD000",
-    firstName: "Modela",
-    lastName: "Tech",
-    email: "modelatech2026@gmail.com",
-    joiningDate: "2024-01-01",
-    designation: "Executive Director & Super Admin",
-    phone: "+1 (555) 123-4567",
-    department: "Executive Office",
-    status: "ACTIVE",
-    location: "San Francisco HQ",
-    compensation: { basic: 95000, allowances: 30000 },
-    pan: "MODTK2026A",
-    bankAccount: "815801500000",
-    avatar: "https://ui-avatars.com/api/?name=Modela+Tech&background=0284c7&color=fff"
-  },
-  {
     id: "MOD001",
     firstName: "Sushoovan",
     lastName: "Das",
@@ -167,20 +91,6 @@ export const INITIAL_EMPLOYEES: Employee[] = [
     avatar: "https://ui-avatars.com/api/?name=Sushoovan+Das&background=3b82f6&color=fff"
   },
   {
-    id: "MOD008",
-    firstName: "Aditi",
-    lastName: "Chakraborty",
-    email: "aditichakraborty2005@gmail.com",
-    joiningDate: "2026-10-01",
-    designation: "QA Engineer Candidate",
-    phone: "",
-    department: "Quality Assurance",
-    status: "ACTIVE",
-    location: "San Francisco HQ",
-    compensation: { basic: 50000, allowances: 15000 },
-    avatar: "https://ui-avatars.com/api/?name=Aditi+Chakraborty&background=f59e0b&color=fff"
-  },
-  {
     id: "MOD011",
     firstName: "Debrupa",
     lastName: "Ghosh",
@@ -193,46 +103,11 @@ export const INITIAL_EMPLOYEES: Employee[] = [
     location: "San Francisco HQ",
     compensation: { basic: 50000, allowances: 15000 },
     avatar: "https://ui-avatars.com/api/?name=Debrupa+Ghosh&background=0284c7&color=fff"
-  },
-  {
-    id: "MOD007",
-    firstName: "Debrupa",
-    lastName: "Ghosh",
-    email: "ghoshdebrupa005@gmail.com",
-    joiningDate: "2024-06-01",
-    designation: "Full Stack Engineer",
-    phone: "+1 (555) 345-6789",
-    department: "Engineering",
-    status: "ACTIVE",
-    location: "San Francisco HQ",
-    compensation: { basic: 50000, allowances: 14000 },
-    pan: "ITHPK8827F",
-    bankAccount: "815801500344",
-    avatar: "https://ui-avatars.com/api/?name=Debrupa+Ghosh&background=0284c7&color=fff"
   }
 ];
 
 // VERIFIED STAFF WORKFLOW REQUESTS (for the Requests tab / Requests & Approvals Central)
 export const INITIAL_STAFF_REQUESTS: StaffWorkflowRequest[] = [
-  {
-    id: "REQ-1042",
-    employeeId: "MOD007",
-    employeeName: "Debrupa Ghosh",
-    employeeEmail: "ghoshdebrupa005@gmail.com",
-    department: "Engineering",
-    designation: "Full Stack Engineer",
-    type: "EQUIPMENT",
-    title: "Ergonomic Monitor & USB-C Thunderbolt 4 Dock",
-    description: "Requisition for dual 27-inch 4K Dell UltraSharp monitors and CalDigit TS4 dock for frontend & backend microservices development, testing high-DPI responsive builds.",
-    amountOrDays: "Rs. 1,150.00",
-    targetDates: "Immediate Requisition",
-    priority: "MEDIUM",
-    status: "PENDING",
-    submittedAt: "2026-10-02T06:10:00.000Z",
-    isVerifiedStaff: true,
-    justification: "Approved under Tech Stack Hardware Allowance policy Sec 4.2 for verified engineering staff.",
-    supervisorName: "Alex Morgan (HR Admin)"
-  },
   {
     id: "REQ-1043",
     employeeId: "MOD005",

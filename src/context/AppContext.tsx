@@ -169,11 +169,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         em.includes('marcus.vance') ||
         em.includes('sourav.ganguly') ||
         em.includes('pooja.sharma') ||
+        em === 'modelatech2026@gmail.com' ||
+        em === 'sushoovandas@gmail.com' ||
+        em === 'ghoshdebrupa005@gmail.com' ||
+        em === 'aditichakraborty2005@gmail.com' ||
+        em === 'aditichakrabarty2005@gmail.com' ||
         (em.includes('tony') && em.includes('stark')) ||
         i.includes('tonystark') ||
+        i === 'mod000' ||
+        i === 'mod101' ||
         i === 'mod003' ||
         i === 'mod005' ||
-        i === 'mod006'
+        i === 'mod006' ||
+        i === 'mod007' ||
+        i === 'mod008' ||
+        i === 'mod102'
       );
     };
 
@@ -181,36 +191,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const requiredEmployees: Employee[] = [
       sushoovanEmployee,
-      {
-        id: resolveEmpId("modelatech2026@gmail.com", "MOD000") || "MOD000",
-        firstName: "Modela",
-        lastName: "Tech",
-        email: "modelatech2026@gmail.com",
-        joiningDate: "2024-01-01",
-        designation: "Executive Director & Super Admin",
-        phone: "+1 (555) 123-4567",
-        department: "Executive Office",
-        status: "ACTIVE",
-        location: "San Francisco HQ",
-        compensation: { basic: 95000, allowances: 30000 },
-        avatar: "https://ui-avatars.com/api/?name=Modela+Tech&background=0284c7&color=fff"
-      },
-      {
-        id: resolveEmpId("ghoshdebrupa005@gmail.com", "MOD007") || "MOD007",
-        firstName: "Debrupa",
-        lastName: "Ghosh",
-        email: "ghoshdebrupa005@gmail.com",
-        joiningDate: "2024-06-01",
-        designation: "Full Stack Engineer",
-        phone: "+1 (555) 345-6789",
-        department: "Engineering",
-        status: "ACTIVE",
-        location: "San Francisco HQ",
-        compensation: { basic: 50000, allowances: 14000 },
-        pan: "ITHPK8827F",
-        bankAccount: "815801500344",
-        avatar: "https://ui-avatars.com/api/?name=Debrupa+Ghosh&background=0284c7&color=fff"
-      },
       {
         id: resolveEmpId("surupa008@gmail.com", "MOD011") || "MOD011",
         firstName: "Debrupa",
@@ -511,21 +491,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   }, [users]);
 
+  const isExcludedStaffRequest = (r?: Partial<StaffWorkflowRequest> | null): boolean => {
+    if (!r) return true;
+    const reqId = String(r.id || '').trim().toUpperCase();
+    const empId = String(r.employeeId || '').trim().toUpperCase();
+    const empEmail = String(r.employeeEmail || '').trim().toLowerCase();
+    return (
+      reqId === 'REQ-622' ||
+      reqId === 'REQ-719' ||
+      reqId === 'REQ-1042' ||
+      reqId === 'REQ-STF-002' ||
+      empId === 'MOD007' ||
+      empEmail === 'ghoshdebrupa005@gmail.com' ||
+      r.employeeName === 'Riju1234' ||
+      r.employeeName === 'Abc123' ||
+      isRecordDeleted(r.id, r.employeeId, r.employeeName)
+    );
+  };
+
   const [staffRequests, setStaffRequests] = useState<StaffWorkflowRequest[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.REQUESTS);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          const filtered = parsed.filter(
-            (r: StaffWorkflowRequest) =>
-              r &&
-              r.id !== 'REQ-622' &&
-              r.id !== 'REQ-719' &&
-              r.employeeName !== 'Riju1234' &&
-              r.employeeName !== 'Abc123' &&
-              !isRecordDeleted(r.id, r.employeeId, r.employeeName)
-          );
+          const filtered = parsed.filter((r: StaffWorkflowRequest) => !isExcludedStaffRequest(r));
           try {
             localStorage.setItem(STORAGE_KEYS.REQUESTS, JSON.stringify(filtered));
           } catch {}
@@ -533,15 +523,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       }
     } catch {}
-    return INITIAL_STAFF_REQUESTS.filter(
-      r =>
-        r &&
-        r.id !== 'REQ-622' &&
-        r.id !== 'REQ-719' &&
-        r.employeeName !== 'Riju1234' &&
-        r.employeeName !== 'Abc123' &&
-        !isRecordDeleted(r.id, r.employeeId, r.employeeName)
-    );
+    return INITIAL_STAFF_REQUESTS.filter(r => !isExcludedStaffRequest(r));
   });
 
   const [attendance, setAttendance] = useState<AttendanceRecord[]>(() => {
@@ -798,8 +780,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     let isSubscribed = true;
 
-    // Proactively delete Marcus Vance (MOD003), Sourav Ganguly (MOD005), and Pooja Sharma (MOD006) from Firestore employees collection
-    ['MOD003', 'MOD005', 'MOD006'].forEach(removedEmpId => {
+    // Proactively delete excluded employees from Firestore employees collection
+    ['MOD000', 'MOD101', 'MOD003', 'MOD005', 'MOD006', 'MOD007', 'MOD008', 'MOD102'].forEach(removedEmpId => {
       deleteDoc(doc(db, 'employees', removedEmpId)).catch(() => {});
     });
 
@@ -838,9 +820,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             lowerEmail === 'marcus.vance@modela.io' ||
             lowerEmail === 'sourav.ganguly@modela.io' ||
             lowerEmail === 'pooja.sharma@modela.io' ||
+            lowerEmail === 'modelatech2026@gmail.com' ||
+            lowerEmail === 'sushoovandas@gmail.com' ||
+            lowerEmail === 'ghoshdebrupa005@gmail.com' ||
+            lowerEmail === 'aditichakraborty2005@gmail.com' ||
+            lowerEmail === 'aditichakrabarty2005@gmail.com' ||
+            upperId === 'MOD000' ||
+            upperId === 'MOD101' ||
             upperId === 'MOD003' ||
             upperId === 'MOD005' ||
-            upperId === 'MOD006';
+            upperId === 'MOD006' ||
+            upperId === 'MOD007' ||
+            upperId === 'MOD008' ||
+            upperId === 'MOD102';
           const isPiu =
             fullName.includes('piu roy') ||
             (fullName.includes('piu') && fullName.includes('roy')) ||
@@ -859,7 +851,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             lowerEmail.includes('tony.stark') ||
             isRecordDeleted(docSnap.id, data.id, data.email, resolveEmpId(data.email, data.id))
           ) {
-            // Permanently delete deleted employee, Marcus Vance, Sourav Ganguly, Pooja Sharma, or Tony Stark from Firestore employees database
             deleteDoc(doc(db, 'employees', docSnap.id)).catch(() => {});
             return;
           }
@@ -1035,9 +1026,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Real-time Firestore synchronization for workflow staff requests across all devices
   useEffect(() => {
-    // Proactively delete REQ-622 and REQ-719 from Firestore database so they never appear across any browser
+    // Proactively delete REQ-622, REQ-719, REQ-1042, and REQ-STF-002 from Firestore database so they never appear across any browser
     deleteDoc(doc(db, 'requests', 'REQ-622')).catch(() => {});
     deleteDoc(doc(db, 'requests', 'REQ-719')).catch(() => {});
+    deleteDoc(doc(db, 'requests', 'REQ-1042')).catch(() => {});
+    deleteDoc(doc(db, 'requests', 'REQ-STF-002')).catch(() => {});
 
     let isSubscribed = true;
     const unsub = onSnapshot(
@@ -1049,11 +1042,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (snapshot.empty) {
           try {
             for (const req of INITIAL_STAFF_REQUESTS) {
-              if (
-                !isRecordDeleted(req.id, req.employeeId, req.employeeName) &&
-                req.id !== 'REQ-622' &&
-                req.id !== 'REQ-719'
-              ) {
+              if (!isExcludedStaffRequest(req)) {
                 await setDoc(doc(db, 'requests', req.id), req);
               }
             }
@@ -1066,11 +1055,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const map = new Map<string, StaffWorkflowRequest>();
         // Add baseline default requests
         INITIAL_STAFF_REQUESTS.forEach(req => {
-          if (
-            !isRecordDeleted(req.id, req.employeeId, req.employeeName) &&
-            req.id !== 'REQ-622' &&
-            req.id !== 'REQ-719'
-          ) {
+          if (!isExcludedStaffRequest(req)) {
             map.set(req.id, req);
           }
         });
@@ -1079,14 +1064,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         snapshot.forEach(docSnap => {
           const data = docSnap.data() as StaffWorkflowRequest;
           if (data && data.id) {
-            if (
-              data.id === 'REQ-622' ||
-              data.id === 'REQ-719' ||
-              data.employeeName === 'Riju1234' ||
-              data.employeeName === 'Abc123' ||
-              isRecordDeleted(data.id, data.employeeId, data.employeeName)
-            ) {
+            if (isExcludedStaffRequest(data)) {
               // Permanently remove from database if present
+              deleteDoc(doc(db, 'requests', docSnap.id)).catch(() => {});
               deleteDoc(doc(db, 'requests', data.id)).catch(() => {});
               map.delete(data.id);
             } else {
@@ -1097,15 +1077,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         // Sort newest submitted requests first and ensure deleted are excluded
         const combined = Array.from(map.values())
-          .filter(
-            r =>
-              r &&
-              r.id !== 'REQ-622' &&
-              r.id !== 'REQ-719' &&
-              r.employeeName !== 'Riju1234' &&
-              r.employeeName !== 'Abc123' &&
-              !isRecordDeleted(r.id, r.employeeId, r.employeeName)
-          )
+          .filter(r => !isExcludedStaffRequest(r))
           .sort(
             (a, b) => new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime()
           );
@@ -1341,24 +1313,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!snap.empty) {
         const map = new Map<string, StaffWorkflowRequest>();
         INITIAL_STAFF_REQUESTS.forEach(req => {
-          if (
-            !isRecordDeleted(req.id, req.employeeId, req.employeeName) &&
-            req.id !== 'REQ-622' &&
-            req.id !== 'REQ-719'
-          ) {
+          if (!isExcludedStaffRequest(req)) {
             map.set(req.id, req);
           }
         });
         snap.forEach(docSnap => {
           const data = docSnap.data() as StaffWorkflowRequest;
           if (data && data.id) {
-            if (
-              data.id === 'REQ-622' ||
-              data.id === 'REQ-719' ||
-              data.employeeName === 'Riju1234' ||
-              data.employeeName === 'Abc123' ||
-              isRecordDeleted(data.id, data.employeeId, data.employeeName)
-            ) {
+            if (isExcludedStaffRequest(data)) {
+              deleteDoc(doc(db, 'requests', docSnap.id)).catch(() => {});
               deleteDoc(doc(db, 'requests', data.id)).catch(() => {});
             } else {
               map.set(data.id, { ...map.get(data.id), ...data });
@@ -1366,15 +1329,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
         });
         const combined = Array.from(map.values())
-          .filter(
-            r =>
-              r &&
-              r.id !== 'REQ-622' &&
-              r.id !== 'REQ-719' &&
-              r.employeeName !== 'Riju1234' &&
-              r.employeeName !== 'Abc123' &&
-              !isRecordDeleted(r.id, r.employeeId, r.employeeName)
-          )
+          .filter(r => !isExcludedStaffRequest(r))
           .sort(
             (a, b) => new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime()
           );

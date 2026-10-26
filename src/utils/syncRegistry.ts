@@ -7,6 +7,23 @@ const STORAGE_KEY_DELETED = 'modela_deleted_registry_v4';
 const STORAGE_KEY_EMP_ID_MAP = 'modela_emp_id_overrides_v1';
 export const SYNC_REGISTRY_DOC_ID = 'SYNC-REGISTRY-GLOBAL';
 
+const PERMANENTLY_EXCLUDED_KEYS = new Set([
+  'modelatech2026@gmail.com',
+  'usr-superadmin-01',
+  'mod000',
+  'mod101',
+  'sushoovandas@gmail.com',
+  'usr-sushoovan-gmail',
+  'ghoshdebrupa005@gmail.com',
+  'usr-obopa1gq',
+  'mod007',
+  'aditichakraborty2005@gmail.com',
+  'aditichakrabarty2005@gmail.com',
+  'usr-aditi-008',
+  'mod008',
+  'mod102'
+]);
+
 const DEFAULT_DELETED_IDS = [
   'alex.morgan@modela.io',
   'elena.rostova@modela.io',
@@ -32,7 +49,8 @@ const DEFAULT_DELETED_IDS = [
   'pay-2026-sep-mod007',
   'pay-2026-oct-mod007',
   'pay-2026-nov-mod007',
-  'pay-2026-dec-mod007'
+  'pay-2026-dec-mod007',
+  ...Array.from(PERMANENTLY_EXCLUDED_KEYS)
 ];
 
 const SYSTEM_PROTECTED_KEYS = new Set([
@@ -164,6 +182,7 @@ export const removeDeletedRecord = (...identifiers: (string | undefined | null)[
     identifiers.forEach(id => {
       if (id && id.trim()) {
         const clean = id.toLowerCase().trim();
+        if (PERMANENTLY_EXCLUDED_KEYS.has(clean)) return;
         if (registry.has(clean)) {
           registry.delete(clean);
           changed = true;
@@ -186,6 +205,7 @@ export const isRecordDeleted = (...identifiers: (string | undefined | null)[]): 
     const clean = id.toLowerCase().trim();
     if (!clean) return false;
     if (
+      PERMANENTLY_EXCLUDED_KEYS.has(clean) ||
       clean.includes('tony stark') ||
       clean.includes('tonystark') ||
       clean.includes('tony.stark') ||
@@ -208,6 +228,11 @@ export const isRecordDeleted = (...identifiers: (string | undefined | null)[]): 
 
 export const recordCustomEmpId = (email?: string | null, oldId?: string | null, newId?: string | null): void => {
   if (!newId || !newId.trim()) return;
+  const cleanEmail = email ? email.trim().toLowerCase() : '';
+  const cleanNewLower = newId.trim().toLowerCase();
+  if ((cleanEmail && PERMANENTLY_EXCLUDED_KEYS.has(cleanEmail)) || PERMANENTLY_EXCLUDED_KEYS.has(cleanNewLower)) {
+    return;
+  }
   const cleanNew = newId.trim().toUpperCase();
   removeDeletedRecord(cleanNew, oldId, email);
   try {

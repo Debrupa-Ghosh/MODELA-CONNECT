@@ -90,18 +90,6 @@ export const LoginPage: React.FC = () => {
         }
       }
 
-      // Direct Instant Access for default Super Admin Modela Tech if not in pending flow
-      if (cleanEmail === 'modelatech2026@gmail.com') {
-        try {
-          localStorage.removeItem('modela_pending_signup_email');
-        } catch {}
-        const ok = loginAs(cleanEmail);
-        if (ok) {
-          navigate('/dashboard', { replace: true });
-          return;
-        }
-      }
-
       // If new sign up request (including a previously deleted user re-requesting access), require full name
       if (!cleanName) {
         setErrorMsg('Please enter your full name.');

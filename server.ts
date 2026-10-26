@@ -32,21 +32,6 @@ app.use(express.json());
 // In-memory persistent database for server session
 let users: ServerUser[] = [
   {
-    id: "USR-SUPERADMIN-01",
-    uid: "USR-SUPERADMIN-01",
-    name: "Modela Tech",
-    email: "modelatech2026@gmail.com",
-    avatar_url: "https://ui-avatars.com/api/?name=Modela+Tech&background=0284c7&color=fff",
-    status: "APPROVED",
-    role: "SUPER_ADMIN",
-    employeeId: "MOD000",
-    designation: "Executive Director & Super Admin",
-    department: "Executive Office",
-    requestedAt: "2026-09-20T08:44:15.481Z",
-    reviewedAt: "2026-09-20T08:44:35.660Z",
-    reviewedBy: "System Root"
-  },
-  {
     id: "USR-Q94BIIQ5",
     uid: "USR-Q94BIIQ5",
     name: "Sushoovan Das",
@@ -59,51 +44,6 @@ let users: ServerUser[] = [
     department: "Executive Office",
     requestedAt: "2026-09-20T08:44:15.481Z",
     reviewedAt: "2026-09-20T08:44:35.660Z",
-    reviewedBy: "System Root"
-  },
-  {
-    id: "USR-SUSHOOVAN-GMAIL",
-    uid: "USR-SUSHOOVAN-GMAIL",
-    name: "Sushoovan Das",
-    email: "sushoovandas@gmail.com",
-    avatar_url: "https://ui-avatars.com/api/?name=Sushoovan+Das&background=3b82f6&color=fff",
-    status: "APPROVED",
-    role: "SUPER_ADMIN",
-    employeeId: "MOD001",
-    designation: "Executive Director & Super Admin",
-    department: "Executive Office",
-    requestedAt: "2026-09-20T08:44:15.481Z",
-    reviewedAt: "2026-09-20T08:44:35.660Z",
-    reviewedBy: "System Root"
-  },
-  {
-    id: "USR-OBOPA1GQ",
-    uid: "USR-OBOPA1GQ",
-    name: "Debrupa Ghosh",
-    email: "ghoshdebrupa005@gmail.com",
-    avatar_url: "https://ui-avatars.com/api/?name=Debrupa+Ghosh&background=0284c7&color=fff",
-    status: "APPROVED",
-    role: "EMPLOYEE",
-    employeeId: "MOD007",
-    designation: "Full Stack Engineer",
-    department: "Engineering",
-    requestedAt: "2026-10-02T06:37:31.931Z",
-    reviewedAt: "2026-10-02T06:37:42.653Z",
-    reviewedBy: "Sushoovan Das"
-  },
-  {
-    id: "USR-ADITI-008",
-    uid: "USR-ADITI-008",
-    name: "Aditi Chakraborty",
-    email: "aditichakraborty2005@gmail.com",
-    avatar_url: "https://ui-avatars.com/api/?name=Aditi+Chakraborty&background=f59e0b&color=fff",
-    status: "APPROVED",
-    role: "EMPLOYEE",
-    employeeId: "MOD008",
-    designation: "QA Engineer Candidate",
-    department: "Quality Assurance",
-    requestedAt: "2026-10-01T14:30:00.000Z",
-    reviewedAt: "2026-10-01T14:35:00.000Z",
     reviewedBy: "System Root"
   },
   {
@@ -138,19 +78,6 @@ let users: ServerUser[] = [
 
 let employees = [
   {
-    id: "MOD000",
-    firstName: "Modela",
-    lastName: "Tech",
-    email: "modelatech2026@gmail.com",
-    joiningDate: "2024-01-01",
-    designation: "Executive Director & Super Admin",
-    phone: "+1 (555) 123-4567",
-    department: "Executive Office",
-    status: "ACTIVE",
-    location: "San Francisco HQ",
-    compensation: { basic: 95000, allowances: 30000 }
-  },
-  {
     id: "MOD001",
     firstName: "Sushoovan",
     lastName: "Das",
@@ -164,19 +91,6 @@ let employees = [
     compensation: { basic: 85000, allowances: 25000 }
   },
   {
-    id: "MOD008",
-    firstName: "Aditi",
-    lastName: "Chakraborty",
-    email: "aditichakraborty2005@gmail.com",
-    joiningDate: "2026-10-01",
-    designation: "QA Engineer Candidate",
-    phone: "",
-    department: "Quality Assurance",
-    status: "ACTIVE",
-    location: "San Francisco HQ",
-    compensation: { basic: 50000, allowances: 15000 }
-  },
-  {
     id: "MOD011",
     firstName: "Debrupa",
     lastName: "Ghosh",
@@ -188,19 +102,6 @@ let employees = [
     status: "ACTIVE",
     location: "San Francisco HQ",
     compensation: { basic: 50000, allowances: 15000 }
-  },
-  {
-    id: "MOD007",
-    firstName: "Debrupa",
-    lastName: "Ghosh",
-    email: "ghoshdebrupa005@gmail.com",
-    joiningDate: "2024-06-01",
-    designation: "Full Stack Engineer",
-    phone: "+1 (555) 345-6789",
-    department: "Engineering",
-    status: "ACTIVE",
-    location: "San Francisco HQ",
-    compensation: { basic: 50000, allowances: 14000 }
   }
 ];
 
@@ -249,23 +150,6 @@ interface ServerStaffRequest {
 }
 
 let staffRequests: ServerStaffRequest[] = [
-  {
-    id: "REQ-STF-002",
-    employeeId: "MOD007",
-    employeeName: "Debrupa Ghosh",
-    employeeEmail: "ghoshdebrupa005@gmail.com",
-    department: "Engineering",
-    designation: "Full Stack Engineer",
-    type: "EQUIPMENT",
-    title: "Workstation GPU & Ultra-Wide Monitor Hardware Requisition",
-    amountOrDays: "Rs. 2,850.00",
-    targetDates: "Immediate Requisition",
-    priority: "URGENT",
-    status: "PENDING",
-    description: "Requisitioning high-memory workstation upgrade for local machine learning model development and 4K multi-display docking hub.",
-    submittedAt: "2026-10-02T06:39:15.000Z",
-    supervisorName: "CTO / Super Admin"
-  },
   {
     id: "REQ-STF-003",
     employeeId: "MOD003",
