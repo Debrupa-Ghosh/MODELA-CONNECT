@@ -149,43 +149,7 @@ interface ServerStaffRequest {
   remarks?: string;
 }
 
-let staffRequests: ServerStaffRequest[] = [
-  {
-    id: "REQ-STF-003",
-    employeeId: "MOD003",
-    employeeName: "Marcus Vance",
-    employeeEmail: "marcus.vance@modela.io",
-    department: "Human Resources",
-    designation: "HR Operations Manager",
-    type: "EXPENSE",
-    title: "Quarterly Recruitment Portal Subscription & Assessment Tokens",
-    amountOrDays: "Rs. 1,450.00",
-    targetDates: "FY26 Q4 Cycle",
-    priority: "MEDIUM",
-    status: "APPROVED",
-    description: "Annual renewal for technical candidate assessment pipeline licenses.",
-    submittedAt: "2026-09-28T14:15:00.000Z",
-    reviewedAt: "2026-09-29T10:00:00.000Z",
-    reviewedBy: "Alex Morgan"
-  },
-  {
-    id: "REQ-STF-004",
-    employeeId: "MOD005",
-    employeeName: "Sourav Ganguly",
-    employeeEmail: "sourav.ganguly@modela.io",
-    department: "Engineering",
-    designation: "Senior BIM Engineer",
-    type: "SHIFT",
-    title: "Core Shift Adjustment for European Client Support",
-    amountOrDays: "Temporary 3-Week Rotation",
-    targetDates: "Oct 20 - Nov 10, 2026",
-    priority: "MEDIUM",
-    status: "PENDING",
-    description: "Requesting schedule shift from 09:00-18:00 to 12:00-21:00 for direct coordination with London deployment team.",
-    submittedAt: "2026-10-01T16:45:00.000Z",
-    supervisorName: "Engineering Director"
-  }
-];
+let staffRequests: ServerStaffRequest[] = [];
 
 // API Endpoints
 app.get('/api/users', (req: Request, res: Response) => {

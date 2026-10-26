@@ -107,50 +107,7 @@ export const INITIAL_EMPLOYEES: Employee[] = [
 ];
 
 // VERIFIED STAFF WORKFLOW REQUESTS (for the Requests tab / Requests & Approvals Central)
-export const INITIAL_STAFF_REQUESTS: StaffWorkflowRequest[] = [
-  {
-    id: "REQ-1043",
-    employeeId: "MOD005",
-    employeeName: "Sourav Ganguly",
-    employeeEmail: "sourav.ganguly@modela.io",
-    department: "Engineering",
-    designation: "Senior BIM Engineer",
-    type: "EXPENSE",
-    title: "Autodesk BIM 360 & Navisworks Professional Certification",
-    description: "Reimbursement claim for Autodesk Certified Professional exam fee and advanced cloud BIM integration workshop.",
-    amountOrDays: "Rs. 680.00",
-    targetDates: "2026-09-28",
-    priority: "NORMAL" as any,
-    status: "APPROVED",
-    submittedAt: "2026-09-29T10:30:00.000Z",
-    reviewedAt: "2026-09-30T14:20:00.000Z",
-    reviewedBy: "Sushoovan Das",
-    remarks: "Approved under professional development annual budget.",
-    isVerifiedStaff: true,
-    justification: "Required for Tier-1 enterprise structural BIM validation on upcoming client deliverables."
-  },
-  {
-    id: "REQ-1044",
-    employeeId: "MOD006",
-    employeeName: "Pooja Sharma",
-    employeeEmail: "pooja.sharma@modela.io",
-    department: "Design",
-    designation: "MEP Designer",
-    type: "SHIFT",
-    title: "Remote Work & Core Hours Flex Adjustment",
-    description: "Requesting core operating hours adjustment to 07:00 AM - 03:30 PM PST with 2 remote workdays weekly (Tuesdays & Thursdays) to align with European architectural partners.",
-    amountOrDays: "Ongoing Q4 Schedule",
-    targetDates: "2026-10-01 to 2026-12-31",
-    priority: "LOW",
-    status: "APPROVED",
-    submittedAt: "2026-09-27T08:45:00.000Z",
-    reviewedAt: "2026-09-28T09:15:00.000Z",
-    reviewedBy: "Marcus Vance",
-    remarks: "Approved with bi-weekly check-in schedule.",
-    isVerifiedStaff: true,
-    justification: "Enhanced collaboration with overseas structural teams."
-  }
-];
+export const INITIAL_STAFF_REQUESTS: StaffWorkflowRequest[] = [];
 
 export const INITIAL_ATTENDANCE: AttendanceRecord[] = [
   {

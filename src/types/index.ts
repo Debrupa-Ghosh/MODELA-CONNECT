@@ -123,6 +123,9 @@ export interface StaffWorkflowRequest {
   description: string;
   amountOrDays: string;
   targetDates?: string;
+  startDate?: string;
+  endDate?: string;
+  requestDate?: string;
   priority: RequestPriority;
   status: RequestStatus;
   submittedAt: string;

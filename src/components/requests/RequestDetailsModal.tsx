@@ -155,25 +155,73 @@ export const RequestDetailsModal: React.FC = () => {
 
         {/* Detailed Fields Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-          <div className="p-3.5 rounded-xl bg-[#070D1D] border border-[#1E293B] space-y-1">
-            <span className="text-slate-400 flex items-center gap-1.5 font-medium">
-              <DollarSign className="w-3.5 h-3.5 text-blue-400" />
-              Scope / Amount / Duration:
-            </span>
-            <p className="text-sm font-bold text-white font-mono">
-              {req.amountOrDays}
-            </p>
-          </div>
+          {req.type === 'LEAVE' && (req.startDate || req.endDate) ? (
+            <>
+              <div className="p-3.5 rounded-xl bg-[#070D1D] border border-[#1E293B] space-y-1">
+                <span className="text-slate-400 flex items-center gap-1.5 font-medium">
+                  <Calendar className="w-3.5 h-3.5 text-blue-400" />
+                  Start Date:
+                </span>
+                <p className="text-sm font-bold text-white font-mono">
+                  {req.startDate || '-'}
+                </p>
+              </div>
 
-          <div className="p-3.5 rounded-xl bg-[#070D1D] border border-[#1E293B] space-y-1">
-            <span className="text-slate-400 flex items-center gap-1.5 font-medium">
-              <Calendar className="w-3.5 h-3.5 text-emerald-400" />
-              Target Dates / Requisition Timeframe:
-            </span>
-            <p className="text-sm font-bold text-white font-mono">
-              {req.targetDates || 'Immediate Requisition'}
-            </p>
-          </div>
+              <div className="p-3.5 rounded-xl bg-[#070D1D] border border-[#1E293B] space-y-1">
+                <span className="text-slate-400 flex items-center gap-1.5 font-medium">
+                  <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+                  End Date:
+                </span>
+                <p className="text-sm font-bold text-white font-mono">
+                  {req.endDate || '-'}
+                </p>
+              </div>
+            </>
+          ) : req.requestDate ? (
+            <>
+              <div className="p-3.5 rounded-xl bg-[#070D1D] border border-[#1E293B] space-y-1">
+                <span className="text-slate-400 flex items-center gap-1.5 font-medium">
+                  <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+                  Date:
+                </span>
+                <p className="text-sm font-bold text-white font-mono">
+                  {req.requestDate}
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-[#070D1D] border border-[#1E293B] space-y-1">
+                <span className="text-slate-400 flex items-center gap-1.5 font-medium">
+                  <DollarSign className="w-3.5 h-3.5 text-blue-400" />
+                  Scope / Requisition Date:
+                </span>
+                <p className="text-sm font-bold text-white font-mono">
+                  {req.amountOrDays || req.requestDate}
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="p-3.5 rounded-xl bg-[#070D1D] border border-[#1E293B] space-y-1">
+                <span className="text-slate-400 flex items-center gap-1.5 font-medium">
+                  <DollarSign className="w-3.5 h-3.5 text-blue-400" />
+                  Scope / Amount / Duration:
+                </span>
+                <p className="text-sm font-bold text-white font-mono">
+                  {req.amountOrDays}
+                </p>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-[#070D1D] border border-[#1E293B] space-y-1">
+                <span className="text-slate-400 flex items-center gap-1.5 font-medium">
+                  <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+                  Target Dates / Requisition Timeframe:
+                </span>
+                <p className="text-sm font-bold text-white font-mono">
+                  {req.targetDates || 'Immediate Requisition'}
+                </p>
+              </div>
+            </>
+          )}
 
           <div className="p-3.5 rounded-xl bg-[#070D1D] border border-[#1E293B] space-y-1">
             <span className="text-slate-400 flex items-center gap-1.5 font-medium">

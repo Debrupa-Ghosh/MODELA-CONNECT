@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
-import { StaffRequestType, RequestPriority } from '../../types';
+import { StaffRequestType } from '../../types';
 import { Send, ChevronDown } from 'lucide-react';
 
 interface Props {
@@ -10,22 +10,42 @@ interface Props {
 }
 
 export const NewStaffRequestModal: React.FC<Props> = ({ isOpen, onClose }) => {
-  const { addStaffRequest, employees, showToast } = useApp();
+  const { addStaffRequest, showToast } = useApp();
   const { currentUser } = useAuth();
 
   const [requestType, setRequestType] = useState<string>('Leave / Paid Time Off');
   const [title, setTitle] = useState('');
-  const [valueOrDuration, setValueOrDuration] = useState('3 Days');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [requestDate, setRequestDate] = useState('');
   const [detailedExplanation, setDetailedExplanation] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
+
+  const isLeaveRequest = requestType === 'Leave / Paid Time Off';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) {
       showToast('Validation Error', 'Please enter a Title / Subject for the request.', 'error');
       return;
+    }
+
+    if (isLeaveRequest) {
+      if (!startDate || !endDate) {
+        showToast('Validation Error', 'Please select both Start Date and End Date from the calendar.', 'error');
+        return;
+      }
+      if (new Date(endDate) < new Date(startDate)) {
+        showToast('Validation Error', 'End Date cannot be earlier than Start Date.', 'error');
+        return;
+      }
+    } else {
+      if (!requestDate) {
+        showToast('Validation Error', 'Please select a Date from the calendar.', 'error');
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -39,11 +59,13 @@ export const NewStaffRequestModal: React.FC<Props> = ({ isOpen, onClose }) => {
       else if (requestType.includes('Access')) mappedType = 'ACCESS_CLEARANCE';
       else if (requestType.includes('Training')) mappedType = 'TRAINING';
 
-      const empId = currentUser?.employeeId || 'MOD000';
-      const empName = currentUser?.name || 'Modelatech2026';
-      const empEmail = currentUser?.email || 'modelatech2026@gmail.com';
+      const empId = currentUser?.employeeId || 'MOD001';
+      const empName = currentUser?.name || 'Sushoovan Das';
+      const empEmail = currentUser?.email || 'sushovand@modelatech.com';
       const empDept = currentUser?.department || 'Executive Office';
       const empDesignation = currentUser?.designation || 'Staff / Super Admin';
+
+      const formattedDates = isLeaveRequest ? `${startDate} to ${endDate}` : requestDate;
 
       await addStaffRequest({
         employeeId: empId,
@@ -54,18 +76,22 @@ export const NewStaffRequestModal: React.FC<Props> = ({ isOpen, onClose }) => {
         type: mappedType,
         title: title.trim(),
         description: detailedExplanation.trim() || `${requestType} requisition filed by ${empName}`,
-        amountOrDays: valueOrDuration.trim() || '3 Days',
-        targetDates: 'Immediate Scheduling',
+        amountOrDays: formattedDates,
+        targetDates: formattedDates,
+        ...(isLeaveRequest
+          ? { startDate, endDate }
+          : { requestDate }),
         priority: 'MEDIUM',
         justification: detailedExplanation.trim() || 'Administrative request submission',
         supervisorName: 'Alex Morgan'
       });
 
-      showToast('Request Submitted', 'Your administrative staff request has been filed successfully.');
       onClose();
       // Reset form
       setTitle('');
-      setValueOrDuration('3 Days');
+      setStartDate('');
+      setEndDate('');
+      setRequestDate('');
       setDetailedExplanation('');
     } catch {
       showToast('Submission Failed', 'Could not record staff request.', 'error');
@@ -78,7 +104,7 @@ export const NewStaffRequestModal: React.FC<Props> = ({ isOpen, onClose }) => {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-150">
       <div className="relative w-full max-w-lg bg-[#0F172A] border border-[#1E293B] rounded-2xl shadow-2xl p-6 sm:p-7 text-white font-sans space-y-5">
         
-        {/* Modal Title (Matches Image 2 Exactly) */}
+        {/* Modal Title */}
         <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight">
           Submit Administrative Request
         </h2>
@@ -123,19 +149,65 @@ export const NewStaffRequestModal: React.FC<Props> = ({ isOpen, onClose }) => {
             />
           </div>
 
-          {/* 3. Value or Duration */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-              Value or Duration
-            </label>
-            <input
-              type="text"
-              value={valueOrDuration}
-              onChange={e => setValueOrDuration(e.target.value)}
-              placeholder="3 Days"
-              className="w-full bg-[#080E1C] border border-[#1E293B] text-slate-100 placeholder-slate-500 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors"
-            />
-          </div>
+          {/* 3. Date Selection (Start Date & End Date for Leave / Paid Time Off; single Date for other types) */}
+          {isLeaveRequest ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  Start Date <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={startDate}
+                  onChange={e => setStartDate(e.target.value)}
+                  onClick={e => {
+                    try {
+                      (e.currentTarget as HTMLInputElement).showPicker?.();
+                    } catch {}
+                  }}
+                  className="w-full bg-[#080E1C] border border-[#1E293B] text-slate-100 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors cursor-pointer [color-scheme:dark]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  End Date <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="date"
+                  required
+                  min={startDate || undefined}
+                  value={endDate}
+                  onChange={e => setEndDate(e.target.value)}
+                  onClick={e => {
+                    try {
+                      (e.currentTarget as HTMLInputElement).showPicker?.();
+                    } catch {}
+                  }}
+                  className="w-full bg-[#080E1C] border border-[#1E293B] text-slate-100 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors cursor-pointer [color-scheme:dark]"
+                />
+              </div>
+            </div>
+          ) : (
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                Date <span className="text-rose-400">*</span>
+              </label>
+              <input
+                type="date"
+                required
+                value={requestDate}
+                onChange={e => setRequestDate(e.target.value)}
+                onClick={e => {
+                  try {
+                    (e.currentTarget as HTMLInputElement).showPicker?.();
+                  } catch {}
+                }}
+                className="w-full bg-[#080E1C] border border-[#1E293B] text-slate-100 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors cursor-pointer [color-scheme:dark]"
+              />
+            </div>
+          )}
 
           {/* 4. Detailed Explanation */}
           <div>
@@ -151,7 +223,7 @@ export const NewStaffRequestModal: React.FC<Props> = ({ isOpen, onClose }) => {
             />
           </div>
 
-          {/* Footer Buttons (Matches Image 2 Exactly) */}
+          {/* Footer Buttons */}
           <div className="border-t border-[#1E293B] pt-4 mt-6 flex items-center justify-end gap-3">
             <button
               type="button"
@@ -174,3 +246,4 @@ export const NewStaffRequestModal: React.FC<Props> = ({ isOpen, onClose }) => {
     </div>
   );
 };
+

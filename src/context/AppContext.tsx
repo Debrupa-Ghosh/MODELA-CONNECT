@@ -98,7 +98,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
   EMPLOYEES: 'modela_employees_v2',
-  REQUESTS: 'modela_requests_v2',
+  REQUESTS: 'modela_requests_v3_clean',
   ATTENDANCE: 'modela_attendance_v2',
   PAYROLL: 'modela_payroll_v2',
   LOGS: 'modela_logs_v2',
@@ -496,21 +496,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const reqId = String(r.id || '').trim().toUpperCase();
     const empId = String(r.employeeId || '').trim().toUpperCase();
     const empEmail = String(r.employeeEmail || '').trim().toLowerCase();
-    return (
+    const empName = String(r.employeeName || '').trim().toLowerCase();
+
+    // Always exclude mock / seed requests and specifically deleted requests
+    if (
       reqId === 'REQ-622' ||
       reqId === 'REQ-719' ||
       reqId === 'REQ-1042' ||
+      reqId === 'REQ-1043' ||
+      reqId === 'REQ-1044' ||
+      reqId === 'REQ-STF-001' ||
       reqId === 'REQ-STF-002' ||
-      empId === 'MOD007' ||
-      empEmail === 'ghoshdebrupa005@gmail.com' ||
+      reqId === 'REQ-STF-003' ||
+      reqId === 'REQ-STF-004' ||
+      empId === 'MOD003' ||
+      empId === 'MOD005' ||
+      empId === 'MOD006' ||
+      empName === 'sourav ganguly' ||
+      empName === 'pooja sharma' ||
+      empName === 'marcus vance' ||
       r.employeeName === 'Riju1234' ||
       r.employeeName === 'Abc123' ||
-      isRecordDeleted(r.id, r.employeeId, r.employeeName)
-    );
+      isRecordDeleted(r.id)
+    ) {
+      return true;
+    }
+
+    // Exclude legacy MOD007 / ghoshdebrupa005@gmail.com seed requests that do not have calendar dates from the form
+    if ((empId === 'MOD007' || empEmail === 'ghoshdebrupa005@gmail.com') && !r.startDate && !r.requestDate) {
+      return true;
+    }
+
+    return false;
   };
 
   const [staffRequests, setStaffRequests] = useState<StaffWorkflowRequest[]>(() => {
     try {
+      localStorage.removeItem('modela_requests_v2');
       const saved = localStorage.getItem(STORAGE_KEYS.REQUESTS);
       if (saved) {
         const parsed = JSON.parse(saved);
@@ -523,7 +545,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       }
     } catch {}
-    return INITIAL_STAFF_REQUESTS.filter(r => !isExcludedStaffRequest(r));
+    return [];
   });
 
   const [attendance, setAttendance] = useState<AttendanceRecord[]>(() => {
@@ -1026,11 +1048,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Real-time Firestore synchronization for workflow staff requests across all devices
   useEffect(() => {
-    // Proactively delete REQ-622, REQ-719, REQ-1042, and REQ-STF-002 from Firestore database so they never appear across any browser
-    deleteDoc(doc(db, 'requests', 'REQ-622')).catch(() => {});
-    deleteDoc(doc(db, 'requests', 'REQ-719')).catch(() => {});
-    deleteDoc(doc(db, 'requests', 'REQ-1042')).catch(() => {});
-    deleteDoc(doc(db, 'requests', 'REQ-STF-002')).catch(() => {});
+    // Proactively delete all mock/legacy requests from Firestore database so they never appear across any browser
+    const mockRequestIds = [
+      'REQ-622',
+      'REQ-719',
+      'REQ-1042',
+      'REQ-1043',
+      'REQ-1044',
+      'REQ-STF-001',
+      'REQ-STF-002',
+      'REQ-STF-003',
+      'REQ-STF-004'
+    ];
+    mockRequestIds.forEach(mockId => {
+      deleteDoc(doc(db, 'requests', mockId)).catch(() => {});
+    });
 
     let isSubscribed = true;
     const unsub = onSnapshot(
@@ -1038,27 +1070,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       async snapshot => {
         if (!isSubscribed) return;
 
-        // If collection is empty, seed with initial baseline workflow requests
         if (snapshot.empty) {
+          setStaffRequests([]);
           try {
-            for (const req of INITIAL_STAFF_REQUESTS) {
-              if (!isExcludedStaffRequest(req)) {
-                await setDoc(doc(db, 'requests', req.id), req);
-              }
-            }
-          } catch (e) {
-            console.warn('Initial staff requests seed error:', e);
-          }
+            localStorage.setItem(STORAGE_KEYS.REQUESTS, JSON.stringify([]));
+          } catch {}
           return;
         }
 
         const map = new Map<string, StaffWorkflowRequest>();
-        // Add baseline default requests
-        INITIAL_STAFF_REQUESTS.forEach(req => {
-          if (!isExcludedStaffRequest(req)) {
-            map.set(req.id, req);
-          }
-        });
 
         // Add & merge all live documents from Firestore
         snapshot.forEach(docSnap => {
@@ -1310,34 +1330,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const refreshStaffRequests = useCallback(async () => {
     try {
       const snap = await getDocs(collection(db, 'requests'));
-      if (!snap.empty) {
-        const map = new Map<string, StaffWorkflowRequest>();
-        INITIAL_STAFF_REQUESTS.forEach(req => {
-          if (!isExcludedStaffRequest(req)) {
-            map.set(req.id, req);
-          }
-        });
-        snap.forEach(docSnap => {
-          const data = docSnap.data() as StaffWorkflowRequest;
-          if (data && data.id) {
-            if (isExcludedStaffRequest(data)) {
-              deleteDoc(doc(db, 'requests', docSnap.id)).catch(() => {});
-              deleteDoc(doc(db, 'requests', data.id)).catch(() => {});
-            } else {
-              map.set(data.id, { ...map.get(data.id), ...data });
-            }
-          }
-        });
-        const combined = Array.from(map.values())
-          .filter(r => !isExcludedStaffRequest(r))
-          .sort(
-            (a, b) => new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime()
-          );
-        setStaffRequests(combined);
+      if (snap.empty) {
+        setStaffRequests([]);
         try {
-          localStorage.setItem(STORAGE_KEYS.REQUESTS, JSON.stringify(combined));
+          localStorage.setItem(STORAGE_KEYS.REQUESTS, JSON.stringify([]));
         } catch {}
+        return;
       }
+
+      const map = new Map<string, StaffWorkflowRequest>();
+      snap.forEach(docSnap => {
+        const data = docSnap.data() as StaffWorkflowRequest;
+        if (data && data.id) {
+          if (isExcludedStaffRequest(data)) {
+            deleteDoc(doc(db, 'requests', docSnap.id)).catch(() => {});
+            deleteDoc(doc(db, 'requests', data.id)).catch(() => {});
+          } else {
+            map.set(data.id, { ...map.get(data.id), ...data });
+          }
+        }
+      });
+      const combined = Array.from(map.values())
+        .filter(r => !isExcludedStaffRequest(r))
+        .sort(
+          (a, b) => new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime()
+        );
+      setStaffRequests(combined);
+      try {
+        localStorage.setItem(STORAGE_KEYS.REQUESTS, JSON.stringify(combined));
+      } catch {}
     } catch (e) {
       console.warn('Manual staff requests refresh error:', e);
     }
@@ -1897,19 +1918,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     data: Omit<StaffWorkflowRequest, 'id' | 'submittedAt' | 'status' | 'isVerifiedStaff'>
   ): Promise<StaffWorkflowRequest> => {
     const id = `REQ-${Math.floor(1000 + Math.random() * 9000)}`;
-    const newReq: StaffWorkflowRequest = {
+    const newReq: StaffWorkflowRequest = cleanFirestoreData({
       ...data,
       id,
       submittedAt: new Date().toISOString(),
       status: 'PENDING',
       isVerifiedStaff: true
-    };
+    });
 
-    setStaffRequests(prev => [newReq, ...prev]);
+    setStaffRequests(prev => {
+      const updated = [newReq, ...prev.filter(r => r.id !== id)];
+      try {
+        localStorage.setItem(STORAGE_KEYS.REQUESTS, JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
 
     // Persist staff request to Firestore for instant real-time sync across all devices
     try {
-      await setDoc(doc(db, 'requests', id), newReq);
+      await setDoc(doc(db, 'requests', id), cleanFirestoreData(newReq));
     } catch (err) {
       console.warn('Firestore staff request write error:', err);
     }
@@ -1987,6 +2014,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const deleteStaffRequest = async (id: string): Promise<boolean> => {
     recordDeletedRecord(id);
+    persistSyncRegistryToFirestore().catch(() => {});
     deleteDoc(doc(db, 'requests', id)).catch(() => {});
     fetch(`/api/requests/${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => {});
 

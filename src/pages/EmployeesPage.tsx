@@ -795,23 +795,23 @@ export const EmployeesPage: React.FC = () => {
 
       {/* Add New Employee Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="relative w-full max-w-xl bg-[#080E1C] border border-[#1E2E4E] rounded-3xl shadow-2xl p-6 sm:p-8 space-y-6 text-white font-sans">
-            <div className="flex items-center justify-between border-b border-[#1E293B] pb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-xs animate-in fade-in duration-200 overflow-y-auto">
+          <div className="relative w-full max-w-xl max-h-[90vh] overflow-y-auto bg-[#080E1C] border border-[#1E2E4E] rounded-3xl shadow-2xl p-5 sm:p-6 space-y-3.5 text-white font-sans my-auto">
+            <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
               <div className="flex items-center gap-2.5">
                 <UserPlus className="w-5 h-5 text-[#00E5FF]" />
-                <h3 className="text-lg font-bold text-white">Add New Employee</h3>
+                <h3 className="text-base sm:text-lg font-bold text-white">Add New Employee</h3>
               </div>
               <button
                 onClick={() => setIsAddModalOpen(false)}
-                className="p-1.5 rounded-xl bg-[#131E36] hover:bg-[#1E2E4E] border border-[#203050] text-slate-400 hover:text-white"
+                className="p-1.5 rounded-xl bg-[#131E36] hover:bg-[#1E2E4E] border border-[#203050] text-slate-400 hover:text-white cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleAddSubmit} className="space-y-4 text-xs">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <form onSubmit={handleAddSubmit} className="space-y-3 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-400 font-semibold mb-1">First Name *</label>
                   <input
@@ -820,7 +820,7 @@ export const EmployeesPage: React.FC = () => {
                     placeholder="e.g. Rachel"
                     value={newFirstName}
                     onChange={e => setNewFirstName(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-[#0B132B] border border-[#1E293B] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    className="w-full px-3 py-2 bg-[#0B132B] border border-[#1E293B] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
                   />
                 </div>
                 <div>
@@ -831,12 +831,12 @@ export const EmployeesPage: React.FC = () => {
                     placeholder="e.g. Green"
                     value={newLastName}
                     onChange={e => setNewLastName(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-[#0B132B] border border-[#1E293B] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    className="w-full px-3 py-2 bg-[#0B132B] border border-[#1E293B] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-400 font-semibold mb-1">Designation *</label>
                   <input
@@ -845,7 +845,7 @@ export const EmployeesPage: React.FC = () => {
                     placeholder="e.g. Solutions Architect"
                     value={newDesignation}
                     onChange={e => setNewDesignation(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-[#0B132B] border border-[#1E293B] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    className="w-full px-3 py-2 bg-[#0B132B] border border-[#1E293B] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
                   />
                 </div>
                 <div>
@@ -855,12 +855,12 @@ export const EmployeesPage: React.FC = () => {
                     value={newLocation}
                     onChange={e => setNewLocation(e.target.value)}
                     placeholder="San Francisco HQ"
-                    className="w-full px-3.5 py-2.5 bg-[#0B132B] border border-[#1E293B] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                    className="w-full px-3 py-2 bg-[#0B132B] border border-[#1E293B] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-400 font-semibold mb-1">Phone Contact</label>
                   <input
@@ -868,7 +868,7 @@ export const EmployeesPage: React.FC = () => {
                     value={newPhone}
                     onChange={e => setNewPhone(e.target.value)}
                     placeholder="+1 (555) 000-0000"
-                    className="w-full px-3.5 py-2.5 bg-[#0B132B] border border-[#1E293B] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono"
+                    className="w-full px-3 py-2 bg-[#0B132B] border border-[#1E293B] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono"
                   />
                 </div>
                 <div>
@@ -877,13 +877,13 @@ export const EmployeesPage: React.FC = () => {
                     type="number"
                     value={newBasic}
                     onChange={e => setNewBasic(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-[#0B132B] border border-[#1E293B] rounded-xl text-white font-mono focus:outline-none focus:border-blue-500"
+                    className="w-full px-3 py-2 bg-[#0B132B] border border-[#1E293B] rounded-xl text-white font-mono focus:outline-none focus:border-blue-500"
                   />
                 </div>
               </div>
 
               {/* PAN Number & A/C Number (Before Allowances) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-400 font-semibold mb-1">PAN Number</label>
                   <input
@@ -891,7 +891,7 @@ export const EmployeesPage: React.FC = () => {
                     value={newPan}
                     onChange={e => setNewPan(e.target.value.toUpperCase())}
                     placeholder="e.g. ABCDE1234F"
-                    className="w-full px-3.5 py-2.5 bg-[#0B132B] border border-[#1E293B] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono tracking-wider"
+                    className="w-full px-3 py-2 bg-[#0B132B] border border-[#1E293B] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono tracking-wider"
                   />
                 </div>
                 <div>
@@ -901,14 +901,14 @@ export const EmployeesPage: React.FC = () => {
                     value={newBankAccount}
                     onChange={e => setNewBankAccount(e.target.value)}
                     placeholder="e.g. 815801500344"
-                    className="w-full px-3.5 py-2.5 bg-[#0B132B] border border-[#1E293B] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono"
+                    className="w-full px-3 py-2 bg-[#0B132B] border border-[#1E293B] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono"
                   />
                 </div>
               </div>
 
               {/* Allowances Section */}
-              <div className="p-3.5 bg-[#080E1C] border border-blue-900/40 rounded-2xl space-y-2.5">
-                <div className="flex items-center justify-between border-b border-[#1E2E4E] pb-1.5">
+              <div className="p-3 bg-[#080E1C] border border-blue-900/40 rounded-2xl space-y-2">
+                <div className="flex items-center justify-between border-b border-[#1E2E4E] pb-1">
                   <span className="font-bold text-sky-400 text-xs flex items-center gap-1">
                     Allowances Breakdown
                   </span>
@@ -916,9 +916,9 @@ export const EmployeesPage: React.FC = () => {
                     Total: +{(Number(newHra) + Number(newMedical) + Number(newSpecial) + Number(newInternet)).toLocaleString()}
                   </span>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                   <div>
-                    <label className="block text-slate-400 font-medium mb-1 text-[11px]">House Rent Allowance (HRA)</label>
+                    <label className="block text-slate-400 font-medium mb-0.5 text-[11px]">House Rent Allowance (HRA)</label>
                     <input
                       type="number"
                       value={newHra}
@@ -927,7 +927,7 @@ export const EmployeesPage: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-400 font-medium mb-1 text-[11px]">Medical Allowance</label>
+                    <label className="block text-slate-400 font-medium mb-0.5 text-[11px]">Medical Allowance</label>
                     <input
                       type="number"
                       value={newMedical}
@@ -936,7 +936,7 @@ export const EmployeesPage: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-400 font-medium mb-1 text-[11px]">Special Allowance</label>
+                    <label className="block text-slate-400 font-medium mb-0.5 text-[11px]">Special Allowance</label>
                     <input
                       type="number"
                       value={newSpecial}
@@ -945,7 +945,7 @@ export const EmployeesPage: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-400 font-medium mb-1 text-[11px]">Internet Allowance</label>
+                    <label className="block text-slate-400 font-medium mb-0.5 text-[11px]">Internet Allowance</label>
                     <input
                       type="number"
                       value={newInternet}
@@ -957,8 +957,8 @@ export const EmployeesPage: React.FC = () => {
               </div>
 
               {/* Deductions Section */}
-              <div className="p-3.5 bg-[#080E1C] border border-rose-900/40 rounded-2xl space-y-2.5">
-                <div className="flex items-center justify-between border-b border-[#1E2E4E] pb-1.5">
+              <div className="p-3 bg-[#080E1C] border border-rose-900/40 rounded-2xl space-y-2">
+                <div className="flex items-center justify-between border-b border-[#1E2E4E] pb-1">
                   <span className="font-bold text-rose-400 text-xs flex items-center gap-1">
                     Deductions Breakdown
                   </span>
@@ -966,9 +966,9 @@ export const EmployeesPage: React.FC = () => {
                     Total: -{(Number(newProfessionalTax) + Number(newPfContribution) + Number(newGroupHealthInsurance)).toLocaleString()}
                   </span>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
                   <div>
-                    <label className="block text-slate-400 font-medium mb-1 text-[11px]">Professional Tax</label>
+                    <label className="block text-slate-400 font-medium mb-0.5 text-[11px]">Professional Tax</label>
                     <input
                       type="number"
                       value={newProfessionalTax}
@@ -977,7 +977,7 @@ export const EmployeesPage: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-400 font-medium mb-1 text-[11px]">Employee PF Contribution</label>
+                    <label className="block text-slate-400 font-medium mb-0.5 text-[11px]">Employee PF Contribution</label>
                     <input
                       type="number"
                       value={newPfContribution}
@@ -986,7 +986,7 @@ export const EmployeesPage: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-slate-400 font-medium mb-1 text-[11px]">Group Health Insurance</label>
+                    <label className="block text-slate-400 font-medium mb-0.5 text-[11px]">Group Health Insurance</label>
                     <input
                       type="number"
                       value={newGroupHealthInsurance}
@@ -998,7 +998,7 @@ export const EmployeesPage: React.FC = () => {
               </div>
 
               {/* Live Net Compensation Preview */}
-              <div className="p-3 bg-gradient-to-r from-emerald-950/60 to-slate-900 border border-emerald-600/40 rounded-xl flex items-center justify-between text-xs">
+              <div className="p-2.5 bg-gradient-to-r from-emerald-950/60 to-slate-900 border border-emerald-600/40 rounded-xl flex items-center justify-between text-xs">
                 <span className="font-bold text-emerald-300">Net Compensation (Gross - Deductions):</span>
                 <span className="font-mono font-bold text-base text-emerald-400">
                   {(
@@ -1009,7 +1009,7 @@ export const EmployeesPage: React.FC = () => {
                 </span>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#1E293B]">
+              <div className="flex items-center justify-end gap-3 pt-2.5 border-t border-[#1E293B]">
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
