@@ -242,21 +242,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     let isSubscribed = true;
 
-    [
-      'USR-HR-MGR01',
-      'USR-SUPERADMIN-01',
-      'USR-SUSHOOVAN-GMAIL',
-      'USR-OBOPA1GQ',
-      'USR-ADITI-008',
-      'REQ-modelatech2026_gmail_com',
-      'REQ-sushoovandas_gmail_com',
-      'REQ-ghoshdebrupa005_gmail_com',
-      'REQ-aditichakraborty2005_gmail_com',
-      'REQ-aditichakrabarty2005_gmail_com'
-    ].forEach(removedDocId => {
-      deleteDoc(doc(db, 'users', removedDocId)).catch(() => {});
-    });
-
     const unsub = onSnapshot(
       collection(db, 'users'),
       async snapshot => {
@@ -421,18 +406,104 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     );
 
+    // Instant Server-Sent Events (SSE) listener for zero-latency cross-device sign-up request delivery
+    const mergeServerUsers = (incomingUsers: any[]) => {
+      if (!isSubscribed || !Array.isArray(incomingUsers)) return;
+      setUsers(prev => {
+        let changed = false;
+        const map = new Map<string, User>();
+        prev.forEach(u => {
+          if (u && u.email) {
+            map.set(u.email.toLowerCase().trim(), u);
+          }
+        });
+
+        incomingUsers.forEach((rawU: any) => {
+          if (!rawU || !rawU.email || !rawU.id) return;
+          const emailKey = String(rawU.email).toLowerCase().trim();
+          const upperEmpId = String(rawU.employeeId || '').trim().toUpperCase();
+          if (
+            emailKey === 'sync@system.internal' ||
+            emailKey === 'modelatech2026@gmail.com' ||
+            emailKey === 'sushoovandas@gmail.com' ||
+            emailKey === 'ghoshdebrupa005@gmail.com' ||
+            emailKey === 'aditichakraborty2005@gmail.com' ||
+            emailKey === 'aditichakrabarty2005@gmail.com' ||
+            upperEmpId === 'MOD000' ||
+            upperEmpId === 'MOD101' ||
+            upperEmpId === 'MOD102' ||
+            upperEmpId === 'MOD003' ||
+            upperEmpId === 'MOD005' ||
+            upperEmpId === 'MOD006' ||
+            upperEmpId === 'MOD007' ||
+            upperEmpId === 'MOD008' ||
+            isRecordDeleted(rawU.id, rawU.uid, emailKey, rawU.employeeId, resolveEmpId(emailKey, rawU.employeeId))
+          ) {
+            return;
+          }
+
+          const existing = map.get(emailKey);
+          const rawUpdated = String(rawU.updatedAt || rawU.requestedAt || '');
+          const exUpdated = existing ? String((existing as any).updatedAt || existing.requestedAt || '') : '';
+
+          if (!existing || rawUpdated > exUpdated || (rawU.status === 'PENDING' && existing.status !== 'APPROVED' && existing.name !== rawU.name)) {
+            map.set(emailKey, {
+              ...(existing || {}),
+              ...rawU,
+              employeeId: resolveEmpId(emailKey, rawU.employeeId || existing?.employeeId)
+            });
+            changed = true;
+          }
+        });
+
+        if (!changed) return prev;
+        const next = Array.from(map.values());
+        try {
+          localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+    };
+
+    let eventSource: EventSource | null = null;
+    try {
+      eventSource = new EventSource('/api/users/stream');
+      eventSource.onmessage = event => {
+        try {
+          const parsed = JSON.parse(event.data);
+          if (parsed && Array.isArray(parsed.users)) {
+            mergeServerUsers(parsed.users);
+          }
+        } catch {}
+      };
+    } catch {}
+
+    // Initial fast fetch from backend API
+    fetch('/api/users')
+      .then(r => r.json())
+      .then(data => {
+        if (data && Array.isArray(data.users)) {
+          mergeServerUsers(data.users);
+        }
+      })
+      .catch(() => {});
+
     return () => {
       isSubscribed = false;
       unsub();
+      if (eventSource) {
+        eventSource.close();
+      }
     };
   }, []);
 
-  // Refresh Registry: sync directly with Firestore users & employees so deleted users never come back and edited EMP IDs never vanish
+  // Refresh Registry: sync directly with Firestore users & employees and backend /api/users so deleted users never come back and new requests appear immediately
   const refreshUsers = useCallback(async () => {
     try {
-      const [userSnap, empSnap] = await Promise.all([
+      const [userSnap, empSnap, apiRes] = await Promise.all([
         getDocs(collection(db, 'users')),
-        getDocs(collection(db, 'employees'))
+        getDocs(collection(db, 'employees')),
+        fetch('/api/users').then(r => r.json()).catch(() => null)
       ]);
 
       // 1. Apply global sync registry document first so all deletions & EMP ID overrides are up to date
@@ -481,6 +552,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         remoteUsers.push(uData);
       });
 
+      if (apiRes && Array.isArray(apiRes.users)) {
+        apiRes.users.forEach((apiU: User) => {
+          if (!apiU || !apiU.id || !apiU.email) return;
+          if (apiU.id === SYNC_REGISTRY_DOC_ID || apiU.email === 'sync@system.internal') return;
+          if (isRecordDeleted(apiU.id, apiU.uid, apiU.email, apiU.employeeId, resolveEmpId(apiU.email, apiU.employeeId))) return;
+          remoteUsers.push(apiU);
+        });
+      }
+
       const map = new Map<string, User>();
 
       INITIAL_USERS.filter(
@@ -499,8 +579,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return;
         }
         const existing = map.get(emailKey);
-        const uUpdatedAt = (u as any).updatedAt || '';
-        const exUpdatedAt = existing ? ((existing as any).updatedAt || '') : '';
+        const uUpdatedAt = (u as any).updatedAt || u.requestedAt || '';
+        const exUpdatedAt = existing ? ((existing as any).updatedAt || existing.requestedAt || '') : '';
         if (uUpdatedAt && u.employeeId) {
           recordCustomEmpId(emailKey, undefined, u.employeeId);
         }
@@ -633,24 +713,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const existing = users.find(u => u.email.toLowerCase() === cleanEmail);
 
-    if (existing) {
-      if (existing.status === 'APPROVED') {
-        setCurrentEmail(cleanEmail);
-        return {
-          success: true,
-          isPending: false,
-          message: 'Account verified. Signed in.',
-          user: existing
-        };
-      } else if (existing.status === 'PENDING') {
-        // Pending approval by Super Admin, Executive Director, or HR Manager
-        return {
-          success: true,
-          isPending: true,
-          message: 'Your sign-up verification request is already pending review in User Management.',
-          user: existing
-        };
-      }
+    if (existing && existing.status === 'APPROVED') {
+      setCurrentEmail(cleanEmail);
+      return {
+        success: true,
+        isPending: false,
+        message: 'Account verified. Signed in.',
+        user: existing
+      };
     }
 
     // If this user was previously deleted from the Approved Users Directory, unblock their email & IDs
@@ -660,6 +730,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const reqDocId = `REQ-${cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
     removeDeletedRecord(
       cleanEmail,
+      existing?.id,
+      existing?.uid,
       initialMatch?.id,
       initialMatch?.uid,
       initialMatch?.employeeId,
@@ -668,22 +740,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 
     const now = new Date().toISOString();
-    const userId = initialMatch?.id || existing?.id || `USR-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
-    const applicantName = (data.name || initialMatch?.name || '').trim() || cleanEmail;
+    const userId = existing?.id || initialMatch?.id || `USR-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+    const applicantName = (data.name || existing?.name || initialMatch?.name || '').trim() || cleanEmail;
 
-    // 1. Create User with status: PENDING so it shows in User Management page
+    // 1. Create User with status: PENDING so it shows in User Management page immediately
     // It will ONLY be accepted by Super Admin or HR or Executive Director
     const newUser: User = {
       id: userId,
       uid: userId,
       name: applicantName,
       email: cleanEmail,
-      avatar_url: initialMatch?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(applicantName)}&background=0284c7&color=fff`,
+      avatar_url: existing?.avatar_url || initialMatch?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(applicantName)}&background=0284c7&color=fff`,
       status: 'PENDING', // PENDING review in User Management!
       role: null,
-      department: data.department || initialMatch?.department || 'General Staff',
-      designation: data.designation || initialMatch?.designation || 'Staff Candidate',
-      requestedAt: now,
+      department: data.department || existing?.department || initialMatch?.department || 'General Staff',
+      designation: data.designation || existing?.designation || initialMatch?.designation || 'Staff Candidate',
+      requestedAt: existing?.status === 'PENDING' && existing?.requestedAt ? existing.requestedAt : now,
       notificationUnread: true,
       ...({ updatedAt: now } as any)
     };
@@ -693,22 +765,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const cleanedNewUser = cleanFirestoreUser(newUser);
 
-    // Persist to Firestore so every browser & device receives it immediately in real-time!
-    setDoc(doc(db, 'users', newUser.id), cleanedNewUser, { merge: true }).catch(err => {
-      console.warn('Firestore user request write notice:', err);
-    });
-
-    // Also persist with email key if needed for direct lookups
-    if (cleanEmail) {
-      setDoc(doc(db, 'users', reqDocId), cleanedNewUser, { merge: true }).catch(() => {});
-    }
-
-    // Send to backend API
+    // Send to backend API for instant SSE broadcast to all connected devices
     fetch('/api/users/request', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(cleanedNewUser)
     }).catch(() => {});
+
+    // Persist to Firestore so every browser & device receives it immediately in real-time!
+    setDoc(doc(db, 'users', newUser.id), cleanedNewUser, { merge: true }).catch(err => {
+      console.warn('Firestore user request write notice:', err);
+    });
 
     return {
       success: true,

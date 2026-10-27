@@ -36,6 +36,28 @@ export const UserManagementPage: React.FC = () => {
     }
   }, [isDirector, activeTab]);
 
+  // Real-time auto-sync when viewing Identity Sign-Up Requests or returning to the tab
+  React.useEffect(() => {
+    refreshUsers();
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === 'visible') {
+        refreshUsers();
+      }
+    };
+    window.addEventListener('focus', handleVisibilityOrFocus);
+    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        refreshUsers();
+      }
+    }, 4000);
+    return () => {
+      window.removeEventListener('focus', handleVisibilityOrFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+      clearInterval(interval);
+    };
+  }, [refreshUsers]);
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await refreshUsers();

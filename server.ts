@@ -151,6 +151,19 @@ interface ServerStaffRequest {
 
 let staffRequests: ServerStaffRequest[] = [];
 
+const sseClients = new Set<Response>();
+
+const broadcastUsers = () => {
+  const payload = `data: ${JSON.stringify({ users })}\n\n`;
+  sseClients.forEach(client => {
+    try {
+      client.write(payload);
+    } catch {
+      sseClients.delete(client);
+    }
+  });
+};
+
 // API Endpoints
 app.get('/api/users', (req: Request, res: Response) => {
   res.json({
@@ -166,15 +179,15 @@ app.post('/api/users/request', (req: Request, res: Response) => {
     return res.status(400).json({ success: false, message: 'Invalid payload' });
   }
   const emailLower = newUser.email.toLowerCase().trim();
-  if (['sushovand@modelatech.com', 'sushoovandas@gmail.com', 'modelatech2026@gmail.com'].includes(emailLower)) {
+  if (['sushovand@modelatech.com'].includes(emailLower)) {
     const sa = users.find(u => u.email.toLowerCase() === emailLower);
     return res.json({ success: true, user: sa || newUser, message: 'Super Admin active' });
   }
-  const existing = users.find(u => u.email.toLowerCase() === emailLower);
-  if (existing) {
-    return res.status(400).json({ success: false, message: 'User already exists' });
-  }
-  users.unshift(newUser);
+  users = [
+    newUser,
+    ...users.filter(u => u.email.toLowerCase().trim() !== emailLower && u.id !== newUser.id)
+  ];
+  broadcastUsers();
   res.json({ success: true, user: newUser });
 });
 
@@ -199,6 +212,7 @@ app.post('/api/users/approve', (req: Request, res: Response) => {
     }
     return u;
   });
+  broadcastUsers();
   res.json({ success: true });
 });
 
@@ -216,18 +230,21 @@ app.post('/api/users/reject', (req: Request, res: Response) => {
     }
     return u;
   });
+  broadcastUsers();
   res.json({ success: true });
 });
 
 app.post('/api/users/role', (req: Request, res: Response) => {
   const { userId, newRole } = req.body;
   users = users.map(u => (u.id === userId || u.uid === userId ? { ...u, role: newRole } : u));
+  broadcastUsers();
   res.json({ success: true });
 });
 
 app.delete('/api/users/:id', (req: Request, res: Response) => {
   const { id } = req.params;
   users = users.filter(u => u.id !== id && u.uid !== id && u.email?.toLowerCase() !== id.toLowerCase());
+  broadcastUsers();
   res.json({ success: true, message: `User ${id} deleted` });
 });
 
@@ -313,14 +330,21 @@ app.get('/api/users/stream', (req: Request, res: Response) => {
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
 
+  sseClients.add(res);
+
   const sendUpdate = () => {
-    res.write(`data: ${JSON.stringify({ users })}\n\n`);
+    try {
+      res.write(`data: ${JSON.stringify({ users })}\n\n`);
+    } catch {
+      sseClients.delete(res);
+    }
   };
 
   sendUpdate();
   const interval = setInterval(sendUpdate, 15000);
 
   req.on('close', () => {
+    sseClients.delete(res);
     clearInterval(interval);
   });
 });

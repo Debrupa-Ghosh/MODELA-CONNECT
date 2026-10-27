@@ -805,11 +805,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     let isSubscribed = true;
 
-    // Proactively delete excluded employees from Firestore employees collection
-    ['MOD000', 'MOD101', 'MOD003', 'MOD005', 'MOD006', 'MOD007', 'MOD008', 'MOD102'].forEach(removedEmpId => {
-      deleteDoc(doc(db, 'employees', removedEmpId)).catch(() => {});
-    });
-
     const unsub = onSnapshot(
       collection(db, 'employees'),
       async snapshot => {
@@ -1051,22 +1046,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Real-time Firestore synchronization for workflow staff requests across all devices
   useEffect(() => {
-    // Proactively delete all mock/legacy requests from Firestore database so they never appear across any browser
-    const mockRequestIds = [
-      'REQ-622',
-      'REQ-719',
-      'REQ-1042',
-      'REQ-1043',
-      'REQ-1044',
-      'REQ-STF-001',
-      'REQ-STF-002',
-      'REQ-STF-003',
-      'REQ-STF-004'
-    ];
-    mockRequestIds.forEach(mockId => {
-      deleteDoc(doc(db, 'requests', mockId)).catch(() => {});
-    });
-
     let isSubscribed = true;
     const unsub = onSnapshot(
       collection(db, 'requests'),
@@ -1123,11 +1102,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Real-time Firestore synchronization for payroll ledger records across all devices
   useEffect(() => {
-    // Proactively delete duplicate Modela Tech & Debrupa Ghosh payslips and Aditi Chakraborty's payslip from Firestore
-    BLOCKED_PAYROLL_DOC_IDS.forEach(badId => {
-      deleteDoc(doc(db, 'payroll', badId)).catch(() => {});
-    });
-
     let isSubscribed = true;
     const unsub = onSnapshot(
       collection(db, 'payroll'),

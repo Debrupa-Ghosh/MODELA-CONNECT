@@ -67,43 +67,36 @@ export const LoginPage: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      // 1. Check if user already exists in the active directory
+      // 1. Check if user already exists and is APPROVED in the active directory
       const existing = users.find(u => u.email.toLowerCase() === cleanEmail);
 
-      if (existing) {
-        if (existing.status === 'APPROVED') {
-          try {
-            localStorage.removeItem('modela_pending_signup_email');
-          } catch {}
-          const success = loginAs(cleanEmail);
-          if (success) {
-            navigate('/dashboard', { replace: true });
-            return;
-          }
-        } else if (existing.status === 'PENDING') {
-          // Status is PENDING -> Show Request Sent (Status: Pending)
-          try {
-            localStorage.setItem('modela_pending_signup_email', cleanEmail);
-          } catch {}
-          setStep('STEP_3_WAITING');
+      if (existing && existing.status === 'APPROVED') {
+        try {
+          localStorage.removeItem('modela_pending_signup_email');
+        } catch {}
+        const success = loginAs(cleanEmail);
+        if (success) {
+          navigate('/dashboard', { replace: true });
           return;
         }
       }
 
+      const resolvedName = cleanName || existing?.name?.trim() || '';
+
       // If new sign up request (including a previously deleted user re-requesting access), require full name
-      if (!cleanName) {
+      if (!resolvedName) {
         setErrorMsg('Please enter your full name.');
         return;
       }
 
-      // 2. Submit sign-up request -> Queued for review, transitions to STEP_3_WAITING!
+      // 2. Submit sign-up request -> Queued for review and immediately broadcast to Firestore & server!
       try {
         localStorage.setItem('modela_pending_signup_email', cleanEmail);
       } catch {}
 
       const res = submitSignupRequest({
         email: cleanEmail,
-        name: cleanName
+        name: resolvedName
       });
 
       if (res.success) {
