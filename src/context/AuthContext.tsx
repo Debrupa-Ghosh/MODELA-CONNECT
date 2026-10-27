@@ -59,8 +59,73 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const STORAGE_KEY_USERS = 'modela_users_v2';
 const STORAGE_KEY_ACTIVE_USER = 'modela_active_user_email_v2';
+const STORAGE_KEY_LIVE_REQUESTS = 'modela_live_signup_requests_v2';
+
+const getLiveRequestsMap = (): Map<string, User> => {
+  const map = new Map<string, User>();
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_LIVE_REQUESTS);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        parsed.forEach((u: User) => {
+          if (u && u.email) {
+            map.set(u.email.toLowerCase().trim(), u);
+          }
+        });
+      }
+    }
+  } catch {}
+  return map;
+};
+
+const saveLiveRequestsMap = (map: Map<string, User>) => {
+  try {
+    localStorage.setItem(STORAGE_KEY_LIVE_REQUESTS, JSON.stringify(Array.from(map.values())));
+  } catch {}
+};
+
+const isLegacyExcludedUser = (u: Partial<User>): boolean => {
+  if ((u as any)?.isLiveRequest) return false;
+  const liveMap = getLiveRequestsMap();
+  const lowerEmail = (u.email || '').trim().toLowerCase();
+  if (lowerEmail && liveMap.has(lowerEmail)) return false;
+
+  const lowerName = (u.name || '').trim().toLowerCase();
+  const upperEmpId = (u.employeeId || '').trim().toUpperCase();
+
+  return (
+    (lowerName.includes('tony') && lowerName.includes('stark')) ||
+    lowerName === 'tony stark' ||
+    lowerName.includes('marcus vance') ||
+    lowerName.includes('sourav ganguly') ||
+    lowerName.includes('pooja sharma') ||
+    lowerEmail.includes('tonystark') ||
+    lowerEmail.includes('tony.stark') ||
+    lowerEmail === 'marcus.vance@modela.io' ||
+    lowerEmail === 'sourav.ganguly@modela.io' ||
+    lowerEmail === 'pooja.sharma@modela.io' ||
+    ((lowerEmail === 'modelatech2026@gmail.com' ||
+      lowerEmail === 'sushoovandas@gmail.com' ||
+      lowerEmail === 'ghoshdebrupa005@gmail.com' ||
+      lowerEmail === 'aditichakraborty2005@gmail.com' ||
+      lowerEmail === 'aditichakrabarty2005@gmail.com') &&
+      isRecordDeleted(lowerEmail)) ||
+    ((upperEmpId === 'MOD000' ||
+      upperEmpId === 'MOD101' ||
+      upperEmpId === 'MOD003' ||
+      upperEmpId === 'MOD005' ||
+      upperEmpId === 'MOD006' ||
+      upperEmpId === 'MOD007' ||
+      upperEmpId === 'MOD008' ||
+      upperEmpId === 'MOD102') &&
+      isRecordDeleted(upperEmpId))
+  );
+};
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const serverUsersRef = React.useRef<User[]>([]);
+
   const [users, setUsers] = useState<User[]>(() => {
     let list: User[] = [];
     try {
@@ -74,7 +139,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 u &&
                 u.id !== SYNC_REGISTRY_DOC_ID &&
                 u.email !== 'sync@system.internal' &&
-                !isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolveEmpId(u.email, u.employeeId))
+                ((u as any).isLiveRequest ||
+                  !isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolveEmpId(u.email, u.employeeId)))
             )
             .map(u => ({
               ...u,
@@ -92,6 +158,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         employeeId: resolveEmpId(u.email, u.employeeId)
       }));
     }
+
+    // Merge any locally submitted live sign-up requests so they never disappear
+    const liveMap = getLiveRequestsMap();
+    liveMap.forEach((liveUser, emailKey) => {
+      const idx = list.findIndex(u => u.email?.toLowerCase().trim() === emailKey);
+      if (idx >= 0) {
+        const curUpdated = String((list[idx] as any).updatedAt || list[idx].requestedAt || '');
+        const liveUpdated = String((liveUser as any).updatedAt || liveUser.requestedAt || '');
+        if (liveUpdated >= curUpdated) {
+          list[idx] = { ...list[idx], ...liveUser };
+        }
+      } else {
+        list.unshift(liveUser);
+      }
+    });
 
     const sushoovanUser: User = {
       id: "USR-Q94BIIQ5",
@@ -149,6 +230,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handleUserDeleted = (event: Event) => {
       const customEvent = event as CustomEvent<{ id?: string; employeeId?: string; email?: string }>;
       const { id, employeeId, email } = customEvent.detail || {};
+      if (email) {
+        const liveMap = getLiveRequestsMap();
+        if (liveMap.delete(email.toLowerCase().trim())) {
+          saveLiveRequestsMap(liveMap);
+        }
+      }
       setUsers(prev => {
         const next = prev.filter(u => {
           if (id && (u.id === id || u.uid === id)) return false;
@@ -192,6 +279,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const handleSyncRegistryUpdated = () => {
+      const liveMap = getLiveRequestsMap();
       setUsers(prev => {
         const next = prev
           .filter(
@@ -199,7 +287,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               u &&
               u.id !== SYNC_REGISTRY_DOC_ID &&
               u.email !== 'sync@system.internal' &&
-              !isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolveEmpId(u.email, u.employeeId))
+              ((u as any).isLiveRequest ||
+                liveMap.has(u.email.toLowerCase().trim()) ||
+                !isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolveEmpId(u.email, u.employeeId)))
           )
           .map(u => ({
             ...u,
@@ -225,18 +315,122 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Sync to localStorage
   useEffect(() => {
     try {
+      const liveMap = getLiveRequestsMap();
       const sanitized = users.filter(
         u =>
           u &&
           u.id !== SYNC_REGISTRY_DOC_ID &&
           u.email !== 'sync@system.internal' &&
-          !isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolveEmpId(u.email, u.employeeId))
+          ((u as any).isLiveRequest ||
+            liveMap.has(u.email.toLowerCase().trim()) ||
+            !isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolveEmpId(u.email, u.employeeId)))
       );
       localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(sanitized));
     } catch (e) {
       console.warn('Failed saving users to localStorage:', e);
     }
   }, [users]);
+
+  const mergeServerUsers = useCallback((incomingUsers: any[], deletedIds?: string[]) => {
+    if (!Array.isArray(incomingUsers)) return;
+    if (Array.isArray(deletedIds) && deletedIds.length > 0) {
+      const liveMap = getLiveRequestsMap();
+      deletedIds.forEach(dId => {
+        const clean = String(dId || '').toLowerCase().trim();
+        if (clean && !liveMap.has(clean)) {
+          recordDeletedRecord(clean);
+        }
+      });
+    }
+
+    const liveMap = getLiveRequestsMap();
+    const validServerUsers: User[] = [];
+
+    incomingUsers.forEach((rawU: any) => {
+      if (!rawU || !rawU.email || !rawU.id) return;
+      const emailKey = String(rawU.email).toLowerCase().trim();
+      if (emailKey === 'sync@system.internal') return;
+
+      if (rawU.isLiveRequest || rawU.status === 'PENDING') {
+        if (rawU.isLiveRequest) {
+          removeDeletedRecord(emailKey, rawU.id, rawU.uid, rawU.employeeId);
+          liveMap.set(emailKey, rawU);
+        }
+      }
+
+      if (
+        !rawU.isLiveRequest &&
+        !liveMap.has(emailKey) &&
+        (isLegacyExcludedUser(rawU) ||
+          isRecordDeleted(rawU.id, rawU.uid, emailKey, rawU.employeeId, resolveEmpId(emailKey, rawU.employeeId)))
+      ) {
+        return;
+      }
+
+      validServerUsers.push(rawU as User);
+    });
+
+    saveLiveRequestsMap(liveMap);
+    serverUsersRef.current = validServerUsers;
+
+    setUsers(prev => {
+      const map = new Map<string, User>();
+      prev.forEach(u => {
+        if (u && u.email) {
+          map.set(u.email.toLowerCase().trim(), u);
+        }
+      });
+
+      // Merge server users
+      validServerUsers.forEach(rawU => {
+        const emailKey = rawU.email.toLowerCase().trim();
+        const existing = map.get(emailKey);
+        const rawUpdated = String((rawU as any).updatedAt || rawU.requestedAt || '');
+        const exUpdated = existing ? String((existing as any).updatedAt || existing.requestedAt || '') : '';
+
+        if (
+          !existing ||
+          rawUpdated >= exUpdated ||
+          (rawU as any).isLiveRequest ||
+          (rawU.status === 'PENDING' && existing.status !== 'APPROVED')
+        ) {
+          map.set(emailKey, {
+            ...(existing || {}),
+            ...rawU,
+            employeeId: resolveEmpId(emailKey, rawU.employeeId || existing?.employeeId)
+          });
+        }
+      });
+
+      // Ensure all local live requests are also present
+      liveMap.forEach((liveU, emailKey) => {
+        const existing = map.get(emailKey);
+        const liveUpdated = String((liveU as any).updatedAt || liveU.requestedAt || '');
+        const exUpdated = existing ? String((existing as any).updatedAt || existing.requestedAt || '') : '';
+        if (!existing || liveUpdated >= exUpdated) {
+          map.set(emailKey, {
+            ...(existing || {}),
+            ...liveU,
+            employeeId: resolveEmpId(emailKey, liveU.employeeId || existing?.employeeId)
+          });
+        }
+      });
+
+      const next = Array.from(map.values()).filter(
+        u =>
+          u &&
+          u.id !== SYNC_REGISTRY_DOC_ID &&
+          u.email !== 'sync@system.internal' &&
+          ((u as any).isLiveRequest ||
+            liveMap.has(u.email.toLowerCase().trim()) ||
+            !isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolveEmpId(u.email, u.employeeId)))
+      );
+      try {
+        localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  }, []);
 
   // Real-time Firestore synchronization across all browsers and devices
   useEffect(() => {
@@ -272,6 +466,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         });
 
+        const liveMap = getLiveRequestsMap();
         const remoteList: User[] = [];
         snapshot.forEach(docSnap => {
           const item = docSnap.data() as User;
@@ -279,36 +474,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (docSnap.id === SYNC_REGISTRY_DOC_ID || item.id === SYNC_REGISTRY_DOC_ID || item.email === 'sync@system.internal' || (item as any).isSystemSync) {
             return;
           }
-          const lowerName = (item.name || '').trim().toLowerCase();
           const lowerEmail = (item.email || '').trim().toLowerCase();
-          const upperEmpId = (item.employeeId || '').trim().toUpperCase();
+          if ((item as any).isLiveRequest) {
+            liveMap.set(lowerEmail, item);
+          }
           if (
-            (lowerName.includes('tony') && lowerName.includes('stark')) ||
-            lowerName === 'tony stark' ||
-            lowerName.includes('marcus vance') ||
-            lowerName.includes('sourav ganguly') ||
-            lowerName.includes('pooja sharma') ||
-            lowerEmail.includes('tonystark') ||
-            lowerEmail.includes('tony.stark') ||
-            lowerEmail === 'marcus.vance@modela.io' ||
-            lowerEmail === 'sourav.ganguly@modela.io' ||
-            lowerEmail === 'pooja.sharma@modela.io' ||
-            lowerEmail === 'modelatech2026@gmail.com' ||
-            lowerEmail === 'sushoovandas@gmail.com' ||
-            lowerEmail === 'ghoshdebrupa005@gmail.com' ||
-            lowerEmail === 'aditichakraborty2005@gmail.com' ||
-            lowerEmail === 'aditichakrabarty2005@gmail.com' ||
-            upperEmpId === 'MOD000' ||
-            upperEmpId === 'MOD101' ||
-            upperEmpId === 'MOD003' ||
-            upperEmpId === 'MOD005' ||
-            upperEmpId === 'MOD006' ||
-            upperEmpId === 'MOD007' ||
-            upperEmpId === 'MOD008' ||
-            upperEmpId === 'MOD102' ||
-            isRecordDeleted(docSnap.id, item.id, item.uid, item.email, item.employeeId, resolveEmpId(item.email, item.employeeId))
+            !(item as any).isLiveRequest &&
+            !liveMap.has(lowerEmail) &&
+            (isLegacyExcludedUser(item) ||
+              isRecordDeleted(docSnap.id, item.id, item.uid, item.email, item.employeeId, resolveEmpId(item.email, item.employeeId)))
           ) {
-            deleteDoc(doc(db, 'users', docSnap.id)).catch(() => {});
             return;
           }
           remoteList.push(item);
@@ -329,12 +504,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Override and add real-time remote accounts & requests from Firestore
         remoteList.forEach(u => {
           const emailKey = u.email.toLowerCase().trim();
-          if (isRecordDeleted(u.id, u.uid, emailKey, u.employeeId, resolveEmpId(emailKey, u.employeeId))) {
+          if (
+            !(u as any).isLiveRequest &&
+            !liveMap.has(emailKey) &&
+            isRecordDeleted(u.id, u.uid, emailKey, u.employeeId, resolveEmpId(emailKey, u.employeeId))
+          ) {
             return;
           }
           const existing = map.get(emailKey);
-          const uUpdatedAt = (u as any).updatedAt || '';
-          const exUpdatedAt = existing ? ((existing as any).updatedAt || '') : '';
+          const uUpdatedAt = (u as any).updatedAt || u.requestedAt || '';
+          const exUpdatedAt = existing ? ((existing as any).updatedAt || existing.requestedAt || '') : '';
 
           if (uUpdatedAt && u.employeeId) {
             recordCustomEmpId(emailKey, undefined, u.employeeId);
@@ -355,6 +534,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               ...u,
               ...existing,
               employeeId: resolvedId
+            });
+          }
+        });
+
+        // Merge server-backed users & SSE updates so Firestore write quota rollbacks NEVER erase pending sign-up requests
+        serverUsersRef.current.forEach(srvU => {
+          if (!srvU || !srvU.email) return;
+          const emailKey = srvU.email.toLowerCase().trim();
+          if (
+            !(srvU as any).isLiveRequest &&
+            !liveMap.has(emailKey) &&
+            isRecordDeleted(srvU.id, srvU.uid, emailKey, srvU.employeeId, resolveEmpId(emailKey, srvU.employeeId))
+          ) {
+            return;
+          }
+          const existing = map.get(emailKey);
+          const srvUpdated = String((srvU as any).updatedAt || srvU.requestedAt || '');
+          const exUpdated = existing ? String((existing as any).updatedAt || existing.requestedAt || '') : '';
+          if (!existing || srvUpdated >= exUpdated || (srvU as any).isLiveRequest) {
+            map.set(emailKey, {
+              ...(existing || {}),
+              ...srvU,
+              employeeId: resolveEmpId(emailKey, srvU.employeeId || existing?.employeeId)
+            });
+          }
+        });
+
+        // Merge persistent local live sign-up requests
+        liveMap.forEach((liveU, emailKey) => {
+          const existing = map.get(emailKey);
+          const liveUpdated = String((liveU as any).updatedAt || liveU.requestedAt || '');
+          const exUpdated = existing ? String((existing as any).updatedAt || existing.requestedAt || '') : '';
+          if (!existing || liveUpdated >= exUpdated) {
+            map.set(emailKey, {
+              ...(existing || {}),
+              ...liveU,
+              employeeId: resolveEmpId(emailKey, liveU.employeeId || existing?.employeeId)
             });
           }
         });
@@ -394,7 +610,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             u &&
             u.id !== SYNC_REGISTRY_DOC_ID &&
             u.email !== 'sync@system.internal' &&
-            !isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolveEmpId(u.email, u.employeeId))
+            ((u as any).isLiveRequest ||
+              liveMap.has(u.email.toLowerCase().trim()) ||
+              !isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolveEmpId(u.email, u.employeeId)))
         );
         setUsers(updatedUsers);
         try {
@@ -406,73 +624,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     );
 
-    // Instant Server-Sent Events (SSE) listener for zero-latency cross-device sign-up request delivery
-    const mergeServerUsers = (incomingUsers: any[]) => {
-      if (!isSubscribed || !Array.isArray(incomingUsers)) return;
-      setUsers(prev => {
-        let changed = false;
-        const map = new Map<string, User>();
-        prev.forEach(u => {
-          if (u && u.email) {
-            map.set(u.email.toLowerCase().trim(), u);
-          }
-        });
-
-        incomingUsers.forEach((rawU: any) => {
-          if (!rawU || !rawU.email || !rawU.id) return;
-          const emailKey = String(rawU.email).toLowerCase().trim();
-          const upperEmpId = String(rawU.employeeId || '').trim().toUpperCase();
-          if (
-            emailKey === 'sync@system.internal' ||
-            emailKey === 'modelatech2026@gmail.com' ||
-            emailKey === 'sushoovandas@gmail.com' ||
-            emailKey === 'ghoshdebrupa005@gmail.com' ||
-            emailKey === 'aditichakraborty2005@gmail.com' ||
-            emailKey === 'aditichakrabarty2005@gmail.com' ||
-            upperEmpId === 'MOD000' ||
-            upperEmpId === 'MOD101' ||
-            upperEmpId === 'MOD102' ||
-            upperEmpId === 'MOD003' ||
-            upperEmpId === 'MOD005' ||
-            upperEmpId === 'MOD006' ||
-            upperEmpId === 'MOD007' ||
-            upperEmpId === 'MOD008' ||
-            isRecordDeleted(rawU.id, rawU.uid, emailKey, rawU.employeeId, resolveEmpId(emailKey, rawU.employeeId))
-          ) {
-            return;
-          }
-
-          const existing = map.get(emailKey);
-          const rawUpdated = String(rawU.updatedAt || rawU.requestedAt || '');
-          const exUpdated = existing ? String((existing as any).updatedAt || existing.requestedAt || '') : '';
-
-          if (!existing || rawUpdated > exUpdated || (rawU.status === 'PENDING' && existing.status !== 'APPROVED' && existing.name !== rawU.name)) {
-            map.set(emailKey, {
-              ...(existing || {}),
-              ...rawU,
-              employeeId: resolveEmpId(emailKey, rawU.employeeId || existing?.employeeId)
-            });
-            changed = true;
-          }
-        });
-
-        if (!changed) return prev;
-        const next = Array.from(map.values());
-        try {
-          localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(next));
-        } catch {}
-        return next;
-      });
-    };
-
     let eventSource: EventSource | null = null;
     try {
       eventSource = new EventSource('/api/users/stream');
       eventSource.onmessage = event => {
+        if (!isSubscribed) return;
         try {
           const parsed = JSON.parse(event.data);
           if (parsed && Array.isArray(parsed.users)) {
-            mergeServerUsers(parsed.users);
+            mergeServerUsers(parsed.users, parsed.deletedIds);
           }
         } catch {}
       };
@@ -482,8 +642,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     fetch('/api/users')
       .then(r => r.json())
       .then(data => {
-        if (data && Array.isArray(data.users)) {
-          mergeServerUsers(data.users);
+        if (isSubscribed && data && Array.isArray(data.users)) {
+          mergeServerUsers(data.users, data.deletedIds);
         }
       })
       .catch(() => {});
@@ -495,71 +655,99 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         eventSource.close();
       }
     };
-  }, []);
+  }, [mergeServerUsers]);
 
-  // Refresh Registry: sync directly with Firestore users & employees and backend /api/users so deleted users never come back and new requests appear immediately
+  // Refresh Registry: sync immediately with backend /api/users first, then reconcile with Firestore with a non-blocking timeout
   const refreshUsers = useCallback(async () => {
     try {
-      const [userSnap, empSnap, apiRes] = await Promise.all([
-        getDocs(collection(db, 'users')),
-        getDocs(collection(db, 'employees')),
-        fetch('/api/users').then(r => r.json()).catch(() => null)
-      ]);
-
-      // 1. Apply global sync registry document first so all deletions & EMP ID overrides are up to date
-      userSnap.forEach(docSnap => {
-        const raw = docSnap.data();
-        if (docSnap.id === SYNC_REGISTRY_DOC_ID || raw?.id === SYNC_REGISTRY_DOC_ID || raw?.isSystemSync) {
-          applyRemoteSyncRegistry(raw);
-        }
-      });
-
-      // 2. Build authoritative email -> employeeId map from Firestore employees collection (cleaning up any deleted ones)
-      const empEmailToId = new Map<string, { id: string; updatedAt: string }>();
-      empSnap.forEach(docSnap => {
-        const eData = docSnap.data();
-        if (!eData || !eData.id) return;
-        if (isRecordDeleted(docSnap.id, eData.id, eData.email, resolveEmpId(eData.email, eData.id))) {
-          deleteDoc(doc(db, 'employees', docSnap.id)).catch(() => {});
-          return;
-        }
-        if (eData.email) {
-          const emailKey = String(eData.email).toLowerCase().trim();
-          const cur = empEmailToId.get(emailKey);
-          const eUpdatedAt = String(eData.updatedAt || '');
-          const cleanId = String(eData.id).trim().toUpperCase();
-          if (eUpdatedAt) {
-            recordCustomEmpId(emailKey, undefined, cleanId);
-          }
-          if (!cur || eUpdatedAt >= cur.updatedAt) {
-            empEmailToId.set(emailKey, { id: cleanId, updatedAt: eUpdatedAt });
-          }
-        }
-      });
-
-      // 3. Collect valid live users from Firestore (cleaning up any deleted ones)
-      const remoteUsers: User[] = [];
-      userSnap.forEach(docSnap => {
-        const uData = docSnap.data() as User;
-        if (!uData || !uData.id || !uData.email) return;
-        if (docSnap.id === SYNC_REGISTRY_DOC_ID || uData.id === SYNC_REGISTRY_DOC_ID || uData.email === 'sync@system.internal' || (uData as any).isSystemSync) {
-          return;
-        }
-        if (isRecordDeleted(docSnap.id, uData.id, uData.uid, uData.email, uData.employeeId, resolveEmpId(uData.email, uData.employeeId))) {
-          deleteDoc(doc(db, 'users', docSnap.id)).catch(() => {});
-          return;
-        }
-        remoteUsers.push(uData);
-      });
+      // Step 1: Fast sync from backend API so pending requests appear immediately even if Firestore is in quota backoff
+      const apiRes = await fetch('/api/users')
+        .then(r => r.json())
+        .catch(() => null);
 
       if (apiRes && Array.isArray(apiRes.users)) {
-        apiRes.users.forEach((apiU: User) => {
-          if (!apiU || !apiU.id || !apiU.email) return;
-          if (apiU.id === SYNC_REGISTRY_DOC_ID || apiU.email === 'sync@system.internal') return;
-          if (isRecordDeleted(apiU.id, apiU.uid, apiU.email, apiU.employeeId, resolveEmpId(apiU.email, apiU.employeeId))) return;
-          remoteUsers.push(apiU);
+        mergeServerUsers(apiRes.users, apiRes.deletedIds);
+      }
+
+      // Step 2: Query Firestore with a 2.5s timeout so a backed-off Firestore stream never blocks User Management refresh
+      const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T | null> =>
+        Promise.race([
+          promise.catch(() => null),
+          new Promise<null>(resolve => setTimeout(() => resolve(null), ms))
+        ]);
+
+      const [userSnap, empSnap] = await Promise.all([
+        withTimeout(getDocs(collection(db, 'users')), 2500),
+        withTimeout(getDocs(collection(db, 'employees')), 2500)
+      ]);
+
+      if (!userSnap && !empSnap) {
+        return;
+      }
+
+      if (userSnap) {
+        userSnap.forEach(docSnap => {
+          const raw = docSnap.data();
+          if (docSnap.id === SYNC_REGISTRY_DOC_ID || raw?.id === SYNC_REGISTRY_DOC_ID || raw?.isSystemSync) {
+            applyRemoteSyncRegistry(raw);
+          }
         });
       }
+
+      const empEmailToId = new Map<string, { id: string; updatedAt: string }>();
+      if (empSnap) {
+        empSnap.forEach(docSnap => {
+          const eData = docSnap.data();
+          if (!eData || !eData.id) return;
+          if (isRecordDeleted(docSnap.id, eData.id, eData.email, resolveEmpId(eData.email, eData.id))) {
+            return;
+          }
+          if (eData.email) {
+            const emailKey = String(eData.email).toLowerCase().trim();
+            const cur = empEmailToId.get(emailKey);
+            const eUpdatedAt = String(eData.updatedAt || '');
+            const cleanId = String(eData.id).trim().toUpperCase();
+            if (eUpdatedAt) {
+              recordCustomEmpId(emailKey, undefined, cleanId);
+            }
+            if (!cur || eUpdatedAt >= cur.updatedAt) {
+              empEmailToId.set(emailKey, { id: cleanId, updatedAt: eUpdatedAt });
+            }
+          }
+        });
+      }
+
+      const liveMap = getLiveRequestsMap();
+      const remoteUsers: User[] = [];
+      if (userSnap) {
+        userSnap.forEach(docSnap => {
+          const uData = docSnap.data() as User;
+          if (!uData || !uData.id || !uData.email) return;
+          if (docSnap.id === SYNC_REGISTRY_DOC_ID || uData.id === SYNC_REGISTRY_DOC_ID || uData.email === 'sync@system.internal' || (uData as any).isSystemSync) {
+            return;
+          }
+          const emailKey = uData.email.toLowerCase().trim();
+          if (
+            !(uData as any).isLiveRequest &&
+            !liveMap.has(emailKey) &&
+            (isLegacyExcludedUser(uData) ||
+              isRecordDeleted(docSnap.id, uData.id, uData.uid, uData.email, uData.employeeId, resolveEmpId(uData.email, uData.employeeId)))
+          ) {
+            return;
+          }
+          remoteUsers.push(uData);
+        });
+      }
+
+      serverUsersRef.current.forEach(apiU => {
+        if (!apiU || !apiU.id || !apiU.email) return;
+        remoteUsers.push(apiU);
+      });
+
+      liveMap.forEach(liveU => {
+        if (!liveU || !liveU.id || !liveU.email) return;
+        remoteUsers.push(liveU);
+      });
 
       const map = new Map<string, User>();
 
@@ -575,7 +763,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       remoteUsers.forEach(u => {
         const emailKey = u.email.toLowerCase().trim();
-        if (isRecordDeleted(u.id, u.uid, emailKey, u.employeeId, resolveEmpId(emailKey, u.employeeId))) {
+        if (
+          !(u as any).isLiveRequest &&
+          !liveMap.has(emailKey) &&
+          isRecordDeleted(u.id, u.uid, emailKey, u.employeeId, resolveEmpId(emailKey, u.employeeId))
+        ) {
           return;
         }
         const existing = map.get(emailKey);
@@ -584,7 +776,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (uUpdatedAt && u.employeeId) {
           recordCustomEmpId(emailKey, undefined, u.employeeId);
         }
-        if (!existing || uUpdatedAt >= exUpdatedAt) {
+        if (!existing || uUpdatedAt >= exUpdatedAt || (u as any).isLiveRequest) {
           map.set(emailKey, {
             ...(existing || {}),
             ...u,
@@ -607,19 +799,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           u &&
           u.id !== SYNC_REGISTRY_DOC_ID &&
           u.email !== 'sync@system.internal' &&
-          !isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolveEmpId(u.email, u.employeeId))
+          ((u as any).isLiveRequest ||
+            liveMap.has(u.email.toLowerCase().trim()) ||
+            !isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolveEmpId(u.email, u.employeeId)))
       );
       setUsers(nextList);
       try {
         localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(nextList));
       } catch {}
 
-      // Notify AppContext so Employees directory is also immediately synced and pruned
       window.dispatchEvent(new CustomEvent('modela_sync_registry_updated'));
     } catch (err) {
       console.warn('Refresh users sync notice:', err);
     }
-  }, []);
+  }, [mergeServerUsers]);
 
   const currentUser = React.useMemo(() => {
     if (!currentEmail) return null;
@@ -757,13 +950,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       designation: data.designation || existing?.designation || initialMatch?.designation || 'Staff Candidate',
       requestedAt: existing?.status === 'PENDING' && existing?.requestedAt ? existing.requestedAt : now,
       notificationUnread: true,
-      ...({ updatedAt: now } as any)
+      ...({ updatedAt: now, isLiveRequest: true } as any)
     };
 
-    // Add user to state so it appears in User Management page immediately
-    setUsers(prev => [newUser, ...prev.filter(u => u.email.toLowerCase() !== cleanEmail && u.id !== userId)]);
-
     const cleanedNewUser = cleanFirestoreUser(newUser);
+
+    // Save to persistent live sign-up requests registry and serverUsersRef so Firestore write quota rollbacks never erase it
+    const liveMap = getLiveRequestsMap();
+    liveMap.set(cleanEmail, cleanedNewUser);
+    saveLiveRequestsMap(liveMap);
+
+    serverUsersRef.current = [
+      cleanedNewUser,
+      ...serverUsersRef.current.filter(u => u.email.toLowerCase().trim() !== cleanEmail && u.id !== userId)
+    ];
+
+    // Add user to state and localStorage immediately so it appears in User Management page right away
+    setUsers(prev => {
+      const next = [cleanedNewUser, ...prev.filter(u => u.email.toLowerCase().trim() !== cleanEmail && u.id !== userId)];
+      try {
+        localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
 
     // Send to backend API for instant SSE broadcast to all connected devices
     fetch('/api/users/request', {
@@ -772,7 +981,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       body: JSON.stringify(cleanedNewUser)
     }).catch(() => {});
 
-    // Persist to Firestore so every browser & device receives it immediately in real-time!
+    // Persist to Firestore in background
     setDoc(doc(db, 'users', newUser.id), cleanedNewUser, { merge: true }).catch(err => {
       console.warn('Firestore user request write notice:', err);
     });
@@ -781,7 +990,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       success: true,
       isPending: true,
       message: 'Sign-up request submitted. It will show in User Management for Super Admin, Executive Director, or HR Manager approval.',
-      user: newUser
+      user: cleanedNewUser
     };
   };
 
@@ -816,7 +1025,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             statusUpdatedAt: now,
             notificationUnread: false,
             remarks: remarks || `Accepted & Approved by ${reviewer} with role ${finalRole}`,
-            ...({ updatedAt: now } as any)
+            ...({ updatedAt: now, isLiveRequest: true } as any)
           }
         : {
             id: userId,
@@ -832,33 +1041,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             statusUpdatedAt: now,
             notificationUnread: false,
             remarks: remarks || `Accepted & Approved by ${reviewer} with role ${finalRole}`,
-            ...({ updatedAt: now } as any)
+            ...({ updatedAt: now, isLiveRequest: true } as any)
           };
 
-      // Update user state
-      setUsers(prev =>
-        prev.map(u => (u.id === userId || u.uid === userId || (targetEmail && u.email?.toLowerCase() === targetEmail.toLowerCase()) ? updatedUser : u))
+      if (targetEmail) {
+        const liveMap = getLiveRequestsMap();
+        liveMap.set(targetEmail, updatedUser);
+        saveLiveRequestsMap(liveMap);
+      }
+
+      serverUsersRef.current = serverUsersRef.current.map(u =>
+        u.id === userId || u.uid === userId || (targetEmail && u.email?.toLowerCase().trim() === targetEmail)
+          ? updatedUser
+          : u
       );
 
-      // Persist user approval to Firestore with merge: true
-      const primaryDocId = targetUser ? targetUser.id : userId;
-      try {
-        await setDoc(doc(db, 'users', primaryDocId), updatedUser, { merge: true });
-        
-        // Also ensure any duplicate or alternate document IDs with this email in Firestore are updated
-        if (targetEmail) {
-          await setDoc(doc(db, 'users', `REQ-${targetEmail.replace(/[^a-zA-Z0-9]/g, '_')}`), updatedUser, { merge: true });
-          const userQuery = query(collection(db, 'users'), where('email', '==', targetEmail));
-          const querySnap = await getDocs(userQuery);
-          for (const d of querySnap.docs) {
-            if (d.id !== primaryDocId) {
-              await setDoc(doc(db, 'users', d.id), updatedUser, { merge: true });
-            }
-          }
-        }
-      } catch (err) {
-        console.warn('Firestore approve write error:', err);
-      }
+      // Update user state and localStorage immediately
+      setUsers(prev => {
+        const next = prev.map(u =>
+          u.id === userId || u.uid === userId || (targetEmail && u.email?.toLowerCase() === targetEmail.toLowerCase())
+            ? updatedUser
+            : u
+        );
+        try {
+          localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+
+      // Call API immediately so SSE broadcasts approval across all devices right away
+      fetch('/api/users/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, email: targetEmail, role: finalRole, reviewer, remarks, employeeId: targetEmpId, user: updatedUser })
+      }).catch(() => {});
 
       // Immediately create and add to Employees page directory and Payroll page (Jan-Oct PAID, Nov-Dec UNPAID)
       if (targetEmail) {
@@ -890,8 +1106,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const updatedList = [newEmp, ...filteredList];
           localStorage.setItem('modela_employees_v2', JSON.stringify(updatedList));
 
-          // Persist new employee to Firestore
-          await setDoc(doc(db, 'employees', targetEmpId), newEmp, { merge: true });
+          // Dispatch event for AppContext immediately
+          window.dispatchEvent(new CustomEvent('modela_employee_added', { detail: newEmp }));
+
+          fetch('/api/employees', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newEmp)
+          }).catch(() => {});
+
+          // Persist new employee to Firestore in background
+          setDoc(doc(db, 'employees', targetEmpId), newEmp, { merge: true }).catch(() => {});
 
           // Automatically generate and persist payroll records for Jan to Oct (PAID) and Nov to Dec (UNPAID)
           const allMonths = [
@@ -940,31 +1165,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             };
           });
 
-          await Promise.all(
-            newPayrollRecords.map(rec =>
-              setDoc(doc(db, 'payroll', rec.id), rec, { merge: true }).catch(() => {})
-            )
-          );
-
-          // Dispatch event for AppContext
-          window.dispatchEvent(new CustomEvent('modela_employee_added', { detail: newEmp }));
-
-          fetch('/api/employees', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(newEmp)
-          }).catch(() => {});
+          newPayrollRecords.forEach(rec => {
+            setDoc(doc(db, 'payroll', rec.id), rec, { merge: true }).catch(() => {});
+          });
         } catch (e) {
           console.warn('Failed saving accepted employee:', e);
         }
       }
 
-      // Call API with email as well
-      fetch('/api/users/approve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, email: targetEmail, role, reviewer, remarks, employeeId: targetEmpId })
-      }).catch(() => {});
+      // Persist user approval to Firestore in background
+      const primaryDocId = targetUser ? targetUser.id : userId;
+      setDoc(doc(db, 'users', primaryDocId), updatedUser, { merge: true }).catch(() => {});
+      if (targetEmail) {
+        setDoc(doc(db, 'users', `REQ-${targetEmail.replace(/[^a-zA-Z0-9]/g, '_')}`), updatedUser, { merge: true }).catch(() => {});
+      }
 
       return true;
     } finally {
@@ -1037,13 +1251,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     if (targetEmail) {
-      try {
-        const userQuery = query(collection(db, 'users'), where('email', '==', targetEmail));
-        const querySnap = await getDocs(userQuery);
-        for (const d of querySnap.docs) {
-          await setDoc(doc(db, 'users', d.id), cleanFirestoreUser({ ...d.data(), employeeId: cleanNew, updatedAt: now }), { merge: true });
-        }
-      } catch {}
+      const liveMap = getLiveRequestsMap();
+      const ex = liveMap.get(targetEmail.toLowerCase().trim());
+      if (ex) {
+        liveMap.set(targetEmail.toLowerCase().trim(), { ...ex, employeeId: cleanNew, ...({ updatedAt: now } as any) });
+        saveLiveRequestsMap(liveMap);
+      }
     }
 
     window.dispatchEvent(
@@ -1060,10 +1273,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const now = new Date().toISOString();
       const reviewer = currentUser?.email || 'System Super Admin';
+      let targetEmail = '';
 
-      setUsers(prev =>
-        prev.map(u => {
+      setUsers(prev => {
+        const next = prev.map(u => {
           if (u.id === userId || u.uid === userId) {
+            targetEmail = u.email.toLowerCase().trim();
             const updated = {
               ...u,
               status: 'REJECTED' as const,
@@ -1071,19 +1286,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               reviewedBy: reviewer,
               statusUpdatedAt: now,
               notificationUnread: false,
-              remarks: reason || 'Access request rejected by security policy'
+              remarks: reason || 'Access request rejected by security policy',
+              ...({ updatedAt: now, isLiveRequest: false } as any)
             };
             setDoc(doc(db, 'users', u.id), updated).catch(() => {});
             return updated;
           }
           return u;
-        })
+        });
+        try {
+          localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+
+      if (targetEmail) {
+        const liveMap = getLiveRequestsMap();
+        if (liveMap.delete(targetEmail)) {
+          saveLiveRequestsMap(liveMap);
+        }
+      }
+
+      serverUsersRef.current = serverUsersRef.current.map(u =>
+        u.id === userId || u.uid === userId || (targetEmail && u.email?.toLowerCase().trim() === targetEmail)
+          ? { ...u, status: 'REJECTED', reviewedAt: now, reviewedBy: reviewer, ...({ updatedAt: now, isLiveRequest: false } as any) }
+          : u
       );
 
       fetch('/api/users/reject', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, reviewer, reason })
+        body: JSON.stringify({ userId, email: targetEmail, reviewer, reason })
       }).catch(() => {});
 
       return true;
@@ -1095,21 +1328,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateUserRole = async (userId: string, newRole: UserRole): Promise<boolean> => {
     setIsLoading(true);
     try {
-      setUsers(prev =>
-        prev.map(u => {
+      const now = new Date().toISOString();
+      let targetEmail = '';
+
+      setUsers(prev => {
+        const next = prev.map(u => {
           if (u.id === userId || u.uid === userId) {
-            const updated = { ...u, role: newRole };
+            targetEmail = u.email.toLowerCase().trim();
+            const updated = { ...u, role: newRole, ...({ updatedAt: now } as any) };
             setDoc(doc(db, 'users', u.id), updated).catch(() => {});
             return updated;
           }
           return u;
-        })
+        });
+        try {
+          localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(next));
+        } catch {}
+        return next;
+      });
+
+      if (targetEmail) {
+        const liveMap = getLiveRequestsMap();
+        const ex = liveMap.get(targetEmail);
+        if (ex) {
+          liveMap.set(targetEmail, { ...ex, role: newRole, ...({ updatedAt: now } as any) });
+          saveLiveRequestsMap(liveMap);
+        }
+      }
+
+      serverUsersRef.current = serverUsersRef.current.map(u =>
+        u.id === userId || u.uid === userId || (targetEmail && u.email?.toLowerCase().trim() === targetEmail)
+          ? { ...u, role: newRole, ...({ updatedAt: now } as any) }
+          : u
       );
 
       fetch('/api/users/role', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, newRole })
+        body: JSON.stringify({ userId, email: targetEmail, newRole })
       }).catch(() => {});
 
       return true;
@@ -1144,6 +1400,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Also collect any baseline IDs for this email from INITIAL_USERS and INITIAL_EMPLOYEES
       const extraIds: (string | undefined)[] = [];
       if (targetEmail) {
+        const liveMap = getLiveRequestsMap();
+        if (liveMap.delete(targetEmail)) {
+          saveLiveRequestsMap(liveMap);
+        }
         INITIAL_USERS.forEach(iu => {
           if (iu.email.toLowerCase().trim() === targetEmail) {
             extraIds.push(iu.id, iu.uid, iu.employeeId);
@@ -1158,12 +1418,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // 1. Record in persistent deleted registry & sync to Firestore SYNC-REGISTRY-GLOBAL so all browsers/devices know
       recordDeletedRecord(userId, target?.id, target?.uid, targetEmail, targetEmpId, resolvedEmpId, ...extraIds);
-      await persistSyncRegistryToFirestore();
+      persistSyncRegistryToFirestore().catch(() => {});
 
       const deletedKeySet = new Set(
         [userId, target?.id, target?.uid, targetEmail, targetEmpId, resolvedEmpId, ...extraIds]
           .filter(Boolean)
           .map(s => String(s).toLowerCase().trim())
+      );
+
+      serverUsersRef.current = serverUsersRef.current.filter(
+        u =>
+          !deletedKeySet.has(String(u.id || '').toLowerCase().trim()) &&
+          !deletedKeySet.has(String(u.uid || '').toLowerCase().trim()) &&
+          !deletedKeySet.has(String(u.email || '').toLowerCase().trim()) &&
+          !deletedKeySet.has(String(u.employeeId || '').toLowerCase().trim())
       );
 
       // 2. Remove from users state and localStorage immediately
@@ -1205,61 +1473,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       );
       window.dispatchEvent(new CustomEvent('modela_sync_registry_updated'));
 
-      // 5. Permanently delete all matching documents from Firestore 'users' and 'employees' collections
-      try {
-        const deletePromises: Promise<any>[] = [];
-        deletePromises.push(deleteDoc(doc(db, 'users', userId)).catch(() => {}));
-        if (target?.id && target.id !== userId) {
-          deletePromises.push(deleteDoc(doc(db, 'users', target.id)).catch(() => {}));
-        }
-        if (targetEmail) {
-          deletePromises.push(
-            deleteDoc(doc(db, 'users', `REQ-${targetEmail.replace(/[^a-zA-Z0-9]/g, '_')}`)).catch(() => {})
-          );
-        }
-        if (targetEmpId) {
-          deletePromises.push(deleteDoc(doc(db, 'employees', targetEmpId)).catch(() => {}));
-        }
-        if (resolvedEmpId && resolvedEmpId !== targetEmpId) {
-          deletePromises.push(deleteDoc(doc(db, 'employees', resolvedEmpId)).catch(() => {}));
-        }
-
-        const [allUsersSnap, allEmpsSnap] = await Promise.all([
-          getDocs(collection(db, 'users')),
-          getDocs(collection(db, 'employees'))
-        ]);
-
-        allUsersSnap.forEach(d => {
-          if (d.id === SYNC_REGISTRY_DOC_ID) return;
-          const uData = d.data();
-          if (
-            deletedKeySet.has(d.id.toLowerCase().trim()) ||
-            deletedKeySet.has(String(uData.id || '').toLowerCase().trim()) ||
-            deletedKeySet.has(String(uData.uid || '').toLowerCase().trim()) ||
-            deletedKeySet.has(String(uData.email || '').toLowerCase().trim()) ||
-            deletedKeySet.has(String(uData.employeeId || '').toLowerCase().trim())
-          ) {
-            deletePromises.push(deleteDoc(doc(db, 'users', d.id)).catch(() => {}));
-          }
-        });
-
-        allEmpsSnap.forEach(d => {
-          const eData = d.data();
-          if (
-            deletedKeySet.has(d.id.toLowerCase().trim()) ||
-            deletedKeySet.has(String(eData.id || '').toLowerCase().trim()) ||
-            deletedKeySet.has(String(eData.email || '').toLowerCase().trim())
-          ) {
-            deletePromises.push(deleteDoc(doc(db, 'employees', d.id)).catch(() => {}));
-          }
-        });
-
-        await Promise.all(deletePromises);
-      } catch (e) {
-        console.warn('Firestore user/employee delete scan notice:', e);
-      }
-
-      // 6. Call server backend APIs
+      // 5. Call server backend APIs immediately
       if (targetEmpId) {
         fetch(`/api/employees/${encodeURIComponent(targetEmpId)}`, { method: 'DELETE' }).catch(() => {});
       }
@@ -1269,6 +1483,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       fetch(`/api/users/${encodeURIComponent(userId)}`, { method: 'DELETE' }).catch(() => {});
       if (targetEmail) {
         fetch(`/api/users/${encodeURIComponent(targetEmail)}`, { method: 'DELETE' }).catch(() => {});
+      }
+
+      // 6. Permanently delete matching documents from Firestore in background
+      deleteDoc(doc(db, 'users', userId)).catch(() => {});
+      if (target?.id && target.id !== userId) {
+        deleteDoc(doc(db, 'users', target.id)).catch(() => {});
+      }
+      if (targetEmail) {
+        deleteDoc(doc(db, 'users', `REQ-${targetEmail.replace(/[^a-zA-Z0-9]/g, '_')}`)).catch(() => {});
+      }
+      if (targetEmpId) {
+        deleteDoc(doc(db, 'employees', targetEmpId)).catch(() => {});
+      }
+      if (resolvedEmpId && resolvedEmpId !== targetEmpId) {
+        deleteDoc(doc(db, 'employees', resolvedEmpId)).catch(() => {});
       }
 
       return true;

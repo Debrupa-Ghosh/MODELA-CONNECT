@@ -23,14 +23,18 @@ interface ServerUser {
   reviewedBy?: string | null;
   notificationUnread?: boolean;
   remarks?: string;
+  updatedAt?: string;
+  isLiveRequest?: boolean;
 }
 
 const PORT = Number(process.env.PORT) || 3000;
 
 app.use(express.json());
 
-// In-memory persistent database for server session
-let users: ServerUser[] = [
+const STATE_FILE_PATH = path.resolve(__dirname, '.server-users-state.json');
+
+// Default baseline users
+const DEFAULT_SERVER_USERS: ServerUser[] = [
   {
     id: "USR-Q94BIIQ5",
     uid: "USR-Q94BIIQ5",
@@ -45,6 +49,19 @@ let users: ServerUser[] = [
     requestedAt: "2026-09-20T08:44:15.481Z",
     reviewedAt: "2026-09-20T08:44:35.660Z",
     reviewedBy: "System Root"
+  },
+  {
+    id: "USR-PENDING-DEBRUPA",
+    uid: "USR-PENDING-DEBRUPA",
+    name: "Debrupa123",
+    email: "debrupa123@gmail.com",
+    avatar_url: "https://ui-avatars.com/api/?name=Debrupa+123&background=0284c7&color=fff",
+    status: "PENDING",
+    role: null,
+    department: "Engineering",
+    designation: "Full Stack Engineer Candidate",
+    requestedAt: "2026-10-02T13:23:00.000Z",
+    notificationUnread: true
   },
   {
     id: "USR-SURUPA-011",
@@ -73,8 +90,47 @@ let users: ServerUser[] = [
     designation: "UI/UX Designer Candidate",
     requestedAt: "2026-10-02T06:28:52.741Z",
     notificationUnread: true
+  },
+  {
+    id: "USR-PENDING-03",
+    uid: "USR-PENDING-03",
+    name: "Vikram Sengupta",
+    email: "vikram.sengupta@gmail.com",
+    avatar_url: "https://ui-avatars.com/api/?name=Vikram+Sengupta&background=10b981&color=fff",
+    status: "PENDING",
+    role: null,
+    department: "Operations",
+    designation: "DevOps Engineer Candidate",
+    requestedAt: "2026-10-02T08:12:10.000Z",
+    notificationUnread: true
   }
 ];
+
+let users: ServerUser[] = [...DEFAULT_SERVER_USERS];
+let serverDeletedIds = new Set<string>();
+
+try {
+  if (fs.existsSync(STATE_FILE_PATH)) {
+    const raw = fs.readFileSync(STATE_FILE_PATH, 'utf-8');
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed.users) && parsed.users.length > 0) {
+      users = parsed.users;
+    }
+    if (Array.isArray(parsed.deletedIds)) {
+      serverDeletedIds = new Set(parsed.deletedIds);
+    }
+  }
+} catch {}
+
+const saveServerState = () => {
+  try {
+    fs.writeFileSync(
+      STATE_FILE_PATH,
+      JSON.stringify({ users, deletedIds: Array.from(serverDeletedIds) }, null, 2),
+      'utf-8'
+    );
+  } catch {}
+};
 
 let employees = [
   {
@@ -154,7 +210,7 @@ let staffRequests: ServerStaffRequest[] = [];
 const sseClients = new Set<Response>();
 
 const broadcastUsers = () => {
-  const payload = `data: ${JSON.stringify({ users })}\n\n`;
+  const payload = `data: ${JSON.stringify({ users, deletedIds: Array.from(serverDeletedIds) })}\n\n`;
   sseClients.forEach(client => {
     try {
       client.write(payload);
@@ -169,6 +225,7 @@ app.get('/api/users', (req: Request, res: Response) => {
   res.json({
     success: true,
     users,
+    deletedIds: Array.from(serverDeletedIds),
     requests: users.filter(u => u.status === 'PENDING')
   });
 });
@@ -183,67 +240,157 @@ app.post('/api/users/request', (req: Request, res: Response) => {
     const sa = users.find(u => u.email.toLowerCase() === emailLower);
     return res.json({ success: true, user: sa || newUser, message: 'Super Admin active' });
   }
+  const now = new Date().toISOString();
+  const existing = users.find(u => u.email.toLowerCase().trim() === emailLower);
+  const record: ServerUser = {
+    ...(existing || {}),
+    ...newUser,
+    id: newUser.id || existing?.id || `USR-${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
+    uid: newUser.uid || newUser.id || existing?.uid || existing?.id,
+    email: emailLower,
+    name: (newUser.name || existing?.name || emailLower).trim(),
+    status: 'PENDING',
+    role: null,
+    requestedAt: newUser.requestedAt || now,
+    updatedAt: now,
+    notificationUnread: true,
+    isLiveRequest: true
+  };
+
+  serverDeletedIds.delete(emailLower);
+  if (record.id) serverDeletedIds.delete(record.id.toLowerCase());
+  if (record.employeeId) serverDeletedIds.delete(record.employeeId.toLowerCase());
+
   users = [
-    newUser,
-    ...users.filter(u => u.email.toLowerCase().trim() !== emailLower && u.id !== newUser.id)
+    record,
+    ...users.filter(u => u.email.toLowerCase().trim() !== emailLower && u.id !== record.id)
   ];
+  saveServerState();
   broadcastUsers();
-  res.json({ success: true, user: newUser });
+  res.json({ success: true, user: record });
 });
 
 app.post('/api/users/approve', (req: Request, res: Response) => {
-  const { userId, email, role, reviewer, remarks, employeeId } = req.body;
+  const { userId, email, role, reviewer, remarks, employeeId, user } = req.body;
+  const now = new Date().toISOString();
+  const cleanEmail = email ? String(email).toLowerCase().trim() : '';
+
+  if (cleanEmail) serverDeletedIds.delete(cleanEmail);
+  if (userId) serverDeletedIds.delete(String(userId).toLowerCase());
+  if (employeeId) serverDeletedIds.delete(String(employeeId).toLowerCase());
+
+  let matched = false;
   users = users.map(u => {
     const isMatch =
       u.id === userId ||
       u.uid === userId ||
-      (email && u.email?.toLowerCase() === email.toLowerCase());
+      (cleanEmail && u.email?.toLowerCase().trim() === cleanEmail);
 
     if (isMatch) {
+      matched = true;
       return {
         ...u,
+        ...(user || {}),
         status: 'APPROVED',
         role: role || 'EMPLOYEE',
         employeeId: employeeId || u.employeeId,
-        reviewedAt: new Date().toISOString(),
+        reviewedAt: now,
         reviewedBy: reviewer || 'Super Admin',
-        remarks: remarks || `Approved with role ${role || 'EMPLOYEE'}`
+        remarks: remarks || `Approved with role ${role || 'EMPLOYEE'}`,
+        updatedAt: now,
+        isLiveRequest: true
       };
     }
     return u;
   });
+
+  if (!matched && (cleanEmail || user)) {
+    const fallbackUser: ServerUser = {
+      id: userId || user?.id || `USR-${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
+      uid: userId || user?.uid || user?.id,
+      name: user?.name || cleanEmail,
+      email: cleanEmail || user?.email,
+      avatar_url: user?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || cleanEmail)}&background=0284c7&color=fff`,
+      status: 'APPROVED',
+      role: role || 'EMPLOYEE',
+      employeeId: employeeId || user?.employeeId,
+      department: user?.department || 'General Staff',
+      designation: user?.designation || 'Staff Associate',
+      reviewedAt: now,
+      reviewedBy: reviewer || 'Super Admin',
+      remarks: remarks || `Approved with role ${role || 'EMPLOYEE'}`,
+      updatedAt: now,
+      isLiveRequest: true
+    };
+    users.unshift(fallbackUser);
+  }
+
+  saveServerState();
   broadcastUsers();
   res.json({ success: true });
 });
 
 app.post('/api/users/reject', (req: Request, res: Response) => {
-  const { userId, reviewer, reason } = req.body;
+  const { userId, email, reviewer, reason } = req.body;
+  const now = new Date().toISOString();
+  const cleanEmail = email ? String(email).toLowerCase().trim() : '';
   users = users.map(u => {
-    if (u.id === userId || u.uid === userId) {
+    if (u.id === userId || u.uid === userId || (cleanEmail && u.email?.toLowerCase().trim() === cleanEmail)) {
       return {
         ...u,
         status: 'REJECTED',
-        reviewedAt: new Date().toISOString(),
+        reviewedAt: now,
         reviewedBy: reviewer || 'Super Admin',
-        remarks: reason || 'Rejected'
+        remarks: reason || 'Rejected',
+        updatedAt: now,
+        isLiveRequest: false
       };
     }
     return u;
   });
+  saveServerState();
   broadcastUsers();
   res.json({ success: true });
 });
 
 app.post('/api/users/role', (req: Request, res: Response) => {
-  const { userId, newRole } = req.body;
-  users = users.map(u => (u.id === userId || u.uid === userId ? { ...u, role: newRole } : u));
+  const { userId, email, newRole } = req.body;
+  const now = new Date().toISOString();
+  const cleanEmail = email ? String(email).toLowerCase().trim() : '';
+  users = users.map(u =>
+    u.id === userId || u.uid === userId || (cleanEmail && u.email?.toLowerCase().trim() === cleanEmail)
+      ? { ...u, role: newRole, updatedAt: now }
+      : u
+  );
+  saveServerState();
   broadcastUsers();
   res.json({ success: true });
 });
 
 app.delete('/api/users/:id', (req: Request, res: Response) => {
   const { id } = req.params;
-  users = users.filter(u => u.id !== id && u.uid !== id && u.email?.toLowerCase() !== id.toLowerCase());
+  const cleanId = id.toLowerCase().trim();
+  serverDeletedIds.add(cleanId);
+  users.forEach(u => {
+    if (
+      u.id.toLowerCase() === cleanId ||
+      u.uid?.toLowerCase() === cleanId ||
+      u.email?.toLowerCase() === cleanId ||
+      u.employeeId?.toLowerCase() === cleanId
+    ) {
+      serverDeletedIds.add(u.id.toLowerCase());
+      if (u.email) serverDeletedIds.add(u.email.toLowerCase());
+      if (u.employeeId) serverDeletedIds.add(u.employeeId.toLowerCase());
+    }
+  });
+  users = users.filter(
+    u =>
+      u.id.toLowerCase() !== cleanId &&
+      u.uid?.toLowerCase() !== cleanId &&
+      u.email?.toLowerCase() !== cleanId &&
+      u.employeeId?.toLowerCase() !== cleanId
+  );
+  saveServerState();
   broadcastUsers();
   res.json({ success: true, message: `User ${id} deleted` });
 });

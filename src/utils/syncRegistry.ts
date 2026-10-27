@@ -4,6 +4,7 @@ import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 
 const STORAGE_KEY_DELETED = 'modela_deleted_registry_v4';
+const STORAGE_KEY_UNBLOCKED = 'modela_unblocked_registry_v1';
 const STORAGE_KEY_EMP_ID_MAP = 'modela_emp_id_overrides_v1';
 export const SYNC_REGISTRY_DOC_ID = 'SYNC-REGISTRY-GLOBAL';
 
@@ -69,8 +70,26 @@ const SYSTEM_PROTECTED_KEYS = new Set([
   'sync@system.internal'
 ]);
 
+export const getUnblockedRegistry = (): Set<string> => {
+  const result = new Set<string>();
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_UNBLOCKED);
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) {
+        arr.forEach(s => {
+          const clean = String(s || '').toLowerCase().trim();
+          if (clean) result.add(clean);
+        });
+      }
+    }
+  } catch {}
+  return result;
+};
+
 export const getDeletedRegistry = (): Set<string> => {
-  const result = new Set<string>(DEFAULT_DELETED_IDS);
+  const unblocked = getUnblockedRegistry();
+  const result = new Set<string>(DEFAULT_DELETED_IDS.filter(k => !unblocked.has(k)));
   try {
     const raw = localStorage.getItem(STORAGE_KEY_DELETED);
     if (raw) {
@@ -78,7 +97,7 @@ export const getDeletedRegistry = (): Set<string> => {
       if (Array.isArray(arr)) {
         arr.forEach(s => {
           const clean = String(s || '').toLowerCase().trim();
-          if (clean && !SYSTEM_PROTECTED_KEYS.has(clean)) {
+          if (clean && !SYSTEM_PROTECTED_KEYS.has(clean) && !unblocked.has(clean)) {
             result.add(clean);
           }
         });
@@ -131,11 +150,12 @@ export const applyRemoteSyncRegistry = (data: any): boolean => {
 
   try {
     if (Array.isArray(data.deletedIds)) {
+      const unblocked = getUnblockedRegistry();
       const currentDeleted = getDeletedRegistry();
       const prevSize = currentDeleted.size;
       data.deletedIds.forEach((item: any) => {
         const clean = String(item || '').toLowerCase().trim();
-        if (clean && !SYSTEM_PROTECTED_KEYS.has(clean)) {
+        if (clean && !SYSTEM_PROTECTED_KEYS.has(clean) && !unblocked.has(clean)) {
           currentDeleted.add(clean);
         }
       });
@@ -170,15 +190,18 @@ export const applyRemoteSyncRegistry = (data: any): boolean => {
 
 export const recordDeletedRecord = (...identifiers: (string | undefined | null)[]): void => {
   try {
+    const unblocked = getUnblockedRegistry();
     const registry = getDeletedRegistry();
     identifiers.forEach(id => {
       if (id && id.trim()) {
         const clean = id.toLowerCase().trim();
         if (!SYSTEM_PROTECTED_KEYS.has(clean)) {
+          unblocked.delete(clean);
           registry.add(clean);
         }
       }
     });
+    localStorage.setItem(STORAGE_KEY_UNBLOCKED, JSON.stringify(Array.from(unblocked)));
     localStorage.setItem(STORAGE_KEY_DELETED, JSON.stringify(Array.from(registry)));
     persistSyncRegistryToFirestore().catch(() => {});
   } catch (e) {
@@ -188,18 +211,23 @@ export const recordDeletedRecord = (...identifiers: (string | undefined | null)[
 
 export const removeDeletedRecord = (...identifiers: (string | undefined | null)[]): void => {
   try {
+    const unblocked = getUnblockedRegistry();
     const registry = getDeletedRegistry();
     let changed = false;
     identifiers.forEach(id => {
       if (id && id.trim()) {
         const clean = id.toLowerCase().trim();
-        if (PERMANENTLY_EXCLUDED_KEYS.has(clean)) return;
+        if (!unblocked.has(clean)) {
+          unblocked.add(clean);
+          changed = true;
+        }
         if (registry.has(clean)) {
           registry.delete(clean);
           changed = true;
         }
       }
     });
+    localStorage.setItem(STORAGE_KEY_UNBLOCKED, JSON.stringify(Array.from(unblocked)));
     localStorage.setItem(STORAGE_KEY_DELETED, JSON.stringify(Array.from(registry)));
     if (changed) {
       persistSyncRegistryToFirestore().catch(() => {});
@@ -210,11 +238,13 @@ export const removeDeletedRecord = (...identifiers: (string | undefined | null)[
 };
 
 export const isRecordDeleted = (...identifiers: (string | undefined | null)[]): boolean => {
+  const unblocked = getUnblockedRegistry();
   const registry = getDeletedRegistry();
   return identifiers.some(id => {
     if (!id) return false;
     const clean = id.toLowerCase().trim();
     if (!clean) return false;
+    if (unblocked.has(clean)) return false;
     if (
       PERMANENTLY_EXCLUDED_KEYS.has(clean) ||
       clean.includes('tony stark') ||
@@ -241,7 +271,11 @@ export const recordCustomEmpId = (email?: string | null, oldId?: string | null, 
   if (!newId || !newId.trim()) return;
   const cleanEmail = email ? email.trim().toLowerCase() : '';
   const cleanNewLower = newId.trim().toLowerCase();
-  if ((cleanEmail && PERMANENTLY_EXCLUDED_KEYS.has(cleanEmail)) || PERMANENTLY_EXCLUDED_KEYS.has(cleanNewLower)) {
+  const unblocked = getUnblockedRegistry();
+  if (
+    ((cleanEmail && PERMANENTLY_EXCLUDED_KEYS.has(cleanEmail) && !unblocked.has(cleanEmail)) ||
+    (PERMANENTLY_EXCLUDED_KEYS.has(cleanNewLower) && !unblocked.has(cleanNewLower)))
+  ) {
     return;
   }
   const cleanNew = newId.trim().toUpperCase();
