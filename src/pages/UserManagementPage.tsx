@@ -46,15 +46,9 @@ export const UserManagementPage: React.FC = () => {
     };
     window.addEventListener('focus', handleVisibilityOrFocus);
     document.addEventListener('visibilitychange', handleVisibilityOrFocus);
-    const interval = setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        refreshUsers();
-      }
-    }, 4000);
     return () => {
       window.removeEventListener('focus', handleVisibilityOrFocus);
       document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
-      clearInterval(interval);
     };
   }, [refreshUsers]);
 

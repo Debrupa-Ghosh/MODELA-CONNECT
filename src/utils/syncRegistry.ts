@@ -22,7 +22,16 @@ const PERMANENTLY_EXCLUDED_KEYS = new Set([
   'aditichakrabarty2005@gmail.com',
   'usr-aditi-008',
   'mod008',
-  'mod102'
+  'mod102',
+  'debrupa123@gmail.com',
+  'usr-pending-debrupa',
+  'req-debrupa123_gmail_com',
+  'deb@gmail.com',
+  'usr-qyg6aplc',
+  'req-deb_gmail_com',
+  'vikram.sengupta@gmail.com',
+  'usr-pending-03',
+  'req-vikram_sengupta_gmail_com'
 ]);
 
 const DEFAULT_DELETED_IDS = [
@@ -62,6 +71,9 @@ const DEFAULT_DELETED_IDS = [
   'pay-2026-oct-mod102',
   'aditi chakrabarty',
   'aditi chakraborty',
+  'debrupa123',
+  'deb chatterjee',
+  'vikram sengupta',
   ...Array.from(PERMANENTLY_EXCLUDED_KEYS)
 ];
 

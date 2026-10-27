@@ -51,19 +51,6 @@ const DEFAULT_SERVER_USERS: ServerUser[] = [
     reviewedBy: "System Root"
   },
   {
-    id: "USR-PENDING-DEBRUPA",
-    uid: "USR-PENDING-DEBRUPA",
-    name: "Debrupa123",
-    email: "debrupa123@gmail.com",
-    avatar_url: "https://ui-avatars.com/api/?name=Debrupa+123&background=0284c7&color=fff",
-    status: "PENDING",
-    role: null,
-    department: "Engineering",
-    designation: "Full Stack Engineer Candidate",
-    requestedAt: "2026-10-02T13:23:00.000Z",
-    notificationUnread: true
-  },
-  {
     id: "USR-SURUPA-011",
     uid: "USR-SURUPA-011",
     name: "Debrupa Ghosh",
@@ -77,47 +64,35 @@ const DEFAULT_SERVER_USERS: ServerUser[] = [
     requestedAt: "2026-10-22T08:00:00.000Z",
     reviewedAt: "2026-10-22T08:05:00.000Z",
     reviewedBy: "System Root"
-  },
-  {
-    id: "USR-QYG6APLC",
-    uid: "USR-QYG6APLC",
-    name: "Deb Chatterjee",
-    email: "deb@gmail.com",
-    avatar_url: "https://ui-avatars.com/api/?name=Deb+Chatterjee&background=0284c7&color=fff",
-    status: "PENDING",
-    role: null,
-    department: "Product Design",
-    designation: "UI/UX Designer Candidate",
-    requestedAt: "2026-10-02T06:28:52.741Z",
-    notificationUnread: true
-  },
-  {
-    id: "USR-PENDING-03",
-    uid: "USR-PENDING-03",
-    name: "Vikram Sengupta",
-    email: "vikram.sengupta@gmail.com",
-    avatar_url: "https://ui-avatars.com/api/?name=Vikram+Sengupta&background=10b981&color=fff",
-    status: "PENDING",
-    role: null,
-    department: "Operations",
-    designation: "DevOps Engineer Candidate",
-    requestedAt: "2026-10-02T08:12:10.000Z",
-    notificationUnread: true
   }
 ];
 
+const PERMANENTLY_DELETED_REQUEST_KEYS = new Set([
+  'debrupa123@gmail.com',
+  'usr-pending-debrupa',
+  'deb@gmail.com',
+  'usr-qyg6aplc',
+  'vikram.sengupta@gmail.com',
+  'usr-pending-03'
+]);
+
 let users: ServerUser[] = [...DEFAULT_SERVER_USERS];
-let serverDeletedIds = new Set<string>();
+let serverDeletedIds = new Set<string>(PERMANENTLY_DELETED_REQUEST_KEYS);
 
 try {
   if (fs.existsSync(STATE_FILE_PATH)) {
     const raw = fs.readFileSync(STATE_FILE_PATH, 'utf-8');
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed.users) && parsed.users.length > 0) {
-      users = parsed.users;
+      users = parsed.users.filter(
+        (u: ServerUser) =>
+          u &&
+          !PERMANENTLY_DELETED_REQUEST_KEYS.has(String(u.email || '').toLowerCase().trim()) &&
+          !PERMANENTLY_DELETED_REQUEST_KEYS.has(String(u.id || '').toLowerCase().trim())
+      );
     }
     if (Array.isArray(parsed.deletedIds)) {
-      serverDeletedIds = new Set(parsed.deletedIds);
+      parsed.deletedIds.forEach((id: string) => serverDeletedIds.add(String(id).toLowerCase().trim()));
     }
   }
 } catch {}
@@ -131,6 +106,8 @@ const saveServerState = () => {
     );
   } catch {}
 };
+
+saveServerState();
 
 let employees = [
   {
@@ -455,7 +432,7 @@ app.post('/api/requests/status', (req: Request, res: Response) => {
       return {
         ...r,
         status,
-        remarks: remarks || (r as any).remarks,
+        remarks: remarks || r.remarks,
         reviewedAt: new Date().toISOString(),
         reviewedBy: reviewer || 'Super Admin'
       };
@@ -471,29 +448,12 @@ app.delete('/api/requests/:id', (req: Request, res: Response) => {
   res.json({ success: true, message: `Request ${id} deleted` });
 });
 
-// Server-Sent Events stream for live sync
-app.get('/api/users/stream', (req: Request, res: Response) => {
+// Server-Sent Events endpoint (closes cleanly to avoid holding Cloud Run proxy slots)
+app.get('/api/users/stream', (_req: Request, res: Response) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-
-  sseClients.add(res);
-
-  const sendUpdate = () => {
-    try {
-      res.write(`data: ${JSON.stringify({ users })}\n\n`);
-    } catch {
-      sseClients.delete(res);
-    }
-  };
-
-  sendUpdate();
-  const interval = setInterval(sendUpdate, 15000);
-
-  req.on('close', () => {
-    sseClients.delete(res);
-    clearInterval(interval);
-  });
+  res.write(`data: ${JSON.stringify({ users, deletedIds: Array.from(serverDeletedIds) })}\n\n`);
+  res.end();
 });
 
 // Vite Middleware Integration

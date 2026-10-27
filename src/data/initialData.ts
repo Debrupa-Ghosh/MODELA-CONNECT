@@ -16,20 +16,6 @@ export const INITIAL_USERS: User[] = [
     reviewedAt: "2026-09-20T08:44:35.660Z",
     reviewedBy: "System Root"
   },
-  // Pending signup verification requests
-  {
-    id: "USR-PENDING-DEBRUPA",
-    uid: "USR-PENDING-DEBRUPA",
-    name: "Debrupa123",
-    email: "debrupa123@gmail.com",
-    avatar_url: "https://ui-avatars.com/api/?name=Debrupa+123&background=0284c7&color=fff",
-    status: "PENDING",
-    role: null,
-    department: "Engineering",
-    designation: "Full Stack Engineer Candidate",
-    requestedAt: "2026-10-02T13:23:00.000Z",
-    notificationUnread: true
-  },
   {
     id: "USR-SURUPA-011",
     uid: "USR-SURUPA-011",
@@ -44,32 +30,6 @@ export const INITIAL_USERS: User[] = [
     requestedAt: "2026-10-22T08:00:00.000Z",
     reviewedAt: "2026-10-22T08:05:00.000Z",
     reviewedBy: "System Root"
-  },
-  {
-    id: "USR-QYG6APLC",
-    uid: "USR-QYG6APLC",
-    name: "Deb Chatterjee",
-    email: "deb@gmail.com",
-    avatar_url: "https://ui-avatars.com/api/?name=Deb+Chatterjee&background=0284c7&color=fff",
-    status: "PENDING",
-    role: null,
-    department: "Product Design",
-    designation: "UI/UX Designer Candidate",
-    requestedAt: "2026-10-02T06:28:52.741Z",
-    notificationUnread: true
-  },
-  {
-    id: "USR-PENDING-03",
-    uid: "USR-PENDING-03",
-    name: "Vikram Sengupta",
-    email: "vikram.sengupta@gmail.com",
-    avatar_url: "https://ui-avatars.com/api/?name=Vikram+Sengupta&background=10b981&color=fff",
-    status: "PENDING",
-    role: null,
-    department: "Operations",
-    designation: "DevOps Engineer Candidate",
-    requestedAt: "2026-10-02T08:12:10.000Z",
-    notificationUnread: true
   }
 ];
 

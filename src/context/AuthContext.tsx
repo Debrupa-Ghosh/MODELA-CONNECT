@@ -61,6 +61,49 @@ const STORAGE_KEY_USERS = 'modela_users_v2';
 const STORAGE_KEY_ACTIVE_USER = 'modela_active_user_email_v2';
 const STORAGE_KEY_LIVE_REQUESTS = 'modela_live_signup_requests_v2';
 
+const DELETED_SEED_REQUEST_EMAILS = new Set([
+  'debrupa123@gmail.com',
+  'deb@gmail.com',
+  'vikram.sengupta@gmail.com'
+]);
+
+const DELETED_SEED_REQUEST_IDS = new Set([
+  'usr-pending-debrupa',
+  'req-debrupa123_gmail_com',
+  'usr-qyg6aplc',
+  'req-deb_gmail_com',
+  'usr-pending-03',
+  'req-vikram_sengupta_gmail_com'
+]);
+
+const isDeletedSeedSignupRequest = (u?: Partial<User> | null, docId?: string): boolean => {
+  if (!u) return false;
+  const lowerId = String(u.id || '').trim().toLowerCase();
+  const lowerUid = String(u.uid || '').trim().toLowerCase();
+  const lowerDocId = String(docId || '').trim().toLowerCase();
+  const lowerEmail = String(u.email || '').trim().toLowerCase();
+  const lowerName = String(u.name || '').trim().toLowerCase();
+
+  if (
+    DELETED_SEED_REQUEST_IDS.has(lowerId) ||
+    DELETED_SEED_REQUEST_IDS.has(lowerUid) ||
+    DELETED_SEED_REQUEST_IDS.has(lowerDocId)
+  ) {
+    return true;
+  }
+
+  if (
+    DELETED_SEED_REQUEST_EMAILS.has(lowerEmail) ||
+    lowerName === 'debrupa123' ||
+    lowerName === 'deb chatterjee' ||
+    lowerName === 'vikram sengupta'
+  ) {
+    return true;
+  }
+
+  return false;
+};
+
 const getLiveRequestsMap = (): Map<string, User> => {
   const map = new Map<string, User>();
   try {
@@ -68,11 +111,19 @@ const getLiveRequestsMap = (): Map<string, User> => {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
+        let modified = false;
         parsed.forEach((u: User) => {
           if (u && u.email) {
+            if (isDeletedSeedSignupRequest(u)) {
+              modified = true;
+              return;
+            }
             map.set(u.email.toLowerCase().trim(), u);
           }
         });
+        if (modified) {
+          localStorage.setItem(STORAGE_KEY_LIVE_REQUESTS, JSON.stringify(Array.from(map.values())));
+        }
       }
     }
   } catch {}
@@ -81,11 +132,13 @@ const getLiveRequestsMap = (): Map<string, User> => {
 
 const saveLiveRequestsMap = (map: Map<string, User>) => {
   try {
-    localStorage.setItem(STORAGE_KEY_LIVE_REQUESTS, JSON.stringify(Array.from(map.values())));
+    const cleanValues = Array.from(map.values()).filter(u => !isDeletedSeedSignupRequest(u));
+    localStorage.setItem(STORAGE_KEY_LIVE_REQUESTS, JSON.stringify(cleanValues));
   } catch {}
 };
 
-const isLegacyExcludedUser = (u: Partial<User>): boolean => {
+const isLegacyExcludedUser = (u: Partial<User>, docId?: string): boolean => {
+  if (isDeletedSeedSignupRequest(u, docId)) return true;
   if ((u as any)?.isLiveRequest) return false;
   const liveMap = getLiveRequestsMap();
   const lowerEmail = (u.email || '').trim().toLowerCase();
@@ -139,6 +192,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 u &&
                 u.id !== SYNC_REGISTRY_DOC_ID &&
                 u.email !== 'sync@system.internal' &&
+                !isDeletedSeedSignupRequest(u) &&
+                !isLegacyExcludedUser(u) &&
                 ((u as any).isLiveRequest ||
                   !isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolveEmpId(u.email, u.employeeId)))
             )
@@ -152,7 +207,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (list.length === 0) {
       list = INITIAL_USERS.filter(
-        u => !isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolveEmpId(u.email, u.employeeId))
+        u =>
+          !isDeletedSeedSignupRequest(u) &&
+          !isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolveEmpId(u.email, u.employeeId))
       ).map(u => ({
         ...u,
         employeeId: resolveEmpId(u.email, u.employeeId)
@@ -162,6 +219,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Merge any locally submitted live sign-up requests so they never disappear
     const liveMap = getLiveRequestsMap();
     liveMap.forEach((liveUser, emailKey) => {
+      if (isDeletedSeedSignupRequest(liveUser)) return;
       const idx = list.findIndex(u => u.email?.toLowerCase().trim() === emailKey);
       if (idx >= 0) {
         const curUpdated = String((list[idx] as any).updatedAt || list[idx].requestedAt || '');
@@ -287,6 +345,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               u &&
               u.id !== SYNC_REGISTRY_DOC_ID &&
               u.email !== 'sync@system.internal' &&
+              !isDeletedSeedSignupRequest(u) &&
+              !isLegacyExcludedUser(u) &&
               ((u as any).isLiveRequest ||
                 liveMap.has(u.email.toLowerCase().trim()) ||
                 !isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolveEmpId(u.email, u.employeeId)))
@@ -321,6 +381,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           u &&
           u.id !== SYNC_REGISTRY_DOC_ID &&
           u.email !== 'sync@system.internal' &&
+          !isDeletedSeedSignupRequest(u) &&
+          !isLegacyExcludedUser(u) &&
           ((u as any).isLiveRequest ||
             liveMap.has(u.email.toLowerCase().trim()) ||
             !isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolveEmpId(u.email, u.employeeId)))
@@ -350,6 +412,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!rawU || !rawU.email || !rawU.id) return;
       const emailKey = String(rawU.email).toLowerCase().trim();
       if (emailKey === 'sync@system.internal') return;
+      if (isDeletedSeedSignupRequest(rawU)) return;
 
       if (rawU.isLiveRequest || rawU.status === 'PENDING') {
         if (rawU.isLiveRequest) {
@@ -376,13 +439,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUsers(prev => {
       const map = new Map<string, User>();
       prev.forEach(u => {
-        if (u && u.email) {
+        if (u && u.email && !isDeletedSeedSignupRequest(u) && !isLegacyExcludedUser(u)) {
           map.set(u.email.toLowerCase().trim(), u);
         }
       });
 
       // Merge server users
       validServerUsers.forEach(rawU => {
+        if (isDeletedSeedSignupRequest(rawU)) return;
         const emailKey = rawU.email.toLowerCase().trim();
         const existing = map.get(emailKey);
         const rawUpdated = String((rawU as any).updatedAt || rawU.requestedAt || '');
@@ -404,6 +468,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Ensure all local live requests are also present
       liveMap.forEach((liveU, emailKey) => {
+        if (isDeletedSeedSignupRequest(liveU)) return;
         const existing = map.get(emailKey);
         const liveUpdated = String((liveU as any).updatedAt || liveU.requestedAt || '');
         const exUpdated = existing ? String((existing as any).updatedAt || existing.requestedAt || '') : '';
@@ -421,10 +486,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           u &&
           u.id !== SYNC_REGISTRY_DOC_ID &&
           u.email !== 'sync@system.internal' &&
+          !isDeletedSeedSignupRequest(u) &&
+          !isLegacyExcludedUser(u) &&
           ((u as any).isLiveRequest ||
             liveMap.has(u.email.toLowerCase().trim()) ||
             !isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolveEmpId(u.email, u.employeeId)))
       );
+      if (JSON.stringify(prev) === JSON.stringify(next)) {
+        return prev;
+      }
       try {
         localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(next));
       } catch {}
@@ -445,7 +515,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (snapshot.empty) {
           try {
             for (const u of INITIAL_USERS) {
-              if (!isRecordDeleted(u.id, u.uid, u.email)) {
+              if (!isDeletedSeedSignupRequest(u) && !isRecordDeleted(u.id, u.uid, u.email)) {
                 await setDoc(doc(db, 'users', u.id), cleanFirestoreUser({
                   ...u,
                   employeeId: resolveEmpId(u.email, u.employeeId)
@@ -474,6 +544,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (docSnap.id === SYNC_REGISTRY_DOC_ID || item.id === SYNC_REGISTRY_DOC_ID || item.email === 'sync@system.internal' || (item as any).isSystemSync) {
             return;
           }
+          if (isDeletedSeedSignupRequest(item, docSnap.id)) {
+            deleteDoc(doc(db, 'users', docSnap.id)).catch(() => {});
+            return;
+          }
           const lowerEmail = (item.email || '').trim().toLowerCase();
           if ((item as any).isLiveRequest) {
             liveMap.set(lowerEmail, item);
@@ -481,7 +555,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (
             !(item as any).isLiveRequest &&
             !liveMap.has(lowerEmail) &&
-            (isLegacyExcludedUser(item) ||
+            (isLegacyExcludedUser(item, docSnap.id) ||
               isRecordDeleted(docSnap.id, item.id, item.uid, item.email, item.employeeId, resolveEmpId(item.email, item.employeeId)))
           ) {
             return;
@@ -492,7 +566,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const map = new Map<string, User>();
         // Ensure default accounts exist ONLY if not deleted
         INITIAL_USERS.filter(
-          u => !isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolveEmpId(u.email, u.employeeId))
+          u =>
+            !isDeletedSeedSignupRequest(u) &&
+            !isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolveEmpId(u.email, u.employeeId))
         ).forEach(u => {
           const emailKey = u.email.toLowerCase().trim();
           map.set(emailKey, {
@@ -503,6 +579,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // Override and add real-time remote accounts & requests from Firestore
         remoteList.forEach(u => {
+          if (isDeletedSeedSignupRequest(u)) return;
           const emailKey = u.email.toLowerCase().trim();
           if (
             !(u as any).isLiveRequest &&
@@ -538,9 +615,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         });
 
-        // Merge server-backed users & SSE updates so Firestore write quota rollbacks NEVER erase pending sign-up requests
+        // Merge server-backed users & updates so Firestore write quota rollbacks NEVER erase pending sign-up requests
         serverUsersRef.current.forEach(srvU => {
-          if (!srvU || !srvU.email) return;
+          if (!srvU || !srvU.email || isDeletedSeedSignupRequest(srvU)) return;
           const emailKey = srvU.email.toLowerCase().trim();
           if (
             !(srvU as any).isLiveRequest &&
@@ -563,6 +640,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // Merge persistent local live sign-up requests
         liveMap.forEach((liveU, emailKey) => {
+          if (isDeletedSeedSignupRequest(liveU)) return;
           const existing = map.get(emailKey);
           const liveUpdated = String((liveU as any).updatedAt || liveU.requestedAt || '');
           const exUpdated = existing ? String((existing as any).updatedAt || existing.requestedAt || '') : '';
@@ -610,6 +688,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             u &&
             u.id !== SYNC_REGISTRY_DOC_ID &&
             u.email !== 'sync@system.internal' &&
+            !isDeletedSeedSignupRequest(u) &&
+            !isLegacyExcludedUser(u) &&
             ((u as any).isLiveRequest ||
               liveMap.has(u.email.toLowerCase().trim()) ||
               !isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolveEmpId(u.email, u.employeeId)))
@@ -624,36 +704,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     );
 
-    let eventSource: EventSource | null = null;
-    try {
-      eventSource = new EventSource('/api/users/stream');
-      eventSource.onmessage = event => {
-        if (!isSubscribed) return;
-        try {
-          const parsed = JSON.parse(event.data);
-          if (parsed && Array.isArray(parsed.users)) {
-            mergeServerUsers(parsed.users, parsed.deletedIds);
+    const fetchFromBackend = () => {
+      if (!isSubscribed) return;
+      fetch('/api/users')
+        .then(r => r.json())
+        .then(data => {
+          if (isSubscribed && data && Array.isArray(data.users)) {
+            mergeServerUsers(data.users, data.deletedIds);
           }
-        } catch {}
-      };
-    } catch {}
+        })
+        .catch(() => {});
+    };
 
-    // Initial fast fetch from backend API
-    fetch('/api/users')
-      .then(r => r.json())
-      .then(data => {
-        if (isSubscribed && data && Array.isArray(data.users)) {
-          mergeServerUsers(data.users, data.deletedIds);
-        }
-      })
-      .catch(() => {});
+    fetchFromBackend();
+
+    const pollInterval = setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        fetchFromBackend();
+      }
+    }, 6000);
 
     return () => {
       isSubscribed = false;
       unsub();
-      if (eventSource) {
-        eventSource.close();
-      }
+      clearInterval(pollInterval);
     };
   }, [mergeServerUsers]);
 
@@ -726,11 +800,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (docSnap.id === SYNC_REGISTRY_DOC_ID || uData.id === SYNC_REGISTRY_DOC_ID || uData.email === 'sync@system.internal' || (uData as any).isSystemSync) {
             return;
           }
+          if (isDeletedSeedSignupRequest(uData, docSnap.id)) {
+            deleteDoc(doc(db, 'users', docSnap.id)).catch(() => {});
+            return;
+          }
           const emailKey = uData.email.toLowerCase().trim();
           if (
             !(uData as any).isLiveRequest &&
             !liveMap.has(emailKey) &&
-            (isLegacyExcludedUser(uData) ||
+            (isLegacyExcludedUser(uData, docSnap.id) ||
               isRecordDeleted(docSnap.id, uData.id, uData.uid, uData.email, uData.employeeId, resolveEmpId(uData.email, uData.employeeId)))
           ) {
             return;
@@ -740,19 +818,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       serverUsersRef.current.forEach(apiU => {
-        if (!apiU || !apiU.id || !apiU.email) return;
+        if (!apiU || !apiU.id || !apiU.email || isDeletedSeedSignupRequest(apiU)) return;
         remoteUsers.push(apiU);
       });
 
       liveMap.forEach(liveU => {
-        if (!liveU || !liveU.id || !liveU.email) return;
+        if (!liveU || !liveU.id || !liveU.email || isDeletedSeedSignupRequest(liveU)) return;
         remoteUsers.push(liveU);
       });
 
       const map = new Map<string, User>();
 
       INITIAL_USERS.filter(
-        u => !isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolveEmpId(u.email, u.employeeId))
+        u =>
+          !isDeletedSeedSignupRequest(u) &&
+          !isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolveEmpId(u.email, u.employeeId))
       ).forEach(u => {
         const emailKey = u.email.toLowerCase().trim();
         map.set(emailKey, {
@@ -762,6 +842,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       remoteUsers.forEach(u => {
+        if (isDeletedSeedSignupRequest(u)) return;
         const emailKey = u.email.toLowerCase().trim();
         if (
           !(u as any).isLiveRequest &&
@@ -799,6 +880,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           u &&
           u.id !== SYNC_REGISTRY_DOC_ID &&
           u.email !== 'sync@system.internal' &&
+          !isDeletedSeedSignupRequest(u) &&
+          !isLegacyExcludedUser(u) &&
           ((u as any).isLiveRequest ||
             liveMap.has(u.email.toLowerCase().trim()) ||
             !isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolveEmpId(u.email, u.employeeId)))
