@@ -57,6 +57,10 @@ const DEFAULT_DELETED_IDS = [
   'pay-2026-oct-mod007',
   'pay-2026-nov-mod007',
   'pay-2026-dec-mod007',
+  'pay-2026-oct-mod101',
+  'pay-2026-oct-mod102',
+  'aditi chakrabarty',
+  'aditi chakraborty',
   ...Array.from(PERMANENTLY_EXCLUDED_KEYS)
 ];
 
