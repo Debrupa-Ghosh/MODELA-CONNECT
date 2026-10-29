@@ -1006,58 +1006,107 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
-  // Real-time Firestore synchronization for workflow staff requests across all devices
+  // Real-time Firestore + backend synchronization for workflow staff requests across all devices
   useEffect(() => {
     let isSubscribed = true;
+
+    const mergeAndSaveRequests = (firestoreList: StaffWorkflowRequest[], apiList: StaffWorkflowRequest[]) => {
+      if (!isSubscribed) return;
+      const map = new Map<string, StaffWorkflowRequest>();
+
+      // 1. Seed from localStorage so locally submitted requests are preserved during Firestore quota backoff
+      try {
+        const savedRaw = localStorage.getItem(STORAGE_KEYS.REQUESTS);
+        const savedList: StaffWorkflowRequest[] = savedRaw ? JSON.parse(savedRaw) : [];
+        if (Array.isArray(savedList)) {
+          savedList.forEach(r => {
+            if (r && r.id && !isExcludedStaffRequest(r)) {
+              map.set(r.id, r);
+            }
+          });
+        }
+      } catch {}
+
+      // 2. Merge Firestore documents
+      firestoreList.forEach(data => {
+        if (data && data.id && !isExcludedStaffRequest(data)) {
+          map.set(data.id, { ...map.get(data.id), ...data });
+        }
+      });
+
+      // 3. Merge backend API requests (most recent cross-browser state during Firestore write backoff)
+      apiList.forEach(data => {
+        if (data && data.id && !isExcludedStaffRequest(data)) {
+          map.set(data.id, { ...map.get(data.id), ...data });
+        }
+      });
+
+      const combined = Array.from(map.values())
+        .filter(r => !isExcludedStaffRequest(r))
+        .sort(
+          (a, b) => new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime()
+        );
+
+      setStaffRequests(combined);
+      try {
+        localStorage.setItem(STORAGE_KEYS.REQUESTS, JSON.stringify(combined));
+      } catch {}
+    };
+
+    let latestFirestoreRequests: StaffWorkflowRequest[] = [];
+
+    const pollApiRequests = async () => {
+      try {
+        const res = await fetch('/api/requests');
+        if (res.ok) {
+          const json = await res.json();
+          const apiReqs: StaffWorkflowRequest[] = Array.isArray(json?.requests) ? json.requests : [];
+          mergeAndSaveRequests(latestFirestoreRequests, apiReqs);
+        }
+      } catch {}
+    };
+
     const unsub = onSnapshot(
       collection(db, 'requests'),
       async snapshot => {
         if (!isSubscribed) return;
 
-        if (snapshot.empty) {
-          setStaffRequests([]);
-          try {
-            localStorage.setItem(STORAGE_KEYS.REQUESTS, JSON.stringify([]));
-          } catch {}
-          return;
-        }
-
-        const map = new Map<string, StaffWorkflowRequest>();
-
-        // Add & merge all live documents from Firestore
+        const fsReqs: StaffWorkflowRequest[] = [];
         snapshot.forEach(docSnap => {
           const data = docSnap.data() as StaffWorkflowRequest;
           if (data && data.id) {
             if (isExcludedStaffRequest(data)) {
-              // Permanently remove from database if present
               deleteDoc(doc(db, 'requests', docSnap.id)).catch(() => {});
               deleteDoc(doc(db, 'requests', data.id)).catch(() => {});
-              map.delete(data.id);
             } else {
-              map.set(data.id, { ...map.get(data.id), ...data });
+              fsReqs.push(data);
             }
           }
         });
 
-        // Sort newest submitted requests first and ensure deleted are excluded
-        const combined = Array.from(map.values())
-          .filter(r => !isExcludedStaffRequest(r))
-          .sort(
-            (a, b) => new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime()
-          );
-
-        setStaffRequests(combined);
+        latestFirestoreRequests = fsReqs;
+        let apiReqs: StaffWorkflowRequest[] = [];
         try {
-          localStorage.setItem(STORAGE_KEYS.REQUESTS, JSON.stringify(combined));
+          const res = await fetch('/api/requests');
+          if (res.ok) {
+            const json = await res.json();
+            if (Array.isArray(json?.requests)) apiReqs = json.requests;
+          }
         } catch {}
+
+        mergeAndSaveRequests(fsReqs, apiReqs);
       },
       err => {
         console.warn('Firestore staff requests sync notice:', err);
       }
     );
 
+    pollApiRequests();
+    const pollTimer = setInterval(pollApiRequests, 4000);
+
     return () => {
       isSubscribed = false;
+      clearInterval(pollTimer);
       unsub();
     };
   }, []);
@@ -1275,30 +1324,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
-  // Manual explicit refresh from Firestore
+  // Manual explicit refresh from Firestore & backend API
   const refreshStaffRequests = useCallback(async () => {
     try {
-      const snap = await getDocs(collection(db, 'requests'));
-      if (snap.empty) {
-        setStaffRequests([]);
-        try {
-          localStorage.setItem(STORAGE_KEYS.REQUESTS, JSON.stringify([]));
-        } catch {}
-        return;
-      }
-
       const map = new Map<string, StaffWorkflowRequest>();
-      snap.forEach(docSnap => {
-        const data = docSnap.data() as StaffWorkflowRequest;
-        if (data && data.id) {
-          if (isExcludedStaffRequest(data)) {
-            deleteDoc(doc(db, 'requests', docSnap.id)).catch(() => {});
-            deleteDoc(doc(db, 'requests', data.id)).catch(() => {});
-          } else {
-            map.set(data.id, { ...map.get(data.id), ...data });
-          }
+
+      try {
+        const savedRaw = localStorage.getItem(STORAGE_KEYS.REQUESTS);
+        const savedList: StaffWorkflowRequest[] = savedRaw ? JSON.parse(savedRaw) : [];
+        if (Array.isArray(savedList)) {
+          savedList.forEach(r => {
+            if (r && r.id && !isExcludedStaffRequest(r)) {
+              map.set(r.id, r);
+            }
+          });
         }
-      });
+      } catch {}
+
+      try {
+        const snap = await getDocs(collection(db, 'requests'));
+        snap.forEach(docSnap => {
+          const data = docSnap.data() as StaffWorkflowRequest;
+          if (data && data.id) {
+            if (isExcludedStaffRequest(data)) {
+              deleteDoc(doc(db, 'requests', docSnap.id)).catch(() => {});
+              deleteDoc(doc(db, 'requests', data.id)).catch(() => {});
+            } else {
+              map.set(data.id, { ...map.get(data.id), ...data });
+            }
+          }
+        });
+      } catch {}
+
+      try {
+        const res = await fetch('/api/requests');
+        if (res.ok) {
+          const json = await res.json();
+          const apiList: StaffWorkflowRequest[] = Array.isArray(json?.requests) ? json.requests : [];
+          apiList.forEach(data => {
+            if (data && data.id && !isExcludedStaffRequest(data)) {
+              map.set(data.id, { ...map.get(data.id), ...data });
+            }
+          });
+        }
+      } catch {}
+
       const combined = Array.from(map.values())
         .filter(r => !isExcludedStaffRequest(r))
         .sort(
@@ -1883,12 +1953,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return updated;
     });
 
-    // Persist staff request to Firestore for instant real-time sync across all devices
-    try {
-      await setDoc(doc(db, 'requests', id), cleanFirestoreData(newReq));
-    } catch (err) {
+    // Persist staff request to Firestore non-blocking so UI never freezes during quota backoff
+    setDoc(doc(db, 'requests', id), cleanFirestoreData(newReq)).catch(err => {
       console.warn('Firestore staff request write error:', err);
-    }
+    });
 
     // Dual-write to Express server backend if present
     fetch('/api/requests', {
@@ -1906,8 +1974,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const reviewer = currentUser?.name || currentUser?.email || 'Executive Admin';
     const now = new Date().toISOString();
 
-    setStaffRequests(prev =>
-      prev.map(r => {
+    setStaffRequests(prev => {
+      const next = prev.map(r => {
         if (r.id === id) {
           const updated: StaffWorkflowRequest = {
             ...r,
@@ -1922,20 +1990,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           return updated;
         }
         return r;
-      })
-    );
-
-    // Persist request status to Firestore for real-time synchronization
-    try {
-      await updateDoc(doc(db, 'requests', id), {
-        status,
-        reviewedAt: now,
-        reviewedBy: reviewer,
-        remarks: remarks || (status === 'APPROVED' ? `Approved by ${reviewer}` : `Rejected by ${reviewer}`)
       });
-    } catch (err) {
+      try {
+        localStorage.setItem(STORAGE_KEYS.REQUESTS, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+
+    // Persist request status to Firestore non-blocking
+    updateDoc(doc(db, 'requests', id), {
+      status,
+      reviewedAt: now,
+      reviewedBy: reviewer,
+      remarks: remarks || (status === 'APPROVED' ? `Approved by ${reviewer}` : `Rejected by ${reviewer}`)
+    }).catch(err => {
       console.warn('Firestore request status update error:', err);
-    }
+    });
 
     // Dual-write to Express server backend if present
     fetch('/api/requests/status', {

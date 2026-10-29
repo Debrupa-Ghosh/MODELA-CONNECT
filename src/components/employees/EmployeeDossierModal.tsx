@@ -92,10 +92,15 @@ export const EmployeeDossierModal: React.FC<EmployeeDossierModalProps> = ({
               </div>
 
               <p className="text-xs text-slate-300 font-medium">
-                {employee.designation || 'Staff'} •{' '}
-                <span className="text-[#38BDF8] font-bold">
-                  {employee.department || 'Unassigned'}
-                </span>
+                {employee.designation || 'Staff'}
+                {employee.department && employee.department.trim().toLowerCase() !== 'general staff' && (
+                  <>
+                    {' • '}
+                    <span className="text-[#38BDF8] font-bold">
+                      {employee.department}
+                    </span>
+                  </>
+                )}
               </p>
 
               <div className="flex items-center gap-4 text-xs text-slate-400 pt-1 flex-wrap font-medium">
@@ -252,7 +257,11 @@ export const EmployeeDossierModal: React.FC<EmployeeDossierModalProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 pt-2">
               <div className="p-4 rounded-xl bg-[#0B132B] border border-[#1E293B] space-y-1">
                 <span className="text-slate-400 text-xs">Department</span>
-                <p className="text-sm font-bold text-white">{employee.department}</p>
+                <p className="text-sm font-bold text-white">
+                  {employee.department && employee.department.trim().toLowerCase() !== 'general staff'
+                    ? employee.department
+                    : '—'}
+                </p>
               </div>
 
               <div className="p-4 rounded-xl bg-[#0B132B] border border-[#1E293B] space-y-1">

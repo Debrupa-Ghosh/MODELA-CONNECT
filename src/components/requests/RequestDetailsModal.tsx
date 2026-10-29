@@ -96,9 +96,6 @@ export const RequestDetailsModal: React.FC = () => {
               <span className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">
                 {req.type}
               </span>
-              <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded border ${getPriorityBadge(req.priority)}`}>
-                {req.priority} Priority
-              </span>
               <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded border ${getStatusBadge(req.status)}`}>
                 {req.status}
               </span>
@@ -143,13 +140,6 @@ export const RequestDetailsModal: React.FC = () => {
                 {req.employeeEmail}
               </p>
             </div>
-          </div>
-
-          <div className="text-left sm:text-right">
-            <span className="text-[11px] text-slate-400 block">Department</span>
-            <span className="text-xs font-semibold text-slate-200 bg-[#131E36] border border-[#203050] px-2 py-0.5 rounded">
-              {req.department}
-            </span>
           </div>
         </div>
 

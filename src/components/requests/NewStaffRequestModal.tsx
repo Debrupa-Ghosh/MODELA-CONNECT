@@ -13,17 +13,24 @@ export const NewStaffRequestModal: React.FC<Props> = ({ isOpen, onClose }) => {
   const { addStaffRequest, showToast } = useApp();
   const { currentUser } = useAuth();
 
-  const [requestType, setRequestType] = useState<string>('Leave / Paid Time Off');
+  const [requestType, setRequestType] = useState<string>('Sick Leave');
   const [title, setTitle] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [requestDate, setRequestDate] = useState('');
+  const [bucketHolidayDate, setBucketHolidayDate] = useState<string>('11/11/2026');
   const [detailedExplanation, setDetailedExplanation] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
 
-  const isLeaveRequest = requestType === 'Leave / Paid Time Off';
+  const isLeaveDateRangeRequest = [
+    'Sick Leave',
+    'Privilege Leave',
+    'Maternity Leave',
+    'Paternity Leave'
+  ].includes(requestType);
+  const isBucketHoliday = requestType === 'Bucket Holiday';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,13 +39,18 @@ export const NewStaffRequestModal: React.FC<Props> = ({ isOpen, onClose }) => {
       return;
     }
 
-    if (isLeaveRequest) {
+    if (isLeaveDateRangeRequest) {
       if (!startDate || !endDate) {
         showToast('Validation Error', 'Please select both Start Date and End Date from the calendar.', 'error');
         return;
       }
       if (new Date(endDate) < new Date(startDate)) {
         showToast('Validation Error', 'End Date cannot be earlier than Start Date.', 'error');
+        return;
+      }
+    } else if (isBucketHoliday) {
+      if (!bucketHolidayDate) {
+        showToast('Validation Error', 'Please select a Date from the dropdown.', 'error');
         return;
       }
     } else {
@@ -51,6 +63,7 @@ export const NewStaffRequestModal: React.FC<Props> = ({ isOpen, onClose }) => {
     setIsSubmitting(true);
     try {
       // Map user friendly type to StaffRequestType enum
+      // Sick Leave, Privilege Leave, Maternity Leave, Paternity Leave, and Bucket Holiday are all under Leave Category ('LEAVE')
       let mappedType: StaffRequestType = 'LEAVE';
       if (requestType.includes('Expense')) mappedType = 'EXPENSE';
       else if (requestType.includes('Equipment') || requestType.includes('Hardware')) mappedType = 'EQUIPMENT';
@@ -65,7 +78,11 @@ export const NewStaffRequestModal: React.FC<Props> = ({ isOpen, onClose }) => {
       const empDept = currentUser?.department || 'Executive Office';
       const empDesignation = currentUser?.designation || 'Staff / Super Admin';
 
-      const formattedDates = isLeaveRequest ? `${startDate} to ${endDate}` : requestDate;
+      const formattedDates = isLeaveDateRangeRequest
+        ? `${startDate} to ${endDate}`
+        : isBucketHoliday
+        ? bucketHolidayDate
+        : requestDate;
 
       await addStaffRequest({
         employeeId: empId,
@@ -78,9 +95,9 @@ export const NewStaffRequestModal: React.FC<Props> = ({ isOpen, onClose }) => {
         description: detailedExplanation.trim() || `${requestType} requisition filed by ${empName}`,
         amountOrDays: formattedDates,
         targetDates: formattedDates,
-        ...(isLeaveRequest
+        ...(isLeaveDateRangeRequest
           ? { startDate, endDate }
-          : { requestDate }),
+          : { requestDate: isBucketHoliday ? bucketHolidayDate : requestDate }),
         priority: 'MEDIUM',
         justification: detailedExplanation.trim() || 'Administrative request submission',
         supervisorName: 'Alex Morgan'
@@ -92,6 +109,7 @@ export const NewStaffRequestModal: React.FC<Props> = ({ isOpen, onClose }) => {
       setStartDate('');
       setEndDate('');
       setRequestDate('');
+      setBucketHolidayDate('11/11/2026');
       setDetailedExplanation('');
     } catch {
       showToast('Submission Failed', 'Could not record staff request.', 'error');
@@ -122,7 +140,11 @@ export const NewStaffRequestModal: React.FC<Props> = ({ isOpen, onClose }) => {
                 onChange={e => setRequestType(e.target.value)}
                 className="w-full bg-[#080E1C] border border-[#1E293B] text-slate-100 rounded-xl pl-3.5 pr-9 py-2.5 text-xs appearance-none focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer transition-colors"
               >
-                <option value="Leave / Paid Time Off">Leave / Paid Time Off</option>
+                <option value="Sick Leave">Sick Leave</option>
+                <option value="Privilege Leave">Privilege Leave</option>
+                <option value="Maternity Leave">Maternity Leave</option>
+                <option value="Paternity Leave">Paternity Leave</option>
+                <option value="Bucket Holiday">Bucket Holiday</option>
                 <option value="Expense Reimbursement">Expense Reimbursement</option>
                 <option value="Hardware / Equipment Requisition">Hardware / Equipment Requisition</option>
                 <option value="Shift / Core Hours Adjustment">Shift / Core Hours Adjustment</option>
@@ -149,8 +171,8 @@ export const NewStaffRequestModal: React.FC<Props> = ({ isOpen, onClose }) => {
             />
           </div>
 
-          {/* 3. Date Selection (Start Date & End Date for Leave / Paid Time Off; single Date for other types) */}
-          {isLeaveRequest ? (
+          {/* 3. Date Selection */}
+          {isLeaveDateRangeRequest ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1.5">
@@ -187,6 +209,23 @@ export const NewStaffRequestModal: React.FC<Props> = ({ isOpen, onClose }) => {
                   }}
                   className="w-full bg-[#080E1C] border border-[#1E293B] text-slate-100 rounded-xl px-3.5 py-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 transition-colors cursor-pointer [color-scheme:dark]"
                 />
+              </div>
+            </div>
+          ) : isBucketHoliday ? (
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                Date <span className="text-rose-400">*</span>
+              </label>
+              <div className="relative">
+                <select
+                  value={bucketHolidayDate}
+                  onChange={e => setBucketHolidayDate(e.target.value)}
+                  className="w-full bg-[#080E1C] border border-[#1E293B] text-slate-100 rounded-xl pl-3.5 pr-9 py-2.5 text-xs appearance-none focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer transition-colors"
+                >
+                  <option value="11/11/2026">11/11/2026</option>
+                  <option value="24/11/2026">24/11/2026</option>
+                </select>
+                <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
             </div>
           ) : (

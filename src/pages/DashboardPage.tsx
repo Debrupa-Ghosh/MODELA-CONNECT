@@ -306,8 +306,8 @@ export const DashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 4 KPI Metric Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* 2 KPI Metric Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Card 1: Active Workforce */}
         <div
           onClick={() => navigate('/employees')}
@@ -329,27 +329,7 @@ export const DashboardPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Card 2: Operations & Compliance */}
-        <div
-          className="p-5 bg-[#0B132B] rounded-2xl border border-[#1E293B] shadow-sm"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400">Operations Status</span>
-            <div className="w-9 h-9 rounded-xl bg-sky-950/80 text-sky-400 flex items-center justify-center">
-              <ShieldCheck className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl font-extrabold text-white">100%</span>
-            <span className="text-xs text-emerald-400">Optimal</span>
-          </div>
-          <div className="mt-2 text-[11px] text-blue-400 flex items-center gap-1 font-medium">
-            <CheckCircle2 className="w-3 h-3 text-sky-400" />
-            <span>Enterprise Enclave Active</span>
-          </div>
-        </div>
-
-        {/* Card 3: Pending Requests */}
+        {/* Card 2: Pending Requests */}
         <div
           onClick={() => navigate('/requests')}
           className="p-5 bg-[#0B132B] rounded-2xl border-2 border-amber-500/80 shadow-sm hover:border-amber-400 transition-all cursor-pointer group"
@@ -366,27 +346,6 @@ export const DashboardPage: React.FC = () => {
           </div>
           <div className="mt-2 text-[11px] text-slate-400 font-medium">
             Leaves &amp; expense reimbursements
-          </div>
-        </div>
-
-        {/* Card 4: Monthly Payroll Run */}
-        <div
-          onClick={() => navigate('/payroll')}
-          className="p-5 bg-[#0B132B] rounded-2xl border border-[#1E293B] shadow-sm hover:border-blue-500/50 transition-all cursor-pointer group"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400">Monthly Payroll Run</span>
-            <div className="w-9 h-9 rounded-xl bg-blue-950/80 text-blue-400 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors">
-              <CreditCard className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl font-extrabold text-white">Rs. 427.0k</span>
-            <span className="text-xs text-slate-400 font-mono">/mo</span>
-          </div>
-          <div className="mt-2 text-[11px] text-[#38BDF8] flex items-center gap-1 font-medium">
-            <CheckCircle2 className="w-3 h-3" />
-            <span>Ledger balanced</span>
           </div>
         </div>
       </div>
@@ -499,102 +458,6 @@ export const DashboardPage: React.FC = () => {
           </div>
         </div>
       )}
-
-      {/* Bottom Split: Workforce Distribution & Live Audit Stream */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-[#0B132B] border border-[#1E293B] rounded-2xl p-6 shadow-sm space-y-4">
-          <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
-            <h2 className="text-sm font-bold text-white">Workforce Distribution by Department</h2>
-            <span className="text-xs text-slate-400 font-medium">15 Staff</span>
-          </div>
-
-          <div className="space-y-4 pt-1">
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs">
-                <span className="font-semibold text-slate-200">Engineering</span>
-                <span className="text-slate-400">7 staff (47%)</span>
-              </div>
-              <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-blue-600 rounded-full" style={{ width: '47%' }} />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs">
-                <span className="font-semibold text-slate-200">Human Resources</span>
-                <span className="text-slate-400">3 staff (20%)</span>
-              </div>
-              <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-sky-400 rounded-full" style={{ width: '20%' }} />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs">
-                <span className="font-semibold text-slate-200">Security &amp; Operations</span>
-                <span className="text-slate-400">2 staff (13%)</span>
-              </div>
-              <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-slate-600 rounded-full" style={{ width: '13%' }} />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs">
-                <span className="font-semibold text-slate-200">Product &amp; Marketing</span>
-                <span className="text-slate-400">3 staff (20%)</span>
-              </div>
-              <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-amber-500 rounded-full" style={{ width: '20%' }} />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-[#0B132B] border border-[#1E293B] rounded-2xl p-6 shadow-sm space-y-4">
-          <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
-            <h2 className="text-sm font-bold text-white">Live Audit Stream</h2>
-            {!isHR && !isDirector && (
-              <Link
-                to="/activity-logs"
-                className="text-xs text-sky-400 hover:text-sky-300 font-semibold flex items-center gap-1"
-              >
-                <span>Full Ledger</span>
-                <span>→</span>
-              </Link>
-            )}
-          </div>
-
-          <div className="space-y-4">
-            <div className="space-y-1 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-white">Auth • Admin Sign In</span>
-                <span className="text-[11px] text-slate-400">01:37 PM</span>
-              </div>
-              <p className="text-slate-400 text-[11px]">
-                Authorized HR Admin/Super Admin logged in: modelatech2026@gmail.com
-              </p>
-              <div className="flex items-center gap-2 pt-0.5">
-                <span className="font-mono text-[10px] text-slate-500">AUD-1790924553138-V76G</span>
-                <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-blue-950 text-sky-400 border border-blue-800">
-                  <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
-                  SUCCESS
-                </span>
-              </div>
-            </div>
-
-            <div className="space-y-1 text-xs pt-2 border-t border-[#1E293B]">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-white">Auth • Logout</span>
-                <span className="text-[11px] text-slate-400">01:37 PM</span>
-              </div>
-              <p className="text-slate-400 text-[11px]">
-                User initiated sign out session termination.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 };

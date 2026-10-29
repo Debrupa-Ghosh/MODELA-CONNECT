@@ -105,9 +105,9 @@ export function generateExecutiveDossierPDF({
   doc.setFont('helvetica', 'bold');
   doc.text('VERIFIED & SYNCHRONIZED', margin + 172, currentY + 6.5);
 
-  // 4. Executive KPI Highlights (3 Metric Containers)
+  // 4. Executive KPI Highlights (2 Metric Containers: Retention & Stability and Average Tenure)
   currentY += 15;
-  const cardWidth = (contentWidth - 8) / 3;
+  const cardWidth = (contentWidth - 6) / 2;
 
   const drawKpiCard = (x: number, title: string, stat: string, sub: string, statColor: readonly [number, number, number]) => {
     doc.setFillColor(255, 255, 255);
@@ -130,156 +130,17 @@ export function generateExecutiveDossierPDF({
   };
 
   drawKpiCard(margin, 'Retention & Stability', '97.8%', 'Annualized attrition < 2.2%', cobalt);
-  drawKpiCard(margin + cardWidth + 4, 'Biometric Compliance', '99.1%', 'First-pass facial scan matches', cobalt);
-  drawKpiCard(margin + (cardWidth + 4) * 2, 'Average Corporate Tenure', '2.4 Yrs', 'Across corporate departments', slateDark);
+  drawKpiCard(margin + cardWidth + 6, 'Average Tenure', '2.4 Yrs', 'Across corporate departments', slateDark);
 
-  // 5. Section 1: Departmental Headcount & Compensation Allocation
-  currentY += 30;
+  currentY += 32;
+
+  // 5. Compliance Certification & Digital Executive Sign-off
   doc.setFillColor(...darkNavy);
   doc.roundedRect(margin, currentY, contentWidth, 7.5, 1.5, 1.5, 'F');
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
   doc.setTextColor(255, 255, 255);
-  doc.text('1. DEPARTMENTAL COMPENSATION & RESOURCE ALLOCATION', margin + 4, currentY + 5);
-
-  currentY += 10;
-  // Table Header
-  doc.setFillColor(...slateLight);
-  doc.rect(margin, currentY, contentWidth, 6.5, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
-  doc.setTextColor(...slateDark);
-  doc.text('DEPARTMENT', margin + 4, currentY + 4.5);
-  doc.text('STAFF ROLE FOCUS', margin + 45, currentY + 4.5);
-  doc.text('MONTHLY BURDEN', margin + 110, currentY + 4.5);
-  doc.text('BUDGET SHARE', margin + 145, currentY + 4.5);
-  doc.text('STATUS', margin + contentWidth - 4, currentY + 4.5, { align: 'right' });
-
-  const deptRows = [
-    { name: 'Engineering', focus: 'Frontend, Microservices, Facial AI', burden: 'Rs. 30,500', share: '54%', status: 'OPTIMAL' },
-    { name: 'Product Design', focus: 'UI/UX Design Systems, Prototyping', burden: 'Rs. 10,700', share: '19%', status: 'OPTIMAL' },
-    { name: 'Security & Compliance', focus: 'Identity Governance, 2FA, Vault', burden: 'Rs. 9,200', share: '16%', status: 'COMPLIANT' },
-    { name: 'Human Resources', focus: 'Talent Acquisition, Payroll, Welfare', burden: 'Rs. 6,200', share: '11%', status: 'BALANCED' }
-  ];
-
-  currentY += 6.5;
-  deptRows.forEach((row, i) => {
-    const isAlt = i % 2 === 1;
-    if (isAlt) {
-      doc.setFillColor(248, 250, 252);
-      doc.rect(margin, currentY, contentWidth, 6.5, 'F');
-    }
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.5);
-    doc.setTextColor(...slateDark);
-    doc.text(row.name, margin + 4, currentY + 4.5);
-    doc.setTextColor(...textMuted);
-    doc.text(row.focus, margin + 45, currentY + 4.5);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...slateDark);
-    doc.text(row.burden, margin + 110, currentY + 4.5);
-    doc.setTextColor(...cobalt);
-    doc.text(row.share, margin + 145, currentY + 4.5);
-    doc.setTextColor(...emerald);
-    doc.text(row.status, margin + contentWidth - 4, currentY + 4.5, { align: 'right' });
-
-    doc.setDrawColor(226, 232, 240);
-    doc.setLineWidth(0.1);
-    doc.line(margin, currentY + 6.5, margin + contentWidth, currentY + 6.5);
-    currentY += 6.5;
-  });
-
-  // Department Subtotal
-  doc.setFillColor(...slateLight);
-  doc.rect(margin, currentY, contentWidth, 7, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.setTextColor(...slateDark);
-  doc.text('TOTAL MONTHLY DIRECT COMPENSATION BURDEN:', margin + 4, currentY + 4.8);
-  doc.setTextColor(...emerald);
-  doc.text('Rs. 56,600 (Normalized Payroll Core)', margin + contentWidth - 4, currentY + 4.8, { align: 'right' });
-  currentY += 12;
-
-  // 6. Section 2: Biometric Access & Authentication Audit
-  doc.setFillColor(...darkNavy);
-  doc.roundedRect(margin, currentY, contentWidth, 7.5, 1.5, 1.5, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
-  doc.setTextColor(255, 255, 255);
-  doc.text('2. BIOMETRIC ATTENDANCE & FACIAL RECOGNITION TELEMETRY', margin + 4, currentY + 5);
-
-  currentY += 10;
-  // Biometric Breakdown Bars
-  const bioWidth = contentWidth / 2 - 3;
-
-  // Left Box: Check-in Method Distribution
-  doc.setFillColor(255, 255, 255);
-  doc.setDrawColor(226, 232, 240);
-  doc.roundedRect(margin, currentY, bioWidth, 38, 2, 2, 'FD');
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.setTextColor(...slateDark);
-  doc.text('AUTHENTICATION METHOD DISTRIBUTION', margin + 4, currentY + 6);
-
-  const drawMethodBar = (label: string, count: string, pct: number, y: number, color: readonly [number, number, number]) => {
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.2);
-    doc.setTextColor(...slateDark);
-    doc.text(label, margin + 4, y);
-    doc.setFont('helvetica', 'bold');
-    doc.text(count, margin + bioWidth - 4, y, { align: 'right' });
-
-    // Bar background
-    doc.setFillColor(226, 232, 240);
-    doc.roundedRect(margin + 4, y + 1.5, bioWidth - 8, 2.5, 1, 1, 'F');
-    // Bar fill
-    doc.setFillColor(...color);
-    doc.roundedRect(margin + 4, y + 1.5, (bioWidth - 8) * (pct / 100), 2.5, 1, 1, 'F');
-  };
-
-  drawMethodBar('Facial AI Vector Match (Live Webcam)', '142 logs (88%)', 88, currentY + 12, cobalt);
-  drawMethodBar('Manual Supervisor Override', '14 logs (9%)', 9, currentY + 20, [217, 119, 6]);
-  drawMethodBar('Emergency Physical Keycard', '5 logs (3%)', 3, currentY + 28, textMuted);
-
-  // Right Box: Kiosk & Edge Hardware Telemetry
-  const rightX = margin + bioWidth + 6;
-  doc.setFillColor(255, 255, 255);
-  doc.setDrawColor(226, 232, 240);
-  doc.roundedRect(rightX, currentY, bioWidth, 38, 2, 2, 'FD');
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.setTextColor(...slateDark);
-  doc.text('EDGE HARDWARE & SENSOR HEALTH', rightX + 4, currentY + 6);
-
-  const drawSensorRow = (node: string, status: string, uptime: string, y: number) => {
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.2);
-    doc.setTextColor(...slateDark);
-    doc.text(node, rightX + 4, y);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(...emerald);
-    doc.text(status, rightX + 55, y);
-    doc.setTextColor(...textMuted);
-    doc.setFont('helvetica', 'normal');
-    doc.text(uptime, rightX + bioWidth - 4, y, { align: 'right' });
-  };
-
-  drawSensorRow('Optical Kiosk Alpha (SF Pine St HQ)', 'ONLINE', '99.98% uptime', currentY + 13);
-  drawSensorRow('Optical Kiosk Beta (Austin Campus)', 'ONLINE', '100.0% uptime', currentY + 20);
-  drawSensorRow('AI Inference Edge (Webcam Browser)', 'ACTIVE', '< 45ms latency', currentY + 27);
-  drawSensorRow('Biometric Hash Encryption Engine', 'SECURE', 'AES-256-GCM', currentY + 34);
-
-  currentY += 44;
-
-  // 7. Section 3: Governance, Access Audit & Sign-off
-  doc.setFillColor(...darkNavy);
-  doc.roundedRect(margin, currentY, contentWidth, 7.5, 1.5, 1.5, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
-  doc.setTextColor(255, 255, 255);
-  doc.text('3. COMPLIANCE CERTIFICATION & DIGITAL EXECUTIVE SIGN-OFF', margin + 4, currentY + 5);
+  doc.text('COMPLIANCE CERTIFICATION & DIGITAL EXECUTIVE SIGN-OFF', margin + 4, currentY + 5);
 
   currentY += 10;
   doc.setFillColor(255, 255, 255);

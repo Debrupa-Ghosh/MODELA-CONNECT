@@ -108,8 +108,8 @@ export const ExecutiveDossierModal: React.FC<Props> = ({
             </div>
           </div>
 
-          {/* 3 Metric Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* 2 Metric Cards: Retention & Stability and Average Tenure */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="p-3.5 bg-[#0B1528] rounded-xl border border-[#1E293B]">
               <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Retention &amp; Stability</span>
               <span className="text-xl font-extrabold text-[#38BDF8] block mt-1">97.8%</span>
@@ -117,107 +117,9 @@ export const ExecutiveDossierModal: React.FC<Props> = ({
             </div>
 
             <div className="p-3.5 bg-[#0B1528] rounded-xl border border-[#1E293B]">
-              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Biometric Compliance</span>
-              <span className="text-xl font-extrabold text-[#38BDF8] block mt-1">99.1%</span>
-              <span className="text-[10px] text-slate-400">First-pass facial scan matches</span>
-            </div>
-
-            <div className="p-3.5 bg-[#0B1528] rounded-xl border border-[#1E293B]">
               <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">Average Tenure</span>
               <span className="text-xl font-extrabold text-white block mt-1">2.4 Yrs</span>
               <span className="text-[10px] text-slate-400">Across corporate departments</span>
-            </div>
-          </div>
-
-          {/* Department Compensation Breakdown Table */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <CreditCard className="w-3.5 h-3.5 text-sky-400" />
-              <h4 className="text-xs font-bold text-white uppercase tracking-wider">
-                Monthly Compensation Burden by Department
-              </h4>
-            </div>
-
-            <div className="overflow-x-auto rounded-xl border border-[#1E293B] bg-[#060D1A]">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-[#0B1528] text-slate-400 text-[10px] uppercase font-bold border-b border-[#1E293B]">
-                  <tr>
-                    <th className="py-2.5 px-3">Department</th>
-                    <th className="py-2.5 px-3">Monthly Allocation</th>
-                    <th className="py-2.5 px-3">Share</th>
-                    <th className="py-2.5 px-3 text-right">Operational Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#1E293B]/70 text-[11px]">
-                  <tr>
-                    <td className="py-2 px-3 font-semibold text-white">Engineering</td>
-                    <td className="py-2 px-3 font-mono text-slate-200">Rs. 30,500</td>
-                    <td className="py-2 px-3 text-sky-400 font-bold">54%</td>
-                    <td className="py-2 px-3 text-right text-emerald-400 font-bold">OPTIMAL</td>
-                  </tr>
-                  <tr>
-                    <td className="py-2 px-3 font-semibold text-white">Product Design</td>
-                    <td className="py-2 px-3 font-mono text-slate-200">Rs. 10,700</td>
-                    <td className="py-2 px-3 text-sky-400 font-bold">19%</td>
-                    <td className="py-2 px-3 text-right text-emerald-400 font-bold">OPTIMAL</td>
-                  </tr>
-                  <tr>
-                    <td className="py-2 px-3 font-semibold text-white">Security &amp; Compliance</td>
-                    <td className="py-2 px-3 font-mono text-slate-200">Rs. 9,200</td>
-                    <td className="py-2 px-3 text-sky-400 font-bold">16%</td>
-                    <td className="py-2 px-3 text-right text-emerald-400 font-bold">COMPLIANT</td>
-                  </tr>
-                  <tr>
-                    <td className="py-2 px-3 font-semibold text-white">Human Resources</td>
-                    <td className="py-2 px-3 font-mono text-slate-200">Rs. 6,200</td>
-                    <td className="py-2 px-3 text-sky-400 font-bold">11%</td>
-                    <td className="py-2 px-3 text-right text-emerald-400 font-bold">BALANCED</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Biometric Telemetry & Hardware Nodes */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-            <div className="p-3.5 bg-[#060D1A] rounded-xl border border-[#1E293B] space-y-2">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                Biometric Check-In Methods
-              </span>
-              <div className="space-y-1 text-[11px]">
-                <div className="flex justify-between">
-                  <span className="text-slate-300">Facial AI Vector Match</span>
-                  <span className="font-bold text-sky-400">142 logs (88%)</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-300">Manual Supervisor Override</span>
-                  <span className="font-bold text-amber-400">14 logs (9%)</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-300">Emergency Physical Keycard</span>
-                  <span className="font-bold text-slate-400">5 logs (3%)</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-3.5 bg-[#060D1A] rounded-xl border border-[#1E293B] space-y-2">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                Edge Kiosk Telemetry
-              </span>
-              <div className="space-y-1 text-[11px]">
-                <div className="flex justify-between">
-                  <span className="text-slate-300">Optical Kiosk Alpha (SF HQ)</span>
-                  <span className="text-emerald-400 font-bold">ONLINE (99.98%)</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-300">Optical Kiosk Beta (Austin)</span>
-                  <span className="text-emerald-400 font-bold">ONLINE (100.0%)</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-300">AI Face-Vector Hash Engine</span>
-                  <span className="text-emerald-400 font-bold">AES-256 SECURE</span>
-                </div>
-              </div>
             </div>
           </div>
 

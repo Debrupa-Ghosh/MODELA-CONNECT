@@ -82,8 +82,8 @@ export const ReportsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 3 Metric Cards (Matches Image 6) */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* 2 Metric Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Retention & Stability */}
         <div className="p-5 bg-[#0B132B] rounded-2xl border border-[#1E293B] shadow-sm">
           <span className="text-xs font-semibold text-slate-400">
@@ -97,19 +97,6 @@ export const ReportsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Biometric Compliance */}
-        <div className="p-5 bg-[#0B132B] rounded-2xl border border-[#1E293B] shadow-sm">
-          <span className="text-xs font-semibold text-slate-400">
-            Biometric Compliance
-          </span>
-          <div className="text-2xl font-extrabold text-[#38BDF8] mt-2">
-            99.1%
-          </div>
-          <div className="text-[11px] text-slate-400 mt-1">
-            First-pass facial scan matches
-          </div>
-        </div>
-
         {/* Average Tenure */}
         <div className="p-5 bg-[#0B132B] rounded-2xl border border-[#1E293B] shadow-sm">
           <span className="text-xs font-semibold text-slate-400">
@@ -120,110 +107,6 @@ export const ReportsPage: React.FC = () => {
           </div>
           <div className="text-[11px] text-slate-400 mt-1">
             Across corporate departments
-          </div>
-        </div>
-      </div>
-
-      {/* 2 Bottom Breakdown Cards (Matches Image 6) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left: Monthly Compensation Burden by Department */}
-        <div className="p-6 bg-[#0B132B] rounded-2xl border border-[#1E293B] shadow-sm space-y-4">
-          <div className="flex items-center gap-2 border-b border-[#1E293B] pb-3">
-            <CreditCard className="w-4 h-4 text-[#38BDF8]" />
-            <h2 className="text-sm font-bold text-white">
-              Monthly Compensation Burden by Department
-            </h2>
-          </div>
-
-          <div className="space-y-4 pt-1">
-            {/* Engineering */}
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs">
-                <span className="font-semibold text-slate-200">Engineering</span>
-                <span className="font-bold text-white font-mono">Rs. 30,500 (54%)</span>
-              </div>
-              <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-blue-600 rounded-full" style={{ width: '54%' }} />
-              </div>
-            </div>
-
-            {/* Product Design */}
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs">
-                <span className="font-semibold text-slate-200">Product Design</span>
-                <span className="font-bold text-white font-mono">Rs. 10,700 (19%)</span>
-              </div>
-              <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-indigo-500 rounded-full" style={{ width: '19%' }} />
-              </div>
-            </div>
-
-            {/* Security & Compliance */}
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs">
-                <span className="font-semibold text-slate-200">Security & Compliance</span>
-                <span className="font-bold text-white font-mono">Rs. 9,200 (16%)</span>
-              </div>
-              <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-slate-500 rounded-full" style={{ width: '16%' }} />
-              </div>
-            </div>
-
-            {/* Human Resources */}
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs">
-                <span className="font-semibold text-slate-200">Human Resources</span>
-                <span className="font-bold text-white font-mono">Rs. 6,200 (11%)</span>
-              </div>
-              <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-sky-400 rounded-full" style={{ width: '11%' }} />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Right: Biometric Check-in Method Distribution */}
-        <div className="p-6 bg-[#0B132B] rounded-2xl border border-[#1E293B] shadow-sm space-y-4">
-          <div className="flex items-center gap-2 border-b border-[#1E293B] pb-3">
-            <BarChart3 className="w-4 h-4 text-[#38BDF8]" />
-            <h2 className="text-sm font-bold text-white">
-              Biometric Check-in Method Distribution
-            </h2>
-          </div>
-
-          <div className="space-y-4 pt-1">
-            {/* Facial AI Vector Match */}
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs">
-                <span className="font-semibold text-slate-200">Facial AI Vector Match</span>
-                <span className="font-bold text-white font-mono">142 logs (88%)</span>
-              </div>
-              <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-blue-600 rounded-full" style={{ width: '88%' }} />
-              </div>
-            </div>
-
-            {/* Manual Supervisor Override */}
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs">
-                <span className="font-semibold text-slate-200">Manual Supervisor Override</span>
-                <span className="font-bold text-white font-mono">14 logs (9%)</span>
-              </div>
-              <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-amber-500 rounded-full" style={{ width: '9%' }} />
-              </div>
-            </div>
-
-            {/* Emergency Physical Keycard */}
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs">
-                <span className="font-semibold text-slate-200">Emergency Physical Keycard</span>
-                <span className="font-bold text-white font-mono">5 logs (3%)</span>
-              </div>
-              <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-slate-600 rounded-full" style={{ width: '3%' }} />
-              </div>
-            </div>
           </div>
         </div>
       </div>
