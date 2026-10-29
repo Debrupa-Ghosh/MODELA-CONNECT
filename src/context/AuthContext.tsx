@@ -160,9 +160,7 @@ const isLegacyExcludedUser = (u: Partial<User>, docId?: string): boolean => {
     lowerEmail === 'pooja.sharma@modela.io' ||
     ((lowerEmail === 'modelatech2026@gmail.com' ||
       lowerEmail === 'sushoovandas@gmail.com' ||
-      lowerEmail === 'ghoshdebrupa005@gmail.com' ||
-      lowerEmail === 'aditichakraborty2005@gmail.com' ||
-      lowerEmail === 'aditichakrabarty2005@gmail.com') &&
+      lowerEmail === 'ghoshdebrupa005@gmail.com') &&
       isRecordDeleted(lowerEmail)) ||
     ((upperEmpId === 'MOD000' ||
       upperEmpId === 'MOD101' ||
@@ -170,7 +168,6 @@ const isLegacyExcludedUser = (u: Partial<User>, docId?: string): boolean => {
       upperEmpId === 'MOD005' ||
       upperEmpId === 'MOD006' ||
       upperEmpId === 'MOD007' ||
-      upperEmpId === 'MOD008' ||
       upperEmpId === 'MOD102') &&
       isRecordDeleted(upperEmpId))
   );
@@ -564,17 +561,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
 
         const map = new Map<string, User>();
-        // Ensure default accounts exist ONLY if not deleted
+        // Ensure default accounts exist ONLY if not deleted, and persist missing baseline users (such as MOD008) to Firestore
         INITIAL_USERS.filter(
           u =>
             !isDeletedSeedSignupRequest(u) &&
             !isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolveEmpId(u.email, u.employeeId))
         ).forEach(u => {
           const emailKey = u.email.toLowerCase().trim();
-          map.set(emailKey, {
+          const resolvedId = resolveEmpId(emailKey, u.employeeId);
+          const userObj = {
             ...u,
-            employeeId: resolveEmpId(emailKey, u.employeeId)
-          });
+            employeeId: resolvedId
+          };
+          map.set(emailKey, userObj);
+          if (!remoteList.some(r => r.email?.toLowerCase().trim() === emailKey)) {
+            setDoc(doc(db, 'users', u.id), cleanFirestoreUser(userObj), { merge: true }).catch(() => {});
+          }
         });
 
         // Override and add real-time remote accounts & requests from Firestore

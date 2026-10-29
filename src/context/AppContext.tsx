@@ -172,8 +172,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         em === 'modelatech2026@gmail.com' ||
         em === 'sushoovandas@gmail.com' ||
         em === 'ghoshdebrupa005@gmail.com' ||
-        em === 'aditichakraborty2005@gmail.com' ||
-        em === 'aditichakrabarty2005@gmail.com' ||
         (em.includes('tony') && em.includes('stark')) ||
         i.includes('tonystark') ||
         i === 'mod000' ||
@@ -182,7 +180,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         i === 'mod005' ||
         i === 'mod006' ||
         i === 'mod007' ||
-        i === 'mod008' ||
         i === 'mod102'
       );
     };
@@ -191,6 +188,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const requiredEmployees: Employee[] = [
       sushoovanEmployee,
+      {
+        id: resolveEmpId("aditichakraborty2005@gmail.com", "MOD008") || "MOD008",
+        firstName: "Aditi",
+        lastName: "Chakrabarty",
+        email: "aditichakraborty2005@gmail.com",
+        joiningDate: "2026-10-29",
+        designation: "Staff Candidate",
+        phone: "",
+        department: "General Staff",
+        status: "ACTIVE",
+        location: "San Francisco HQ",
+        compensation: { basic: 50000, allowances: 15000 },
+        avatar: "https://ui-avatars.com/api/?name=Aditi+Chakrabarty&background=0284c7&color=fff"
+      },
       {
         id: resolveEmpId("surupa008@gmail.com", "MOD011") || "MOD011",
         firstName: "Debrupa",
@@ -447,48 +458,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       return prev;
     });
-
-    // Ensure every approved user has all 12 months (Jan-Oct PAID, Nov-Dec UNPAID) in payroll
-    const allMonths = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
-    approved.forEach(u => {
-      if (!u.email || u.id === SYNC_REGISTRY_DOC_ID || u.email === 'sync@system.internal') return;
-      const resolvedUserId = (resolveEmpId(u.email, u.employeeId) || u.employeeId || '').trim().toUpperCase();
-      if (!resolvedUserId || isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolvedUserId)) return;
-      if (resolvedUserId === 'MOD000' || resolvedUserId === 'MOD101' || resolvedUserId === 'MOD102' || resolvedUserId === 'MOD003' || resolvedUserId === 'MOD005' || resolvedUserId === 'MOD006' || resolvedUserId === 'MOD007' || resolvedUserId === 'MOD008' || resolvedUserId === 'MOD0090' || resolvedUserId === 'MOD01') return;
-
-      const parts = (u.name || '').trim().split(/\s+/);
-      const empObj: Employee = {
-        id: resolvedUserId,
-        firstName: parts[0] || (u.name || '').trim() || 'Staff',
-        lastName: parts.slice(1).join(' ') || '',
-        joiningDate: new Date().toISOString().split('T')[0],
-        phone: '',
-        email: u.email,
-        designation: u.designation || (u.role === 'SUPER_ADMIN' ? 'Executive Director & Super Admin' : 'Enterprise Staff'),
-        department: u.department || (u.role === 'SUPER_ADMIN' ? 'Executive Office' : 'General Staff'),
-        status: 'ACTIVE',
-        location: 'San Francisco HQ',
-        compensation: u.role === 'SUPER_ADMIN' ? { basic: 95000, allowances: 30000 } : { basic: 50000, allowances: 15000 },
-        avatar: u.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || u.email)}&background=0284c7&color=fff`
-      };
-
-      const fullName = `${empObj.firstName} ${empObj.lastName}`.trim() || empObj.id;
-      const personKey = getPayrollPersonKey({ employeeName: fullName, employeeId: empObj.id });
-      const existingMonthsCount = allMonths.filter(m =>
-        payroll.some(
-          p =>
-            p.month?.toLowerCase() === m.toLowerCase() &&
-            Number(p.year) === 2026 &&
-            (p.employeeId?.toUpperCase() === resolvedUserId || getPayrollPersonKey(p) === personKey)
-        )
-      ).length;
-      if (existingMonthsCount < 12) {
-        syncEmployeeToPayroll(empObj, undefined, 2026);
-      }
-    });
   }, [users]);
 
   const isExcludedStaffRequest = (r?: Partial<StaffWorkflowRequest> | null): boolean => {
@@ -571,9 +540,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     'PAY-2026-OCT-MOD100',
     'PAY-2026-OCT-MOD101',
     'PAY-2026-OCT-MOD102',
+    'PAY-2026-OCT-MOD106',
     'PAY-2026-OCT-MOD01',
     'PAY-2026-OCT-MOD0090',
-    'PAY-2026-OCT-MOD008',
     'PAY-2026-OCT-MOD003',
     'PAY-2026-OCT-MOD005',
     'PAY-2026-OCT-MOD006',
@@ -588,10 +557,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       `PAY-2026-${m}-MOD000`,
       `PAY-2026-${m}-MOD101`,
       `PAY-2026-${m}-MOD102`,
+      `PAY-2026-${m}-MOD106`,
       `PAY-2026-${m}-MOD003`,
       `PAY-2026-${m}-MOD005`,
-      `PAY-2026-${m}-MOD006`,
-      `PAY-2026-${m}-MOD008`
+      `PAY-2026-${m}-MOD006`
     ])
   ]);
 
@@ -603,8 +572,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (BLOCKED_PAYROLL_DOC_IDS.has(docId)) return true;
 
-    // Exclude EMP ID MOD101, MOD102, MOD000, MOD003, MOD005, MOD006, MOD007, legacy MOD008/MOD0090, Aditi Chakrabarty, Marcus Vance, Sourav Ganguly, Pooja Sharma, Tony Stark, and Piu Roy salary slips
+    // Exclude EMP ID MOD101, MOD102, MOD106 (Modela Tech), MOD000, MOD003, MOD005, MOD006, MOD007, legacy MOD0090, Marcus Vance, Sourav Ganguly, Pooja Sharma, Tony Stark, and Piu Roy salary slips
     if (
+      empName === 'modela tech' ||
+      empName.includes('modela tech') ||
       empName.includes('tony stark') ||
       (empName.includes('tony') && empName.includes('stark')) ||
       empName.includes('piu roy') ||
@@ -615,50 +586,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       (empName.includes('sourav') && empName.includes('ganguly')) ||
       empName.includes('pooja sharma') ||
       (empName.includes('pooja') && empName.includes('sharma')) ||
-      empName.includes('aditi chakrabarty') ||
-      empName.includes('aditi chakraborty') ||
-      (empName.includes('aditi') && empName.includes('chakrab')) ||
       empId === 'MOD000' ||
       empId === 'MOD101' ||
       empId === 'MOD102' ||
+      empId === 'MOD106' ||
       empId === 'MOD003' ||
       empId === 'MOD005' ||
       empId === 'MOD006' ||
       empId === 'MOD007' ||
       empId === 'MOD0090' ||
-      empId === 'MOD008' ||
       docId === 'PAY-2026-09-04' ||
       docId === 'PAY-2026-10-04' ||
       docId.includes('MOD000') ||
       docId.includes('MOD101') ||
       docId.includes('MOD102') ||
+      docId.includes('MOD106') ||
       docId.includes('MOD003') ||
       docId.includes('MOD005') ||
       docId.includes('MOD006') ||
       docId.includes('MOD007') ||
       docId.includes('MOD0090') ||
-      docId.includes('MOD008') ||
       docId.includes('TONY') ||
       docId.includes('STARK') ||
       docId.includes('PIU') ||
       docId.includes('MARCUS') ||
       docId.includes('SOURAV') ||
-      docId.includes('POOJA') ||
-      docId.includes('ADITI')
+      docId.includes('POOJA')
     ) {
       return true;
     }
 
     // Exclude old intermediate MOD01 record (keep MOD011 for Debrupa Ghosh surupa008@gmail.com!)
     if (empId === 'MOD01' || docId.endsWith('-MOD01')) {
-      return true;
-    }
-
-    // Exclude intermediate/duplicate Modela Tech IDs (MOD, MOD0, MOD00, MOD000, MOD0001, MOD100, MOD101)
-    if (
-      empName === 'modela tech' &&
-      (empId === 'MOD' || empId === 'MOD0' || empId === 'MOD00' || empId === 'MOD000' || empId === 'MOD0001' || empId === 'MOD100' || empId === 'MOD101')
-    ) {
       return true;
     }
 
@@ -843,15 +802,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             lowerEmail === 'modelatech2026@gmail.com' ||
             lowerEmail === 'sushoovandas@gmail.com' ||
             lowerEmail === 'ghoshdebrupa005@gmail.com' ||
-            lowerEmail === 'aditichakraborty2005@gmail.com' ||
-            lowerEmail === 'aditichakrabarty2005@gmail.com' ||
             upperId === 'MOD000' ||
             upperId === 'MOD101' ||
             upperId === 'MOD003' ||
             upperId === 'MOD005' ||
             upperId === 'MOD006' ||
             upperId === 'MOD007' ||
-            upperId === 'MOD008' ||
             upperId === 'MOD102';
           const isPiu =
             fullName.includes('piu roy') ||
@@ -944,8 +900,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             return;
           }
 
-          personMap.set(cleanEmail || resolvedInitId, { ...initEmp, id: resolvedInitId });
+          const initRecord: Employee = { ...initEmp, id: resolvedInitId };
+          personMap.set(cleanEmail || resolvedInitId, initRecord);
           seenIds.add(resolvedInitId);
+          // Persist missing baseline employee (such as MOD008) to Firestore employees collection
+          if (!remoteDocs.some(d => d.docId.toUpperCase() === resolvedInitId || (cleanEmail && d.data.email?.toLowerCase().trim() === cleanEmail))) {
+            setDoc(doc(db, 'employees', resolvedInitId), cleanFirestoreData(initRecord), { merge: true }).catch(() => {});
+          }
         });
 
         // 3. Approved users from AuthContext / User Management
@@ -1011,10 +972,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               id: empId,
               firstName: parts[0] || (u.name || '').trim() || 'Staff',
               lastName: parts.slice(1).join(' ') || '',
-              joiningDate: new Date().toISOString().split('T')[0],
+              joiningDate: cleanEmail === 'aditichakraborty2005@gmail.com' ? '2026-10-29' : new Date().toISOString().split('T')[0],
               phone: '',
               email: u.email,
-              designation: u.designation || (u.role === 'SUPER_ADMIN' ? 'Executive Director & Super Admin' : 'Enterprise Staff'),
+              designation: u.designation || (u.role === 'SUPER_ADMIN' ? 'Executive Director & Super Admin' : 'Staff Candidate'),
               department: u.department || (u.role === 'SUPER_ADMIN' ? 'Executive Office' : 'General Staff'),
               status: 'ACTIVE',
               location: 'San Francisco HQ',
@@ -1022,6 +983,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               avatar: u.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || u.email)}&background=0284c7&color=fff`
             };
             personMap.set(cleanEmail, newEmp);
+            setDoc(doc(db, 'employees', empId), cleanFirestoreData(newEmp), { merge: true }).catch(() => {});
           }
         });
 
@@ -1143,9 +1105,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             const isNewCanonical = /^PAY-\d{4}-\d{2}-\d{2}$/.test(data.id);
             const isExCanonical = /^PAY-\d{4}-\d{2}-\d{2}$/.test(existing.data.id);
             const preferredEmpId =
-              personKey === 'modela-tech'
-                ? resolveEmpId('modelatech2026@gmail.com', data.employeeId)
-                : personKey === 'debrupa-ghosh-surupa008'
+              personKey === 'debrupa-ghosh-surupa008'
                 ? resolveEmpId('surupa008@gmail.com', data.employeeId || 'MOD011')
                 : personKey === 'debrupa-ghosh-primary'
                 ? resolveEmpId('ghoshdebrupa005@gmail.com', data.employeeId || 'MOD007')
@@ -1156,8 +1116,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
             const shouldReplace =
               (isNewCanonical && !isExCanonical) ||
-              (!isExCanonical && newMatchesPreferred && !exMatchesPreferred) ||
-              (!isExCanonical && personKey === 'modela-tech' && data.basicSalary === 95000 && existing.data.basicSalary !== 95000);
+              (!isExCanonical && newMatchesPreferred && !exMatchesPreferred);
 
             if (shouldReplace) {
               deleteDoc(doc(db, 'payroll', existing.docId)).catch(() => {});
@@ -1212,12 +1171,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
           combinedApprovedUsers.forEach(u => {
             const empId = (u.employeeId || '').trim().toUpperCase();
-            if (!empId || empId === 'MOD000' || empId === 'MOD101' || empId === 'MOD102' || empId === 'MOD003' || empId === 'MOD005' || empId === 'MOD006' || empId === 'MOD007' || empId === 'MOD008' || empId === 'MOD0090' || empId === 'MOD01') return;
             const fullName = (u.name || u.email.split('@')[0]).trim();
-            const isModelaUser = fullName.toLowerCase() === 'modela tech' || u.email.toLowerCase() === 'modelatech4@gmail.com';
+            const isModelaUser = fullName.toLowerCase() === 'modela tech' || u.email.toLowerCase() === 'modelatech4@gmail.com' || empId === 'MOD106';
+            if (
+              !empId ||
+              isModelaUser ||
+              empId === 'MOD000' ||
+              empId === 'MOD101' ||
+              empId === 'MOD102' ||
+              empId === 'MOD106' ||
+              empId === 'MOD003' ||
+              empId === 'MOD005' ||
+              empId === 'MOD006' ||
+              empId === 'MOD007' ||
+              empId === 'MOD0090' ||
+              empId === 'MOD01'
+            ) return;
             const isSushoovanUser = fullName.toLowerCase() === 'sushoovan das' || u.email.toLowerCase() === 'sushovand@modelatech.com';
-            const basic = isModelaUser ? 95000 : isSushoovanUser ? 85000 : 50000;
-            const allowances = isModelaUser ? 30000 : isSushoovanUser ? 25000 : 15000;
+            const basic = isSushoovanUser ? 85000 : 50000;
+            const allowances = isSushoovanUser ? 25000 : 15000;
             const deductions = 3700;
             const grossSalary = basic + allowances;
             const netSalary = grossSalary - deductions;
@@ -2119,8 +2091,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const lowerEmail = (emp.email || '').trim().toLowerCase();
     const upperEmpId = (emp.id || '').trim().toUpperCase();
 
-    // Do not generate or sync payslips for MOD101, MOD102, MOD000, MOD003, MOD005, MOD006, MOD007, legacy MOD008/MOD0090, Aditi Chakrabarty, Marcus Vance, Sourav Ganguly, Pooja Sharma, Tony Stark, Piu Roy, intermediate MOD01, or deleted employees
+    // Do not generate or sync payslips for MOD101, MOD102, MOD106 (Modela Tech), MOD000, MOD003, MOD005, MOD006, MOD007, legacy MOD0090, Marcus Vance, Sourav Ganguly, Pooja Sharma, Tony Stark, Piu Roy, intermediate MOD01, or deleted employees
     if (
+      lowerName === 'modela tech' ||
+      lowerName.includes('modela tech') ||
       lowerName.includes('tony stark') ||
       (lowerName.includes('tony') && lowerName.includes('stark')) ||
       lowerName.includes('piu roy') ||
@@ -2131,25 +2105,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       (lowerName.includes('sourav') && lowerName.includes('ganguly')) ||
       lowerName.includes('pooja sharma') ||
       (lowerName.includes('pooja') && lowerName.includes('sharma')) ||
-      lowerName.includes('aditi chakrabarty') ||
-      lowerName.includes('aditi chakraborty') ||
-      (lowerName.includes('aditi') && lowerName.includes('chakrab')) ||
       upperEmpId === 'MOD000' ||
       upperEmpId === 'MOD101' ||
       upperEmpId === 'MOD102' ||
+      upperEmpId === 'MOD106' ||
       upperEmpId === 'MOD003' ||
       upperEmpId === 'MOD005' ||
       upperEmpId === 'MOD006' ||
       upperEmpId === 'MOD007' ||
-      upperEmpId === 'MOD008' ||
       upperEmpId === 'MOD0090' ||
       upperEmpId === 'MOD01' ||
+      lowerEmail === 'modelatech4@gmail.com' ||
       lowerEmail === 'modelatech2026@gmail.com' ||
       lowerEmail === 'sushoovandas@gmail.com' ||
       lowerEmail === 'ghoshdebrupa005@gmail.com' ||
-      lowerEmail === 'aditichakrabarty2005@gmail.com' ||
-      lowerEmail === 'aditichakraborty2005@gmail.com' ||
-      lowerEmail.includes('aditichakrab') ||
       lowerEmail === 'marcus.vance@modela.io' ||
       lowerEmail === 'sourav.ganguly@modela.io' ||
       lowerEmail === 'pooja.sharma@modela.io' ||

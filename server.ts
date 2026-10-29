@@ -52,6 +52,21 @@ const DEFAULT_SERVER_USERS: ServerUser[] = [
     reviewedBy: "System Root"
   },
   {
+    id: "USR-ADITI-008",
+    uid: "USR-ADITI-008",
+    name: "Aditi Chakrabarty",
+    email: "aditichakraborty2005@gmail.com",
+    avatar_url: "https://ui-avatars.com/api/?name=Aditi+Chakrabarty&background=0284c7&color=fff",
+    status: "APPROVED",
+    role: "EMPLOYEE",
+    employeeId: "MOD008",
+    designation: "Staff Candidate",
+    department: "General Staff",
+    requestedAt: "2026-10-29T05:00:00.000Z",
+    reviewedAt: "2026-10-29T05:05:00.000Z",
+    reviewedBy: "System Root"
+  },
+  {
     id: "USR-SURUPA-011",
     uid: "USR-SURUPA-011",
     name: "Debrupa Ghosh",
@@ -77,6 +92,13 @@ const PERMANENTLY_DELETED_REQUEST_KEYS = new Set([
   'usr-pending-03'
 ]);
 
+const PROTECTED_ACTIVE_KEYS = new Set([
+  'aditichakraborty2005@gmail.com',
+  'aditichakrabarty2005@gmail.com',
+  'usr-aditi-008',
+  'mod008'
+]);
+
 let users: ServerUser[] = [...DEFAULT_SERVER_USERS];
 let serverDeletedIds = new Set<string>(PERMANENTLY_DELETED_REQUEST_KEYS);
 
@@ -91,9 +113,19 @@ try {
           !PERMANENTLY_DELETED_REQUEST_KEYS.has(String(u.email || '').toLowerCase().trim()) &&
           !PERMANENTLY_DELETED_REQUEST_KEYS.has(String(u.id || '').toLowerCase().trim())
       );
+      DEFAULT_SERVER_USERS.forEach(defU => {
+        if (!users.some(u => u.email.toLowerCase().trim() === defU.email.toLowerCase().trim())) {
+          users.push(defU);
+        }
+      });
     }
     if (Array.isArray(parsed.deletedIds)) {
-      parsed.deletedIds.forEach((id: string) => serverDeletedIds.add(String(id).toLowerCase().trim()));
+      parsed.deletedIds.forEach((id: string) => {
+        const clean = String(id).toLowerCase().trim();
+        if (!PROTECTED_ACTIVE_KEYS.has(clean)) {
+          serverDeletedIds.add(clean);
+        }
+      });
     }
   }
 } catch {}
@@ -123,6 +155,19 @@ let employees = [
     status: "ACTIVE",
     location: "San Francisco HQ",
     compensation: { basic: 85000, allowances: 25000 }
+  },
+  {
+    id: "MOD008",
+    firstName: "Aditi",
+    lastName: "Chakrabarty",
+    email: "aditichakraborty2005@gmail.com",
+    joiningDate: "2026-10-29",
+    designation: "Staff Candidate",
+    phone: "",
+    department: "General Staff",
+    status: "ACTIVE",
+    location: "San Francisco HQ",
+    compensation: { basic: 50000, allowances: 15000 }
   },
   {
     id: "MOD011",
@@ -457,8 +502,91 @@ app.get('/api/users/stream', (_req: Request, res: Response) => {
   res.end();
 });
 
+// Server-side Firestore reconciliation to guarantee database state
+async function reconcileFirestoreDatabase() {
+  try {
+    const configPath = path.resolve(__dirname, 'firebase-applet-config.json');
+    if (!fs.existsSync(configPath)) return;
+    const firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    const { initializeApp, getApps } = await import('firebase/app');
+    const { getFirestore, doc, setDoc, deleteDoc, collection, getDocs, getDoc } = await import('firebase/firestore');
+
+    const fbApp = getApps().length > 0 ? getApps()[0] : initializeApp(firebaseConfig);
+    const db = getFirestore(fbApp, firebaseConfig.firestoreDatabaseId);
+
+    const withWriteTimeout = <T>(p: Promise<T>, ms = 6000): Promise<T> =>
+      Promise.race([
+        p,
+        new Promise<T>((_, reject) => setTimeout(() => reject(new Error('Write timeout (quota backoff)')), ms))
+      ]);
+
+    let needsRetry = false;
+
+    // 1. Ensure MOD008 (aditichakraborty2005@gmail.com) is present in Firestore employees collection
+    const mod008Ref = doc(db, 'employees', 'MOD008');
+    const mod008Snap = await getDoc(mod008Ref);
+    if (!mod008Snap.exists()) {
+      try {
+        await withWriteTimeout(
+          setDoc(
+            mod008Ref,
+            {
+              id: 'MOD008',
+              firstName: 'Aditi',
+              lastName: 'Chakraborty',
+              email: 'aditichakraborty2005@gmail.com',
+              joiningDate: '2026-10-29',
+              designation: 'Staff Candidate',
+              phone: '',
+              department: 'General Staff',
+              status: 'ACTIVE',
+              location: 'San Francisco HQ',
+              compensation: { basic: 50000, allowances: 15000 },
+              avatar: 'https://ui-avatars.com/api/?name=Aditi%20Chakraborty&background=0284c7&color=fff'
+            },
+            { merge: true }
+          )
+        );
+      } catch {
+        needsRetry = true;
+      }
+    }
+
+    // 2. Delete all Modela Tech, MOD106 records from Firestore payroll collection ONLY
+    const payrollSnap = await getDocs(collection(db, 'payroll'));
+    for (const d of payrollSnap.docs) {
+      const data = d.data();
+      const docIdUpper = d.id.toUpperCase();
+      const empIdUpper = String(data.employeeId || '').trim().toUpperCase();
+      const empNameLower = String(data.employeeName || '').trim().toLowerCase();
+      if (
+        docIdUpper.includes('MOD106') ||
+        empIdUpper === 'MOD106' ||
+        empNameLower === 'modela tech' ||
+        empNameLower.includes('modela tech')
+      ) {
+        try {
+          await withWriteTimeout(deleteDoc(doc(db, 'payroll', d.id)));
+        } catch {
+          needsRetry = true;
+          break;
+        }
+      }
+    }
+
+    if (needsRetry) {
+      setTimeout(reconcileFirestoreDatabase, 5 * 60 * 1000);
+    } else {
+      console.log('Firestore reconciliation complete: MOD008 added to employees, MOD106 removed from payroll.');
+    }
+  } catch (err) {
+    setTimeout(reconcileFirestoreDatabase, 5 * 60 * 1000);
+  }
+}
+
 // Vite Middleware Integration
 async function startServer() {
+  reconcileFirestoreDatabase();
   const distPath = path.resolve(__dirname, 'dist');
   const distIndexPath = path.resolve(distPath, 'index.html');
 

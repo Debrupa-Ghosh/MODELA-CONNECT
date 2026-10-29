@@ -18,10 +18,6 @@ const PERMANENTLY_EXCLUDED_KEYS = new Set([
   'ghoshdebrupa005@gmail.com',
   'usr-obopa1gq',
   'mod007',
-  'aditichakraborty2005@gmail.com',
-  'aditichakrabarty2005@gmail.com',
-  'usr-aditi-008',
-  'mod008',
   'mod102',
   'debrupa123@gmail.com',
   'usr-pending-debrupa',
@@ -69,8 +65,7 @@ const DEFAULT_DELETED_IDS = [
   'pay-2026-dec-mod007',
   'pay-2026-oct-mod101',
   'pay-2026-oct-mod102',
-  'aditi chakrabarty',
-  'aditi chakraborty',
+  'pay-2026-oct-mod106',
   'debrupa123',
   'deb chatterjee',
   'vikram sengupta',
@@ -79,11 +74,24 @@ const DEFAULT_DELETED_IDS = [
 
 const SYSTEM_PROTECTED_KEYS = new Set([
   'sync-registry-global',
-  'sync@system.internal'
+  'sync@system.internal',
+  'aditichakraborty2005@gmail.com',
+  'aditichakrabarty2005@gmail.com',
+  'usr-aditi-008',
+  'mod008',
+  'aditi chakrabarty',
+  'aditi chakraborty'
 ]);
 
 export const getUnblockedRegistry = (): Set<string> => {
-  const result = new Set<string>();
+  const result = new Set<string>([
+    'aditichakraborty2005@gmail.com',
+    'aditichakrabarty2005@gmail.com',
+    'usr-aditi-008',
+    'mod008',
+    'aditi chakrabarty',
+    'aditi chakraborty'
+  ]);
   try {
     const raw = localStorage.getItem(STORAGE_KEY_UNBLOCKED);
     if (raw) {

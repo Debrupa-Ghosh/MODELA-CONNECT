@@ -88,9 +88,9 @@ export const PayrollPage: React.FC = () => {
       'PAY-2026-OCT-MOD100',
       'PAY-2026-OCT-MOD101',
       'PAY-2026-OCT-MOD102',
+      'PAY-2026-OCT-MOD106',
       'PAY-2026-OCT-MOD01',
       'PAY-2026-OCT-MOD0090',
-      'PAY-2026-OCT-MOD008',
       'PAY-2026-OCT-MOD003',
       'PAY-2026-OCT-MOD005',
       'PAY-2026-OCT-MOD006',
@@ -111,6 +111,8 @@ export const PayrollPage: React.FC = () => {
 
       if (dId && blockedDocIds.has(dId)) return true;
       if (
+        n === 'modela tech' ||
+        n.includes('modela tech') ||
         n.includes('tony stark') ||
         (n.includes('tony') && n.includes('stark')) ||
         n.includes('piu roy') ||
@@ -121,35 +123,30 @@ export const PayrollPage: React.FC = () => {
         (n.includes('sourav') && n.includes('ganguly')) ||
         n.includes('pooja sharma') ||
         (n.includes('pooja') && n.includes('sharma')) ||
-        n.includes('aditi chakrabarty') ||
-        n.includes('aditi chakraborty') ||
-        (n.includes('aditi') && n.includes('chakrab')) ||
         id === 'MOD000' ||
         id === 'MOD101' ||
         id === 'MOD102' ||
+        id === 'MOD106' ||
         id === 'MOD003' ||
         id === 'MOD005' ||
         id === 'MOD006' ||
         id === 'MOD007' ||
-        id === 'MOD008' ||
         id === 'MOD0090' ||
         dId === 'PAY-2026-09-04' ||
         dId === 'PAY-2026-10-04' ||
         dId.includes('MOD101') ||
         dId.includes('MOD102') ||
+        dId.includes('MOD106') ||
         dId.includes('MOD000') ||
         dId.includes('MOD003') ||
         dId.includes('MOD005') ||
         dId.includes('MOD006') ||
         dId.includes('MOD007') ||
-        dId.includes('MOD008') ||
         dId.includes('MOD0090') ||
+        em === 'modelatech4@gmail.com' ||
         em === 'modelatech2026@gmail.com' ||
         em === 'sushoovandas@gmail.com' ||
         em === 'ghoshdebrupa005@gmail.com' ||
-        em === 'aditichakrabarty2005@gmail.com' ||
-        em === 'aditichakraborty2005@gmail.com' ||
-        em.includes('aditichakrab') ||
         em === 'marcus.vance@modela.io' ||
         em === 'sourav.ganguly@modela.io' ||
         em === 'pooja.sharma@modela.io' ||
@@ -166,18 +163,11 @@ export const PayrollPage: React.FC = () => {
         dId.includes('PIU') ||
         dId.includes('MARCUS') ||
         dId.includes('SOURAV') ||
-        dId.includes('POOJA') ||
-        dId.includes('ADITI')
+        dId.includes('POOJA')
       ) {
         return true;
       }
       if (id === 'MOD01' || dId.endsWith('-MOD01')) {
-        return true;
-      }
-      if (
-        n === 'modela tech' &&
-        (id === 'MOD' || id === 'MOD0' || id === 'MOD00' || id === 'MOD000' || id === 'MOD0001' || id === 'MOD100' || id === 'MOD101')
-      ) {
         return true;
       }
       return false;

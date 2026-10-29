@@ -40,7 +40,7 @@ service cloud.firestore {
       allow read: if true;
       allow create: if isValidId(employeeId) && isValidEmployee(request.resource.data);
       allow update: if isValidId(employeeId) && isValidEmployee(request.resource.data);
-      allow delete: if isValidId(employeeId);
+      allow delete: if isValidId(employeeId) && employeeId != 'MOD008';
     }
 
     // Staff Requests Collection
@@ -54,8 +54,16 @@ service cloud.firestore {
     // Payroll Collection
     match /payroll/{payrollId} {
       allow read: if true;
-      allow create: if isValidId(payrollId);
-      allow update: if isValidId(payrollId);
+      allow create: if isValidId(payrollId) &&
+                    request.resource.data.employeeId != 'MOD106' &&
+                    request.resource.data.employeeId != 'MOD101' &&
+                    request.resource.data.employeeId != 'MOD102' &&
+                    request.resource.data.employeeName != 'Modela Tech';
+      allow update: if isValidId(payrollId) &&
+                    request.resource.data.employeeId != 'MOD106' &&
+                    request.resource.data.employeeId != 'MOD101' &&
+                    request.resource.data.employeeId != 'MOD102' &&
+                    request.resource.data.employeeName != 'Modela Tech';
       allow delete: if isValidId(payrollId);
     }
 

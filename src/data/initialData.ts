@@ -17,6 +17,21 @@ export const INITIAL_USERS: User[] = [
     reviewedBy: "System Root"
   },
   {
+    id: "USR-ADITI-008",
+    uid: "USR-ADITI-008",
+    name: "Aditi Chakrabarty",
+    email: "aditichakraborty2005@gmail.com",
+    avatar_url: "https://ui-avatars.com/api/?name=Aditi+Chakrabarty&background=0284c7&color=fff",
+    status: "APPROVED",
+    role: "EMPLOYEE",
+    employeeId: "MOD008",
+    designation: "Staff Candidate",
+    department: "General Staff",
+    requestedAt: "2026-10-29T05:00:00.000Z",
+    reviewedAt: "2026-10-29T05:05:00.000Z",
+    reviewedBy: "System Root"
+  },
+  {
     id: "USR-SURUPA-011",
     uid: "USR-SURUPA-011",
     name: "Debrupa Ghosh",
@@ -49,6 +64,20 @@ export const INITIAL_EMPLOYEES: Employee[] = [
     pan: "DASSV1989K",
     bankAccount: "815801500111",
     avatar: "https://ui-avatars.com/api/?name=Sushoovan+Das&background=3b82f6&color=fff"
+  },
+  {
+    id: "MOD008",
+    firstName: "Aditi",
+    lastName: "Chakrabarty",
+    email: "aditichakraborty2005@gmail.com",
+    joiningDate: "2026-10-29",
+    designation: "Staff Candidate",
+    phone: "",
+    department: "General Staff",
+    status: "ACTIVE",
+    location: "San Francisco HQ",
+    compensation: { basic: 50000, allowances: 15000 },
+    avatar: "https://ui-avatars.com/api/?name=Aditi+Chakrabarty&background=0284c7&color=fff"
   },
   {
     id: "MOD011",
