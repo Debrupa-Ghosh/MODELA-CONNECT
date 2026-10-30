@@ -9,7 +9,8 @@ import {
   AuditLog,
   OnboardingCandidate,
   RequestStatus,
-  User
+  User,
+  canUserApproveRequest
 } from '../types';
 import {
   INITIAL_USERS,
@@ -2136,6 +2137,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateStaffRequestStatus = async (id: string, status: RequestStatus, remarks?: string): Promise<boolean> => {
+    if (!canUserApproveRequest(currentUser?.role)) {
+      showToast('Permission Denied', 'Only HR, Super Admin, or Director can accept or reject requests.', 'error');
+      return false;
+    }
     const reviewer = currentUser?.name || currentUser?.email || 'Executive Admin';
     const now = new Date().toISOString();
 

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
-import { User, UserRole, getRoleLabel, USER_ROLES } from '../types';
+import { User, UserRole, getRoleLabel, USER_ROLES, canUserApproveRequest } from '../types';
 import {
   Users,
   Search,
@@ -17,24 +17,17 @@ import {
 } from 'lucide-react';
 
 export const UserManagementPage: React.FC = () => {
-  const { pendingUsers, approvedUsers, approveUserRequest, rejectUserRequest, updateUserRole, deleteUser, refreshUsers, updateUserEmployeeId, isSuperAdmin, isDirector, hasFullAccess } = useAuth();
+  const { currentUser, pendingUsers, approvedUsers, approveUserRequest, rejectUserRequest, updateUserRole, deleteUser, refreshUsers, updateUserEmployeeId, isSuperAdmin, isDirector, hasFullAccess } = useAuth();
   const { showToast, deleteEmployee, updateEmployee } = useApp();
+  const canApproveRequests = canUserApproveRequest(currentUser?.role);
 
-  const [activeTab, setActiveTab] = useState<'SIGNUP_QUEUE' | 'APPROVED_USERS'>(
-    isDirector ? 'APPROVED_USERS' : 'SIGNUP_QUEUE'
-  );
+  const [activeTab, setActiveTab] = useState<'SIGNUP_QUEUE' | 'APPROVED_USERS'>('SIGNUP_QUEUE');
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const [editingEmpIdUserId, setEditingEmpIdUserId] = useState<string | null>(null);
   const [editEmpIdVal, setEditEmpIdVal] = useState('');
   const [isSavingEmpId, setIsSavingEmpId] = useState(false);
-
-  React.useEffect(() => {
-    if (isDirector && activeTab !== 'APPROVED_USERS') {
-      setActiveTab('APPROVED_USERS');
-    }
-  }, [isDirector, activeTab]);
 
   // Real-time auto-sync when viewing Identity Sign-Up Requests or returning to the tab
   React.useEffect(() => {
@@ -63,6 +56,10 @@ export const UserManagementPage: React.FC = () => {
 
   // Automatically assign Employee role on approval and add to Employees page
   const handleApproveUser = async (userId: string, targetIdentifier: string) => {
+    if (!canApproveRequests) {
+      showToast('Permission Denied', 'Only HR, Super Admin, or Director can accept or reject requests.', 'error');
+      return;
+    }
     await approveUserRequest(userId, 'EMPLOYEE');
     showToast(
       'Request Accepted as Employee',
@@ -80,6 +77,10 @@ export const UserManagementPage: React.FC = () => {
   };
 
   const handleRejectUser = async (userId: string, targetIdentifier: string) => {
+    if (!canApproveRequests) {
+      showToast('Permission Denied', 'Only HR, Super Admin, or Director can accept or reject requests.', 'error');
+      return;
+    }
     await rejectUserRequest(userId, 'Administrative security policy rejection');
     showToast('Request Rejected', `Signup request for ${targetIdentifier} was rejected.`, 'info');
   };
@@ -159,7 +160,7 @@ export const UserManagementPage: React.FC = () => {
     (u.department && u.department.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  const currentTab = isDirector ? 'APPROVED_USERS' : activeTab;
+  const currentTab = activeTab;
 
   return (
     <div className="space-y-6 max-w-[1550px] mx-auto antialiased font-sans text-white">
@@ -171,16 +172,12 @@ export const UserManagementPage: React.FC = () => {
             <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-white">
               User Management &amp; Access Control
             </h1>
-            {!isDirector && (
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#2A1B02] border border-[#B45309]/80 text-[#FBBF24]">
-                {pendingUsers.length} Pending
-              </span>
-            )}
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#2A1B02] border border-[#B45309]/80 text-[#FBBF24]">
+              {pendingUsers.length} Pending
+            </span>
           </div>
           <p className="text-xs text-slate-400">
-            {isDirector
-              ? 'Approved users directory and enterprise RBAC access permissions.'
-              : 'Identity verification queue, mail ID access authorizations, and enterprise RBAC access permissions.'}
+            Identity verification queue, mail ID access authorizations, and enterprise RBAC access permissions.
           </p>
         </div>
 
@@ -224,24 +221,22 @@ export const UserManagementPage: React.FC = () => {
 
       {/* 3. Sub-Tabs Bar: Identity Sign-Up Requests and Approved Users Directory (Dark Navy Box) */}
       <div className="bg-[#0B1528] border border-[#1E293B] rounded-2xl p-1.5 flex items-center gap-1.5 overflow-x-auto shadow-sm text-xs">
-        {!isDirector && (
-          <button
-            onClick={() => setActiveTab('SIGNUP_QUEUE')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all cursor-pointer whitespace-nowrap ${
-              currentTab === 'SIGNUP_QUEUE'
-                ? 'bg-[#2563EB] text-white shadow-md'
-                : 'text-slate-300 hover:text-white hover:bg-[#131E36]'
-            }`}
-          >
-            <Mail className="w-4 h-4 text-amber-400" />
-            <span>Identity Sign-Up Requests</span>
-            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-              currentTab === 'SIGNUP_QUEUE' ? 'bg-[#1D4ED8] text-white' : 'bg-slate-800 text-slate-300'
-            }`}>
-              {pendingUsers.length}
-            </span>
-          </button>
-        )}
+        <button
+          onClick={() => setActiveTab('SIGNUP_QUEUE')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all cursor-pointer whitespace-nowrap ${
+            currentTab === 'SIGNUP_QUEUE'
+              ? 'bg-[#2563EB] text-white shadow-md'
+              : 'text-slate-300 hover:text-white hover:bg-[#131E36]'
+          }`}
+        >
+          <Mail className="w-4 h-4 text-amber-400" />
+          <span>Identity Sign-Up Requests</span>
+          <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+            currentTab === 'SIGNUP_QUEUE' ? 'bg-[#1D4ED8] text-white' : 'bg-slate-800 text-slate-300'
+          }`}>
+            {pendingUsers.length}
+          </span>
+        </button>
 
         <button
           onClick={() => setActiveTab('APPROVED_USERS')}
@@ -261,8 +256,8 @@ export const UserManagementPage: React.FC = () => {
         </button>
       </div>
 
-      {/* 4. TAB 1: Identity Sign-Up Requests Queue (Hidden for Director role) */}
-      {!isDirector && currentTab === 'SIGNUP_QUEUE' && (
+      {/* 4. TAB 1: Identity Sign-Up Requests Queue */}
+      {currentTab === 'SIGNUP_QUEUE' && (
         <div className="space-y-5">
           {/* Identity Verification Queue Orange Notice Box */}
           <div className="p-4 rounded-2xl bg-[#261503]/85 border border-amber-800/80 text-xs text-amber-200 flex items-start gap-3 shadow-lg">
@@ -340,20 +335,28 @@ export const UserManagementPage: React.FC = () => {
 
                     {/* Bottom Actions: Reject and Accept Request */}
                     <div className="pt-2 border-t border-[#1E293B] flex items-center justify-end gap-2.5">
-                      <button
-                        onClick={() => handleRejectUser(u.id, u.name || u.email)}
-                        className="px-4 py-2 bg-transparent hover:bg-rose-950/40 text-rose-400 border border-rose-900/60 rounded-xl text-xs font-bold transition-colors cursor-pointer"
-                      >
-                        Reject
-                      </button>
+                      {canApproveRequests ? (
+                        <>
+                          <button
+                            onClick={() => handleRejectUser(u.id, u.name || u.email)}
+                            className="px-4 py-2 bg-transparent hover:bg-rose-950/40 text-rose-400 border border-rose-900/60 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                          >
+                            Reject
+                          </button>
 
-                      <button
-                        onClick={() => handleApproveUser(u.id, u.name || u.email)}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#16A34A] hover:bg-[#15803D] text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-950/40 transition-all cursor-pointer"
-                      >
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>Accept Request</span>
-                      </button>
+                          <button
+                            onClick={() => handleApproveUser(u.id, u.name || u.email)}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#16A34A] hover:bg-[#15803D] text-white rounded-xl text-xs font-bold shadow-md shadow-emerald-950/40 transition-all cursor-pointer"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Accept Request</span>
+                          </button>
+                        </>
+                      ) : (
+                        <span className="text-[11px] font-medium text-amber-400/90 bg-[#2A1B02] border border-[#B45309]/60 px-2.5 py-1 rounded-lg">
+                          View Only • HR, Super Admin, or Director Approval Required
+                        </span>
+                      )}
                     </div>
                   </div>
                 );

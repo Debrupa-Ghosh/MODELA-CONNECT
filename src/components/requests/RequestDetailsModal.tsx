@@ -356,11 +356,7 @@ export const RequestDetailsModal: React.FC = () => {
                   </>
                 ) : (
                   <div className="text-xs text-amber-400 bg-amber-950/40 border border-amber-800/80 px-3 py-1.5 rounded-xl font-medium">
-                    {isBucketHolidayRequest(req.type, req)
-                      ? 'View Only • Only Super Admin or HR can approve Bucket Holiday Requests'
-                      : req.type === 'LEAVE'
-                      ? 'View Only • Only Manager can approve Leave Requests'
-                      : 'View Only • Administrative Approval Required'}
+                    View Only • Only HR, Super Admin, or Director can approve or reject requests
                   </div>
                 )}
               </>

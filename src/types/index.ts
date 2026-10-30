@@ -11,7 +11,7 @@ export const USER_ROLES: { role: UserRole; label: string; description: string }[
   { role: 'SUPER_ADMIN', label: 'Super Admin', description: 'Full access to all systems, settings, and administration.' },
   { role: 'DIRECTOR', label: 'Director', description: 'Full administrative access across all organizational enclaves.' },
   { role: 'HR', label: 'HR', description: 'Full access to human resources, workforce, and payroll management.' },
-  { role: 'MANAGER', label: 'Manager', description: 'Full management access and approval authority for Leave Requests.' },
+  { role: 'MANAGER', label: 'Manager', description: 'Full management access across organizational enclaves.' },
   { role: 'EMPLOYEE', label: 'Employee', description: 'Limited self-service access to dashboard and personal requests.' },
 ];
 
@@ -75,36 +75,16 @@ export function isBucketHolidayRequest(
 
 /**
  * Requirement:
- * - Bucket Holiday Request can be approved by Super Admin or HR only.
- * - Other Leave Requests can be approved by Manager (viewed by HR, Super Admin, Director).
+ * - Every request can be only accepted or rejected by HR or Super Admin or Director.
  */
 export function canUserApproveRequest(
   role?: UserRole | string | null,
-  requestType?: StaffRequestType | string,
-  req?: Partial<StaffWorkflowRequest> | null
+  _requestType?: StaffRequestType | string,
+  _req?: Partial<StaffWorkflowRequest> | null
 ): boolean {
   if (!role) return false;
   const norm = normalizeRole(role);
-
-  if (isBucketHolidayRequest(requestType, req)) {
-    return norm === 'SUPER_ADMIN' || norm === 'HR';
-  }
-
-  const isLeave = (requestType || '').toUpperCase() === 'LEAVE';
-
-  // Manager can ONLY approve Leave Requests (except Bucket Holiday which is Super Admin / HR only)
-  if (norm === 'MANAGER') {
-    return isLeave;
-  }
-
-  // Super Admin, Director, HR can view regular Leave Requests, but CANNOT approve them (only Manager can approve regular Leave Requests).
-  // They can approve all other request types (Expense, Equipment, Shift, Travel, Training, etc.).
-  if (norm === 'SUPER_ADMIN' || norm === 'DIRECTOR' || norm === 'HR') {
-    return !isLeave;
-  }
-
-  // Employees have limited self-service access and cannot approve requests
-  return false;
+  return norm === 'SUPER_ADMIN' || norm === 'DIRECTOR' || norm === 'HR';
 }
 
 export type UserStatus = 'APPROVED' | 'PENDING' | 'REJECTED';

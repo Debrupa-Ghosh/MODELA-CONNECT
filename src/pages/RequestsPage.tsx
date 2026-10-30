@@ -324,11 +324,7 @@ export const RequestsPage: React.FC = () => {
                       </>
                     ) : (
                       <span className="text-[11px] font-medium text-amber-400/90 bg-[#2A1B02] border border-[#B45309]/60 px-2.5 py-1 rounded-lg">
-                        {isBucketHolidayRequest(req.type, req)
-                          ? 'View Only • Super Admin or HR Approval Required'
-                          : req.type === 'LEAVE'
-                          ? 'View Only • Manager Approval Required'
-                          : 'View Only • Admin Approval Required'}
+                        View Only • HR, Super Admin, or Director Approval Required
                       </span>
                     )}
                   </div>
