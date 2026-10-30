@@ -81,8 +81,8 @@ export const DashboardPage: React.FC = () => {
           </div>
         </div>
 
-        {/* 4 KPI Metric Cards (Matches Image 1 Exactly) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* 3 KPI Metric Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Card 1: Workplace Identity Status */}
           <div
             className="p-5 bg-[#080E1C] rounded-2xl border border-[#1E293B] shadow-sm"
@@ -119,24 +119,6 @@ export const DashboardPage: React.FC = () => {
             </div>
             <div className="mt-2 text-xs text-slate-400 font-medium">
               {myRequests.length} total requests filed
-            </div>
-          </div>
-
-          {/* Card 3: My Estimated Net Pay */}
-          <div className="p-5 bg-[#080E1C] rounded-2xl border border-[#1E293B] shadow-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-slate-400">My Estimated Net Pay</span>
-              <div className="w-8 h-8 rounded-xl bg-blue-950 text-blue-400 flex items-center justify-center">
-                <CreditCard className="w-4 h-4" />
-              </div>
-            </div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="text-2xl font-black text-white">Rs. 90,200</span>
-              <span className="text-xs text-slate-400 font-mono">/mo</span>
-            </div>
-            <div className="mt-2 text-xs text-[#38BDF8] flex items-center gap-1.5 font-medium">
-              <CheckCircle2 className="w-3.5 h-3.5 text-sky-400" />
-              <span>Direct deposit active</span>
             </div>
           </div>
 
