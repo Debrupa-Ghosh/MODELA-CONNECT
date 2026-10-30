@@ -73,6 +73,10 @@ export const PayrollPage: React.FC = () => {
   const [editingLopId, setEditingLopId] = useState<string | null>(null);
   const [lopInputVal, setLopInputVal] = useState<string>('0');
 
+  // Inline OT editing state
+  const [editingOtId, setEditingOtId] = useState<string | null>(null);
+  const [otInputVal, setOtInputVal] = useState<string>('0');
+
   // Build unified payroll ledger for the selected cycle (combining stored records and active employees)
   const cycleRecords = useMemo(() => {
     const list: PayrollRecord[] = [];
@@ -256,6 +260,7 @@ export const PayrollPage: React.FC = () => {
           disbursedBy: defaultCycleStatus === 'PAID' ? 'System Master Disburser' : '',
           lopDays: 0,
           lopAmount: 0,
+          otAmount: 0,
           allowanceBreakdown: { hra, medical, special, internet },
           deductionBreakdown: { professionalTax: pt, pfContribution: pf, groupHealthInsurance: health, lop: 0 }
         });
@@ -309,6 +314,7 @@ export const PayrollPage: React.FC = () => {
           disbursedBy: defaultCycleStatus === 'PAID' ? 'System Master Disburser' : '',
           lopDays: 0,
           lopAmount: 0,
+          otAmount: 0,
           allowanceBreakdown: { hra, medical, special, internet },
           deductionBreakdown: { professionalTax: pt, pfContribution: pf, groupHealthInsurance: health, lop: 0 }
         });
@@ -376,6 +382,31 @@ export const PayrollPage: React.FC = () => {
     await updatePayrollRecord(p.id, { lopDays: parsedDays }, p);
     setEditingLopId(null);
     showToast('LOP Updated', `Recalculated deductions & net compensation for ${p.employeeName} (${parsedDays} LOP days).`);
+  };
+
+  const handleStartEditOt = (p: PayrollRecord, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!canEditPayroll) return;
+    if (p.status === 'PAID') {
+      showToast('OT Locked', 'OT cannot be edited after status is PAID.', 'error');
+      return;
+    }
+    setEditingOtId(p.id);
+    setOtInputVal(String(p.otAmount || 0));
+  };
+
+  const handleSaveOt = async (p: PayrollRecord, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (p.status === 'PAID') {
+      showToast('OT Locked', 'OT cannot be edited after status is PAID.', 'error');
+      setEditingOtId(null);
+      return;
+    }
+    const rawVal = parseFloat(otInputVal);
+    const parsedOt = isNaN(rawVal) ? 0 : Math.max(0, parseFloat(rawVal.toFixed(2)));
+    await updatePayrollRecord(p.id, { otAmount: parsedOt }, p);
+    setEditingOtId(null);
+    showToast('OT Updated', `Saved OT of ₹${parsedOt.toLocaleString()} for ${p.employeeName}.`);
   };
 
   const handleToggleStatus = async (p: PayrollRecord, e: React.MouseEvent) => {
@@ -519,6 +550,12 @@ export const PayrollPage: React.FC = () => {
                     {canEditPayroll && <Edit3 className="w-3 h-3 text-amber-400" />}
                   </span>
                 </th>
+                <th className="py-3.5 px-4">
+                  <span className="flex items-center gap-1">
+                    OT (Rs.)
+                    {canEditPayroll && <Edit3 className="w-3 h-3 text-emerald-400" />}
+                  </span>
+                </th>
                 <th className="py-3.5 px-4">Status</th>
                 {/* Payslip column ONLY visible if there are PAID records */}
                 {hasPaidRecords && (
@@ -530,7 +567,7 @@ export const PayrollPage: React.FC = () => {
               {filteredRecords.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={hasPaidRecords ? 10 : 9}
+                    colSpan={hasPaidRecords ? 11 : 10}
                     className="py-12 text-center text-slate-400"
                   >
                     No payroll entries found for {selectedMonth} {selectedYear} ({statusFilter}).
@@ -540,6 +577,7 @@ export const PayrollPage: React.FC = () => {
                 filteredRecords.map(p => {
                   const isPaid = p.status === 'PAID';
                   const lopDaysVal = p.lopDays || 0;
+                  const otAmountVal = p.otAmount || 0;
 
                   return (
                     <tr
@@ -659,6 +697,69 @@ export const PayrollPage: React.FC = () => {
                                   title="Edit LOP Days (HR Manager & Super Admin clearance)"
                                 >
                                   <Edit3 className="w-3 h-3 text-amber-400" />
+                                </button>
+                              )
+                            )}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* OT (Editable in Rs., locked once status is PAID) */}
+                      <td className="py-3.5 px-4">
+                        {editingOtId === p.id ? (
+                          <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                            <input
+                              type="number"
+                              min="0"
+                              step="any"
+                              value={otInputVal}
+                              onChange={e => setOtInputVal(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  handleSaveOt(p, e as any);
+                                } else if (e.key === 'Escape') {
+                                  setEditingOtId(null);
+                                }
+                              }}
+                              className="w-20 px-1.5 py-1 bg-[#060B18] border border-blue-500 rounded text-center text-white font-mono text-xs focus:outline-none"
+                              autoFocus
+                            />
+                            <button
+                              onClick={e => handleSaveOt(p, e)}
+                              className="p-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded cursor-pointer"
+                              title="Save OT"
+                            >
+                              <Check className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => setEditingOtId(null)}
+                              className="p-1 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded cursor-pointer"
+                              title="Cancel"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono text-xs font-semibold text-emerald-400">
+                              ₹{otAmountVal.toLocaleString()}
+                            </span>
+                            {canEditPayroll && (
+                              isPaid ? (
+                                <span
+                                  className="p-1 text-slate-500 cursor-not-allowed inline-flex items-center"
+                                  title="OT locked: Status is PAID"
+                                >
+                                  <Lock className="w-3 h-3 text-slate-500" />
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={e => handleStartEditOt(p, e)}
+                                  className="p-1 hover:bg-[#131E36] rounded text-slate-400 hover:text-white transition-colors cursor-pointer"
+                                  title="Edit OT in Rs."
+                                >
+                                  <Edit3 className="w-3 h-3 text-emerald-400" />
                                 </button>
                               )
                             )}

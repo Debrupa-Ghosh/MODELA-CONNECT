@@ -162,14 +162,15 @@ export function generatePayslipPDF({
   const medical = record.allowanceBreakdown?.medical ?? Math.round(record.allowances * 0.15);
   const special = record.allowanceBreakdown?.special ?? Math.round(record.allowances * 0.35);
   const internet = record.allowanceBreakdown?.internet ?? Math.max(0, record.allowances - (hra + medical + special));
-  const grossSalary = record.grossSalary || (basicAmt + record.allowances);
+  const otAmount = Number(record.otAmount) || 0;
+  const grossSalary = basicAmt + record.allowances + otAmount;
 
   const pt = record.deductionBreakdown?.professionalTax ?? 200;
   const pf = record.deductionBreakdown?.pfContribution ?? 1800;
   const healthInsurance = record.deductionBreakdown?.groupHealthInsurance ?? 1700;
   const standardDed = pt + pf + healthInsurance;
 
-  const baseNet = grossSalary - standardDed;
+  const baseNet = (basicAmt + record.allowances) - standardDed;
   const lopAmount = record.lopAmount !== undefined ? record.lopAmount : +((baseNet / 30) * lopDays).toFixed(2);
   const totalDeductions = record.deductions || (standardDed + lopAmount);
   const netPayable = +(grossSalary - totalDeductions).toFixed(2);
@@ -183,7 +184,8 @@ export function generatePayslipPDF({
     ['House Rent Allowance (HRA)', formatCurr(hra), 'Employee PF Contribution', formatCurr(pf)],
     ['Medical Allowance', formatCurr(medical), 'Group Health Insurance', formatCurr(healthInsurance)],
     ['Special Allowance', formatCurr(special), 'LOP', formatCurr(lopAmount)],
-    ['Internet Allowance', formatCurr(internet), '', '']
+    ['Internet Allowance', formatCurr(internet), '', ''],
+    ['OT', formatCurr(otAmount), '', '']
   ];
 
   lineItems.forEach((item, idx) => {

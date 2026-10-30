@@ -50,21 +50,54 @@ export function hasFullAccessRole(role?: UserRole | string | null): boolean {
   return norm === 'SUPER_ADMIN' || norm === 'DIRECTOR' || norm === 'HR' || norm === 'MANAGER';
 }
 
+export function isBucketHolidayRequest(
+  requestType?: StaffRequestType | string | null,
+  req?: Partial<StaffWorkflowRequest> | null
+): boolean {
+  const subType = String(req?.subType || '').trim().toLowerCase();
+  const rawType = String(requestType || req?.type || '').trim().toLowerCase();
+  const desc = String(req?.description || '').trim().toLowerCase();
+  const title = String(req?.title || '').trim().toLowerCase();
+  const reqDate = String(req?.requestDate || req?.amountOrDays || '').trim();
+
+  if (subType === 'bucket holiday' || rawType === 'bucket holiday') return true;
+  if (desc.includes('bucket holiday') || title.includes('bucket holiday')) return true;
+  if (
+    rawType === 'leave' &&
+    !req?.startDate &&
+    !req?.endDate &&
+    (reqDate === '11/11/2026' || reqDate === '24/11/2026')
+  ) {
+    return true;
+  }
+  return false;
+}
+
 /**
- * Requirement 2:
- * Only Leave Request can be approved by Manager but the request can be viewed by HR,Super Admin,Director.
+ * Requirement:
+ * - Bucket Holiday Request can be approved by Super Admin or HR only.
+ * - Other Leave Requests can be approved by Manager (viewed by HR, Super Admin, Director).
  */
-export function canUserApproveRequest(role?: UserRole | string | null, requestType?: StaffRequestType | string): boolean {
+export function canUserApproveRequest(
+  role?: UserRole | string | null,
+  requestType?: StaffRequestType | string,
+  req?: Partial<StaffWorkflowRequest> | null
+): boolean {
   if (!role) return false;
   const norm = normalizeRole(role);
+
+  if (isBucketHolidayRequest(requestType, req)) {
+    return norm === 'SUPER_ADMIN' || norm === 'HR';
+  }
+
   const isLeave = (requestType || '').toUpperCase() === 'LEAVE';
 
-  // Manager can ONLY approve Leave Requests
+  // Manager can ONLY approve Leave Requests (except Bucket Holiday which is Super Admin / HR only)
   if (norm === 'MANAGER') {
     return isLeave;
   }
 
-  // Super Admin, Director, HR can view Leave Requests, but CANNOT approve them (only Manager can approve Leave Requests).
+  // Super Admin, Director, HR can view regular Leave Requests, but CANNOT approve them (only Manager can approve regular Leave Requests).
   // They can approve all other request types (Expense, Equipment, Shift, Travel, Training, etc.).
   if (norm === 'SUPER_ADMIN' || norm === 'DIRECTOR' || norm === 'HR') {
     return !isLeave;
@@ -119,6 +152,7 @@ export interface StaffWorkflowRequest {
   department: string;
   designation: string;
   type: StaffRequestType;
+  subType?: string;
   title: string;
   description: string;
   amountOrDays: string;
@@ -152,6 +186,13 @@ export interface EmployeeDeductions {
   groupHealthInsurance: number;
 }
 
+export interface EmployeeLeaves {
+  sickLeave: number;
+  privilegeLeave: number;
+  maternityLeave: number;
+  paternityLeave: number;
+}
+
 export interface Employee {
   id: string;
   firstName: string;
@@ -172,6 +213,11 @@ export interface Employee {
     grossSalary?: number;
     netCompensation?: number;
   };
+  leaves?: EmployeeLeaves;
+  sickLeave?: number;
+  privilegeLeave?: number;
+  maternityLeave?: number;
+  paternityLeave?: number;
   pan?: string;
   uan?: string;
   bankAccount?: string;
@@ -218,6 +264,7 @@ export interface PayrollRecord {
   disbursedBy?: string;
   lopDays?: number;
   lopAmount?: number;
+  otAmount?: number;
   allowanceBreakdown?: EmployeeAllowances;
   deductionBreakdown?: EmployeeDeductions & { lop?: number };
   pan?: string;

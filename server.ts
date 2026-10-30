@@ -100,7 +100,35 @@ const PROTECTED_ACTIVE_KEYS = new Set([
 ]);
 
 let users: ServerUser[] = [...DEFAULT_SERVER_USERS];
-let serverDeletedIds = new Set<string>(PERMANENTLY_DELETED_REQUEST_KEYS);
+let serverDeletedIds = new Set<string>([
+  ...PERMANENTLY_DELETED_REQUEST_KEYS,
+  'req-3779',
+  'req-9074',
+  'req-2709',
+  'req-6425'
+]);
+let persistedEmployees: any[] = [];
+let persistedPayroll: any[] = [];
+let persistedRequests: any[] = [];
+
+const isExcludedServerStaffRequest = (r: any): boolean => {
+  if (!r) return true;
+  const reqId = String(r.id || '').trim().toUpperCase();
+  const empId = String(r.employeeId || '').trim().toUpperCase();
+  const empName = String(r.employeeName || '').trim().toLowerCase();
+  const reqTitle = String(r.title || '').trim().toLowerCase();
+  if (
+    reqId === 'REQ-2709' ||
+    reqId === 'REQ-6425' ||
+    reqId === 'REQ-3779' ||
+    reqId === 'REQ-9074' ||
+    ((empId === 'MOD106' || empName === 'modela tech') && (reqTitle === 'bhaifota' || reqTitle === 'laptop')) ||
+    ((empId === 'MOD011' || empName === 'debrupa ghosh') && (reqTitle === 'laptop needed' || reqTitle === 'device needed'))
+  ) {
+    return true;
+  }
+  return false;
+};
 
 try {
   if (fs.existsSync(STATE_FILE_PATH)) {
@@ -127,20 +155,17 @@ try {
         }
       });
     }
+    if (Array.isArray(parsed.employees)) {
+      persistedEmployees = parsed.employees;
+    }
+    if (Array.isArray(parsed.payroll)) {
+      persistedPayroll = parsed.payroll;
+    }
+    if (Array.isArray(parsed.staffRequests)) {
+      persistedRequests = parsed.staffRequests.filter((r: any) => !isExcludedServerStaffRequest(r));
+    }
   }
 } catch {}
-
-const saveServerState = () => {
-  try {
-    fs.writeFileSync(
-      STATE_FILE_PATH,
-      JSON.stringify({ users, deletedIds: Array.from(serverDeletedIds) }, null, 2),
-      'utf-8'
-    );
-  } catch {}
-};
-
-saveServerState();
 
 let employees = [
   {
@@ -228,7 +253,44 @@ interface ServerStaffRequest {
   remarks?: string;
 }
 
-let staffRequests: ServerStaffRequest[] = [];
+let staffRequests: ServerStaffRequest[] = [...persistedRequests];
+let payrollRecords: any[] = [...persistedPayroll];
+
+if (persistedEmployees.length > 0) {
+  persistedEmployees.forEach(pe => {
+    if (!pe || !pe.id) return;
+    const idx = employees.findIndex(
+      e => e.id.toUpperCase() === String(pe.id).toUpperCase() || (pe.email && e.email?.toLowerCase() === String(pe.email).toLowerCase())
+    );
+    if (idx >= 0) {
+      employees[idx] = { ...employees[idx], ...pe };
+    } else {
+      employees.push(pe);
+    }
+  });
+}
+
+const saveServerState = () => {
+  try {
+    fs.writeFileSync(
+      STATE_FILE_PATH,
+      JSON.stringify(
+        {
+          users,
+          deletedIds: Array.from(serverDeletedIds),
+          employees,
+          payroll: payrollRecords,
+          staffRequests: staffRequests.filter(r => !isExcludedServerStaffRequest(r))
+        },
+        null,
+        2
+      ),
+      'utf-8'
+    );
+  } catch {}
+};
+
+saveServerState();
 
 const sseClients = new Set<Response>();
 
@@ -424,7 +486,21 @@ app.get('/api/employees', (req: Request, res: Response) => {
 
 app.post('/api/employees', (req: Request, res: Response) => {
   const newEmp = req.body;
-  employees.unshift(newEmp);
+  if (!newEmp || !newEmp.id) {
+    return res.status(400).json({ success: false, message: 'Invalid employee payload' });
+  }
+  const idx = employees.findIndex(
+    e =>
+      e.id.toUpperCase() === String(newEmp.id).toUpperCase() ||
+      (newEmp.email && e.email?.toLowerCase() === String(newEmp.email).toLowerCase())
+  );
+  if (idx >= 0) {
+    employees[idx] = { ...employees[idx], ...newEmp };
+  } else {
+    employees.unshift(newEmp);
+  }
+  saveServerState();
+  reconcileFirestoreDatabase();
   res.json({ success: true, employee: newEmp });
 });
 
@@ -444,13 +520,35 @@ app.post('/api/employees/update-id', (req: Request, res: Response) => {
       ? { ...u, employeeId: newId }
       : u
   );
+  saveServerState();
   res.json({ success: true });
 });
 
 app.delete('/api/employees/:id', (req: Request, res: Response) => {
   const { id } = req.params;
   employees = employees.filter(e => e.id !== id);
+  saveServerState();
   res.json({ success: true, message: `Employee ${id} deleted` });
+});
+
+app.get('/api/payroll', (_req: Request, res: Response) => {
+  res.json({ success: true, payroll: payrollRecords });
+});
+
+app.post('/api/payroll', (req: Request, res: Response) => {
+  const rec = req.body;
+  if (!rec || !rec.id) {
+    return res.status(400).json({ success: false, message: 'Invalid payroll record' });
+  }
+  const idx = payrollRecords.findIndex(p => p.id === rec.id);
+  if (idx >= 0) {
+    payrollRecords[idx] = { ...payrollRecords[idx], ...rec };
+  } else {
+    payrollRecords.unshift(rec);
+  }
+  saveServerState();
+  reconcileFirestoreDatabase();
+  res.json({ success: true, record: rec });
 });
 
 app.get('/api/audit-logs', (req: Request, res: Response) => {
@@ -459,6 +557,7 @@ app.get('/api/audit-logs', (req: Request, res: Response) => {
 
 // Staff workflow requests endpoints
 app.get('/api/requests', (req: Request, res: Response) => {
+  staffRequests = staffRequests.filter(r => !isExcludedServerStaffRequest(r));
   res.json({ success: true, requests: staffRequests });
 });
 
@@ -467,30 +566,38 @@ app.post('/api/requests', (req: Request, res: Response) => {
   if (!newReq || !newReq.title) {
     return res.status(400).json({ success: false, message: 'Invalid request' });
   }
-  staffRequests.unshift(newReq);
+  if (isExcludedServerStaffRequest(newReq)) {
+    return res.json({ success: true, request: newReq });
+  }
+  staffRequests = [newReq, ...staffRequests.filter(r => r.id !== newReq.id && !isExcludedServerStaffRequest(r))];
+  saveServerState();
   res.json({ success: true, request: newReq });
 });
 
 app.post('/api/requests/status', (req: Request, res: Response) => {
   const { id, status, remarks, reviewer } = req.body;
-  staffRequests = staffRequests.map(r => {
-    if (r.id === id) {
-      return {
-        ...r,
-        status,
-        remarks: remarks || r.remarks,
-        reviewedAt: new Date().toISOString(),
-        reviewedBy: reviewer || 'Super Admin'
-      };
-    }
-    return r;
-  });
+  staffRequests = staffRequests
+    .filter(r => !isExcludedServerStaffRequest(r))
+    .map(r => {
+      if (r.id === id) {
+        return {
+          ...r,
+          status,
+          remarks: remarks || r.remarks,
+          reviewedAt: new Date().toISOString(),
+          reviewedBy: reviewer || 'Super Admin'
+        };
+      }
+      return r;
+    });
+  saveServerState();
   res.json({ success: true });
 });
 
 app.delete('/api/requests/:id', (req: Request, res: Response) => {
   const { id } = req.params;
-  staffRequests = staffRequests.filter(r => r.id !== id);
+  staffRequests = staffRequests.filter(r => r.id !== id && !isExcludedServerStaffRequest(r));
+  saveServerState();
   res.json({ success: true, message: `Request ${id} deleted` });
 });
 
@@ -574,10 +681,49 @@ async function reconcileFirestoreDatabase() {
       }
     }
 
+    // 3. Delete REQ-3779, REQ-9074, REQ-2709, and REQ-6425 from Firestore requests collection
+    try {
+      await withWriteTimeout(deleteDoc(doc(db, 'requests', 'REQ-3779')));
+      await withWriteTimeout(deleteDoc(doc(db, 'requests', 'REQ-9074')));
+      await withWriteTimeout(deleteDoc(doc(db, 'requests', 'REQ-2709')));
+      await withWriteTimeout(deleteDoc(doc(db, 'requests', 'REQ-6425')));
+      const reqSnap = await getDocs(collection(db, 'requests'));
+      for (const rDoc of reqSnap.docs) {
+        const rData = rDoc.data();
+        if (isExcludedServerStaffRequest({ ...rData, id: rData.id || rDoc.id })) {
+          await withWriteTimeout(deleteDoc(doc(db, 'requests', rDoc.id)));
+        }
+      }
+    } catch {
+      needsRetry = true;
+    }
+
+    // 4. Sync any updated payroll records (such as OT amounts) to Firestore payroll collection
+    for (const pRec of payrollRecords) {
+      if (!pRec || !pRec.id) continue;
+      try {
+        await withWriteTimeout(setDoc(doc(db, 'payroll', pRec.id), pRec, { merge: true }));
+      } catch {
+        needsRetry = true;
+        break;
+      }
+    }
+
+    // 5. Sync any updated employee records (such as Sick/Privilege/Maternity/Paternity Leave) to Firestore employees collection
+    for (const empRec of employees) {
+      if (!empRec || !empRec.id || !(empRec as any).updatedAt) continue;
+      try {
+        await withWriteTimeout(setDoc(doc(db, 'employees', empRec.id), empRec, { merge: true }));
+      } catch {
+        needsRetry = true;
+        break;
+      }
+    }
+
     if (needsRetry) {
       setTimeout(reconcileFirestoreDatabase, 5 * 60 * 1000);
     } else {
-      console.log('Firestore reconciliation complete: MOD008 added to employees, MOD106 removed from payroll.');
+      console.log('Firestore reconciliation complete.');
     }
   } catch (err) {
     setTimeout(reconcileFirestoreDatabase, 5 * 60 * 1000);

@@ -466,9 +466,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const empId = String(r.employeeId || '').trim().toUpperCase();
     const empEmail = String(r.employeeEmail || '').trim().toLowerCase();
     const empName = String(r.employeeName || '').trim().toLowerCase();
+    const reqTitle = String(r.title || '').trim().toLowerCase();
 
-    // Always exclude mock / seed requests and specifically deleted requests
+    // Always exclude mock / seed requests and specifically deleted requests (including REQ-3779, REQ-9074, REQ-2709, REQ-6425)
     if (
+      reqId === 'REQ-2709' ||
+      reqId === 'REQ-6425' ||
+      reqId === 'REQ-3779' ||
+      reqId === 'REQ-9074' ||
       reqId === 'REQ-622' ||
       reqId === 'REQ-719' ||
       reqId === 'REQ-1042' ||
@@ -478,6 +483,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       reqId === 'REQ-STF-002' ||
       reqId === 'REQ-STF-003' ||
       reqId === 'REQ-STF-004' ||
+      ((empId === 'MOD106' || empName === 'modela tech') && (reqTitle === 'bhaifota' || reqTitle === 'laptop')) ||
+      ((empId === 'MOD011' || empName === 'debrupa ghosh') && (reqTitle === 'laptop needed' || reqTitle === 'device needed')) ||
       empId === 'MOD003' ||
       empId === 'MOD005' ||
       empId === 'MOD006' ||
@@ -665,8 +672,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         finalStatus = 'UNPAID';
       }
 
+      const otAmt = Number(rawP.otAmount) || 0;
+      const baseBasic = Number(rawP.basicSalary) || 0;
+      const baseAllowances = Number(rawP.allowances) || 0;
+      const computedGross = baseBasic + baseAllowances + otAmt;
+      const computedDed = Number(rawP.deductions) || 0;
+      const computedNet = +(computedGross - computedDed).toFixed(2);
+
       let p: PayrollRecord = {
         ...rawP,
+        otAmount: otAmt,
+        grossSalary: computedGross,
+        netSalary: computedNet,
         status: finalStatus,
         paymentDate: finalStatus === 'PAID' ? (rawP.paymentDate || `${rawP.year}-01-01`) : '',
         disbursedBy: finalStatus === 'PAID' ? (rawP.disbursedBy || 'System Master Disburser') : ''
@@ -698,14 +715,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!existing) {
         cyclePersonMap.set(cycleKey, p);
       } else {
+        const pUpdated = String((p as any).updatedAt || '');
+        const exUpdated = String((existing as any).updatedAt || '');
         const isPCanonical = /^PAY-\d{4}-\d{2}-\d{2}$/.test(p.id);
         const isExCanonical = /^PAY-\d{4}-\d{2}-\d{2}$/.test(existing.id);
         const pMatchesResolvedId = p.id.toUpperCase().endsWith(`-${p.employeeId.toUpperCase()}`);
         const exMatchesResolvedId = existing.id.toUpperCase().endsWith(`-${existing.employeeId.toUpperCase()}`);
 
-        if (p.manualStatusOverride && !existing.manualStatusOverride) {
+        if (pUpdated && (!exUpdated || pUpdated > exUpdated)) {
+          cyclePersonMap.set(cycleKey, p);
+        } else if (!exUpdated && p.manualStatusOverride && !existing.manualStatusOverride) {
           cyclePersonMap.set(cycleKey, p);
         } else if (
+          !exUpdated &&
           !existing.manualStatusOverride &&
           ((isPCanonical && !isExCanonical) || (!isExCanonical && pMatchesResolvedId && !exMatchesResolvedId))
         ) {
@@ -987,6 +1009,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
         });
 
+        // 4. Overlay server-synced employee updates (leave balances, compensation, etc.) so real-time updates persist across all browsers
+        try {
+          const empRes = await fetch('/api/employees');
+          if (empRes.ok) {
+            const empJson = await empRes.json();
+            const serverEmps: Employee[] = Array.isArray(empJson?.employees) ? empJson.employees : [];
+            serverEmps.forEach(srvEmp => {
+              if (!srvEmp || !srvEmp.id) return;
+              const cleanEmail = srvEmp.email ? srvEmp.email.toLowerCase().trim() : '';
+              const upperId = srvEmp.id.toUpperCase().trim();
+              if (isRecordDeleted(upperId, cleanEmail)) return;
+              const key = cleanEmail || upperId;
+              const existing = personMap.get(key) || Array.from(personMap.values()).find(item => item.id.toUpperCase() === upperId);
+              const srvUpdatedAt = String((srvEmp as any).updatedAt || '');
+              const exUpdatedAt = existing ? String((existing as any).updatedAt || '') : '';
+              if (existing && srvUpdatedAt && (!exUpdatedAt || srvUpdatedAt >= exUpdatedAt)) {
+                const mapKey = existing.email ? existing.email.toLowerCase().trim() : existing.id.toUpperCase().trim();
+                personMap.set(mapKey, { ...existing, ...srvEmp });
+              }
+            });
+          }
+        } catch {}
+
         const mergedEmployees = Array.from(personMap.values()).filter(
           e => !isRecordDeleted(e.id, e.email, resolveEmpId(e.email, e.id))
         );
@@ -1000,8 +1045,47 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     );
 
+    const pollServerEmployees = async () => {
+      try {
+        const res = await fetch('/api/employees');
+        if (!res.ok) return;
+        const json = await res.json();
+        const serverEmps: Employee[] = Array.isArray(json?.employees) ? json.employees : [];
+        if (serverEmps.length === 0) return;
+        setEmployees(prev => {
+          let changed = false;
+          const next = prev.map(e => {
+            const match = serverEmps.find(
+              se =>
+                se &&
+                ((se.id && se.id.toUpperCase() === e.id.toUpperCase()) ||
+                  (se.email && e.email && se.email.toLowerCase().trim() === e.email.toLowerCase().trim()))
+            );
+            if (!match) return e;
+            const mUpdated = String((match as any).updatedAt || '');
+            const eUpdated = String((e as any).updatedAt || '');
+            if (mUpdated && (!eUpdated || mUpdated > eUpdated)) {
+              changed = true;
+              return { ...e, ...match };
+            }
+            return e;
+          });
+          if (changed) {
+            try {
+              localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(next));
+            } catch {}
+            return next;
+          }
+          return prev;
+        });
+      } catch {}
+    };
+
+    const empPollTimer = setInterval(pollServerEmployees, 4000);
+
     return () => {
       isSubscribed = false;
+      clearInterval(empPollTimer);
       unsub();
     };
   }, []);
@@ -1306,6 +1390,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
         });
 
+        // Overlay server-synced payroll overrides (OT, LOP, Status) so real-time updates persist across all browsers even during Firestore quota backoff
+        try {
+          const payRes = await fetch('/api/payroll');
+          if (payRes.ok) {
+            const payJson = await payRes.json();
+            const apiPayroll: PayrollRecord[] = Array.isArray(payJson?.payroll) ? payJson.payroll : [];
+            apiPayroll.forEach(ap => {
+              if (!ap || !ap.id || isExcludedPayrollRecord(ap)) return;
+              const personKey = getPayrollPersonKey(ap);
+              const cycleKey = `${(ap.month || '').trim().toLowerCase()}-${ap.year}-${personKey}`;
+              const existing = cycleWinnerMap.get(cycleKey);
+              if (!existing) {
+                cycleWinnerMap.set(cycleKey, { docId: ap.id, data: ap });
+              } else {
+                const apUpdated = String((ap as any).updatedAt || '');
+                const exUpdated = String((existing.data as any).updatedAt || '');
+                if (apUpdated && (!exUpdated || apUpdated >= exUpdated)) {
+                  cycleWinnerMap.set(cycleKey, { docId: ap.id, data: { ...existing.data, ...ap } });
+                }
+              }
+            });
+          }
+        } catch {}
+
         const remotePayroll = Array.from(cycleWinnerMap.values()).map(item => item.data);
         const normalized = enforceMonthPayrollRules(remotePayroll.length > 0 ? remotePayroll : INITIAL_PAYROLL);
         setPayroll(normalized);
@@ -1318,8 +1426,63 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     );
 
+    const pollServerPayroll = async () => {
+      try {
+        const res = await fetch('/api/payroll');
+        if (!res.ok) return;
+        const json = await res.json();
+        const apiPayroll: PayrollRecord[] = Array.isArray(json?.payroll) ? json.payroll : [];
+        if (apiPayroll.length === 0) return;
+
+        setPayroll(prev => {
+          const map = new Map<string, PayrollRecord>();
+          prev.forEach(p => {
+            const cKey = `${(p.month || '').trim().toLowerCase()}-${p.year}-${getPayrollPersonKey(p)}`;
+            map.set(cKey, p);
+          });
+          let changed = false;
+          apiPayroll.forEach(ap => {
+            if (!ap || !ap.id || isExcludedPayrollRecord(ap)) return;
+            const cKey = `${(ap.month || '').trim().toLowerCase()}-${ap.year}-${getPayrollPersonKey(ap)}`;
+            const ex = map.get(cKey);
+            if (!ex) {
+              map.set(cKey, ap);
+              changed = true;
+            } else {
+              const apUpdated = String((ap as any).updatedAt || '');
+              const exUpdated = String((ex as any).updatedAt || '');
+              if (
+                (apUpdated && (!exUpdated || apUpdated > exUpdated)) ||
+                ex.otAmount !== ap.otAmount ||
+                ex.lopDays !== ap.lopDays ||
+                ex.status !== ap.status ||
+                ex.netSalary !== ap.netSalary
+              ) {
+                if (!exUpdated || (apUpdated && apUpdated >= exUpdated)) {
+                  map.set(cKey, { ...ex, ...ap });
+                  changed = true;
+                }
+              }
+            }
+          });
+          if (changed) {
+            const next = enforceMonthPayrollRules(Array.from(map.values()));
+            try {
+              localStorage.setItem(STORAGE_KEYS.PAYROLL, JSON.stringify(next));
+            } catch {}
+            return next;
+          }
+          return prev;
+        });
+      } catch {}
+    };
+
+    pollServerPayroll();
+    const payrollPollTimer = setInterval(pollServerPayroll, 4000);
+
     return () => {
       isSubscribed = false;
+      clearInterval(payrollPollTimer);
       unsub();
     };
   }, []);
@@ -1636,71 +1799,75 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     }
 
-    // 3. Persist to Firestore employees collection & clean up any old/duplicate documents for this person
-    try {
-      const cleanEmp = cleanFirestoreData(mergedEmp);
-      await setDoc(doc(db, 'employees', finalId), cleanEmp, { merge: true });
+    // 3. Persist to backend API immediately & Firestore employees collection non-blockingly so UI never freezes
+    fetch('/api/employees', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(mergedEmp)
+    }).catch(() => {});
 
-      if (isIdChanging) {
-        if (oldEmpId !== finalId) {
-          await deleteDoc(doc(db, 'employees', oldEmpId)).catch(() => {});
-        }
-        if (oldEmpId.toUpperCase() !== finalId) {
-          await deleteDoc(doc(db, 'employees', oldEmpId.toUpperCase())).catch(() => {});
-        }
-      }
-
-      // Also scan Firestore employees collection to remove any other leftover documents with the same email or old ID
-      const allEmpDocs = await getDocs(collection(db, 'employees'));
-      for (const eDoc of allEmpDocs.docs) {
-        if (eDoc.id === finalId) continue;
-        const eData = eDoc.data();
-        const sameEmail = targetEmail && eData.email && String(eData.email).toLowerCase().trim() === targetEmail.toLowerCase();
-        const sameOldId = isIdChanging && (eDoc.id.toUpperCase() === oldEmpId.toUpperCase() || String(eData.id || '').toUpperCase() === oldEmpId.toUpperCase());
-        if (sameEmail || sameOldId) {
-          await deleteDoc(doc(db, 'employees', eDoc.id)).catch(() => {});
-        }
-      }
-    } catch (err) {
+    const cleanEmp = cleanFirestoreData(mergedEmp);
+    setDoc(doc(db, 'employees', finalId), cleanEmp, { merge: true }).catch(err => {
       console.warn('Firestore employee update error:', err);
+    });
+
+    if (isIdChanging) {
+      if (oldEmpId !== finalId) {
+        deleteDoc(doc(db, 'employees', oldEmpId)).catch(() => {});
+      }
+      if (oldEmpId.toUpperCase() !== finalId) {
+        deleteDoc(doc(db, 'employees', oldEmpId.toUpperCase())).catch(() => {});
+      }
     }
 
-    // 4. Cascade ID change across all database collections & context states in real time
-    try {
-      const userDocs = await getDocs(collection(db, 'users'));
-      let updatedUserInFirestore = false;
-      for (const uDoc of userDocs.docs) {
-        const uData = uDoc.data();
-        const matches =
-          (oldEmpId && uData.employeeId?.toUpperCase() === oldEmpId.toUpperCase()) ||
-          (targetEmail && uData.email?.toLowerCase() === targetEmail.toLowerCase()) ||
-          (oldEmpId && uDoc.id.toUpperCase() === oldEmpId.toUpperCase());
-        if (matches) {
-          updatedUserInFirestore = true;
-          await setDoc(
-            doc(db, 'users', uDoc.id),
-            cleanFirestoreData({ ...uData, employeeId: finalId, updatedAt: now }),
-            { merge: true }
-          ).catch(() => {});
+    getDocs(collection(db, 'employees'))
+      .then(allEmpDocs => {
+        for (const eDoc of allEmpDocs.docs) {
+          if (eDoc.id === finalId) continue;
+          const eData = eDoc.data();
+          const sameEmail = targetEmail && eData.email && String(eData.email).toLowerCase().trim() === targetEmail.toLowerCase();
+          const sameOldId = isIdChanging && (eDoc.id.toUpperCase() === oldEmpId.toUpperCase() || String(eData.id || '').toUpperCase() === oldEmpId.toUpperCase());
+          if (sameEmail || sameOldId) {
+            deleteDoc(doc(db, 'employees', eDoc.id)).catch(() => {});
+          }
         }
-      }
+      })
+      .catch(() => {});
 
-      // If this user wasn't yet saved as a document in Firestore 'users', create/save it now so reload always has it
-      if (!updatedUserInFirestore && targetEmail) {
-        const matchedU =
-          users.find(u => u.email.toLowerCase() === targetEmail.toLowerCase()) ||
-          INITIAL_USERS.find(u => u.email.toLowerCase() === targetEmail.toLowerCase());
-        if (matchedU) {
-          await setDoc(
-            doc(db, 'users', matchedU.id),
-            cleanFirestoreData({ ...matchedU, employeeId: finalId, updatedAt: now }),
-            { merge: true }
-          ).catch(() => {});
+    // 4. Cascade ID change across all database collections & context states in real time (non-blocking)
+    getDocs(collection(db, 'users'))
+      .then(userDocs => {
+        let updatedUserInFirestore = false;
+        for (const uDoc of userDocs.docs) {
+          const uData = uDoc.data();
+          const matches =
+            (oldEmpId && uData.employeeId?.toUpperCase() === oldEmpId.toUpperCase()) ||
+            (targetEmail && uData.email?.toLowerCase() === targetEmail.toLowerCase()) ||
+            (oldEmpId && uDoc.id.toUpperCase() === oldEmpId.toUpperCase());
+          if (matches) {
+            updatedUserInFirestore = true;
+            setDoc(
+              doc(db, 'users', uDoc.id),
+              cleanFirestoreData({ ...uData, employeeId: finalId, updatedAt: now }),
+              { merge: true }
+            ).catch(() => {});
+          }
         }
-      }
-    } catch (e) {
-      console.warn('User employeeId update notice:', e);
-    }
+
+        if (!updatedUserInFirestore && targetEmail) {
+          const matchedU =
+            users.find(u => u.email.toLowerCase() === targetEmail.toLowerCase()) ||
+            INITIAL_USERS.find(u => u.email.toLowerCase() === targetEmail.toLowerCase());
+          if (matchedU) {
+            setDoc(
+              doc(db, 'users', matchedU.id),
+              cleanFirestoreData({ ...matchedU, employeeId: finalId, updatedAt: now }),
+              { merge: true }
+            ).catch(() => {});
+          }
+        }
+      })
+      .catch(() => {});
 
     if (isIdChanging) {
       // B. Cascade update payroll records
@@ -1716,22 +1883,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return updated;
       });
 
-      try {
-        const payrollDocs = await getDocs(collection(db, 'payroll'));
-        for (const pDoc of payrollDocs.docs) {
-          const pData = pDoc.data();
-          if (pData.employeeId?.toUpperCase() === oldEmpId.toUpperCase()) {
-            const isCanonical = /^PAY-\d{4}-\d{2}-\d{2}$/.test(pDoc.id);
-            if (isCanonical) {
-              await updateDoc(doc(db, 'payroll', pDoc.id), { employeeId: finalId }).catch(() => {});
-            } else if (pDoc.id.toUpperCase() !== `PAY-${pData.year}-${String(pData.month || 'OCT').substring(0, 3).toUpperCase()}-${finalId}`) {
-              await deleteDoc(doc(db, 'payroll', pDoc.id)).catch(() => {});
+      getDocs(collection(db, 'payroll'))
+        .then(payrollDocs => {
+          for (const pDoc of payrollDocs.docs) {
+            const pData = pDoc.data();
+            if (pData.employeeId?.toUpperCase() === oldEmpId.toUpperCase()) {
+              const isCanonical = /^PAY-\d{4}-\d{2}-\d{2}$/.test(pDoc.id);
+              if (isCanonical) {
+                updateDoc(doc(db, 'payroll', pDoc.id), { employeeId: finalId }).catch(() => {});
+              } else if (pDoc.id.toUpperCase() !== `PAY-${pData.year}-${String(pData.month || 'OCT').substring(0, 3).toUpperCase()}-${finalId}`) {
+                deleteDoc(doc(db, 'payroll', pDoc.id)).catch(() => {});
+              }
             }
           }
-        }
-      } catch (e) {
-        console.warn('Payroll employeeId update notice:', e);
-      }
+        })
+        .catch(() => {});
 
       // C. Cascade update attendance records
       setAttendance(prev => {
@@ -1755,17 +1921,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return updated;
       });
 
-      try {
-        const reqDocs = await getDocs(collection(db, 'requests'));
-        for (const rDoc of reqDocs.docs) {
-          const rData = rDoc.data();
-          if (rData.employeeId?.toUpperCase() === oldEmpId.toUpperCase()) {
-            await updateDoc(doc(db, 'requests', rDoc.id), { employeeId: finalId }).catch(() => {});
+      getDocs(collection(db, 'requests'))
+        .then(reqDocs => {
+          for (const rDoc of reqDocs.docs) {
+            const rData = rDoc.data();
+            if (rData.employeeId?.toUpperCase() === oldEmpId.toUpperCase()) {
+              updateDoc(doc(db, 'requests', rDoc.id), { employeeId: finalId }).catch(() => {});
+            }
           }
-        }
-      } catch (e) {
-        console.warn('Requests employeeId update notice:', e);
-      }
+        })
+        .catch(() => {});
 
       // E. Update Express server backend
       fetch('/api/employees/update-id', {
@@ -1786,7 +1951,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
     showToast(
       'Record Updated',
-      `Employee ID updated to ${finalId}${isIdChanging ? ` (changed from ${oldEmpId})` : ''} and synced across all pages in real time.`
+      `Employee profile for ${fullName || finalId} updated and synced across all pages in real time.`
     );
     return true;
   };
@@ -2259,9 +2424,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       const lopDays = existing?.lopDays || 0;
+      const otAmount = existing?.otAmount || 0;
       const lopAmount = +((baseNet / 30) * lopDays).toFixed(2);
       const totalDeductions = standardDeductions + lopAmount;
-      const netSalary = +(grossSalary - totalDeductions).toFixed(2);
+      const cycleGrossSalary = grossSalary + otAmount;
+      const netSalary = +(cycleGrossSalary - totalDeductions).toFixed(2);
 
       const isNovDec = isNovDecMonth(m);
       const defaultStatus: 'PAID' | 'UNPAID' = isNovDec ? 'UNPAID' : 'PAID';
@@ -2278,13 +2445,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         basicSalary: basic,
         allowances: totalAllowances,
         deductions: totalDeductions,
-        grossSalary,
+        grossSalary: cycleGrossSalary,
         netSalary,
         status: finalStatus,
         paymentDate: finalStatus === 'PAID' ? (existing?.paymentDate || `${cycleYear}-${monthNumberStr}-01`) : '',
         disbursedBy: finalStatus === 'PAID' ? (existing?.disbursedBy || 'System Master Disburser') : '',
         lopDays,
         lopAmount,
+        otAmount,
         pan: emp.pan || existing?.pan,
         bankAccount: emp.bankAccount || existing?.bankAccount,
         ...(existing?.manualStatusOverride ? { manualStatusOverride: true } : {}),
@@ -2325,19 +2493,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return next;
     });
 
-    try {
-      for (const oldId of oldIdsToDelete) {
-        await deleteDoc(doc(db, 'payroll', oldId)).catch(() => {});
-      }
-      await Promise.all(
-        generatedRecords.map(rec => {
-          const cleanDoc = cleanFirestoreData(rec);
-          return setDoc(doc(db, 'payroll', rec.id), cleanDoc, { merge: true }).catch(() => {});
-        })
-      );
-    } catch (e) {
-      console.warn('Firestore payroll write error:', e);
-    }
+    oldIdsToDelete.forEach(oldId => {
+      deleteDoc(doc(db, 'payroll', oldId)).catch(() => {});
+    });
+    generatedRecords.forEach(rec => {
+      const cleanDoc = cleanFirestoreData(rec);
+      setDoc(doc(db, 'payroll', rec.id), cleanDoc, { merge: true }).catch(() => {});
+    });
 
     return generatedRecords.find(r => r.month.toLowerCase() === 'october') || generatedRecords[0] || ({} as PayrollRecord);
   };
@@ -2351,39 +2513,48 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const existing = payroll.find(p => p.id === id) || fallbackRecord;
     if (!existing) return false;
 
-    // Requirement 2: after status to be paid and salary slip generation LOP can't be edited.
+    // Requirement: once status is PAID, LOP and OT inputs are locked
     if (updates.lopDays !== undefined && existing.status === 'PAID') {
       showToast('LOP Locked', 'LOP cannot be edited after status is PAID and salary slip is generated.', 'error');
       return false;
     }
+    if (updates.otAmount !== undefined && existing.status === 'PAID') {
+      showToast('OT Locked', 'OT cannot be edited after status is PAID.', 'error');
+      return false;
+    }
 
     const lopDays = updates.lopDays !== undefined ? updates.lopDays : (existing.lopDays || 0);
+    const otAmount = updates.otAmount !== undefined ? updates.otAmount : (existing.otAmount || 0);
     const basic = updates.basicSalary !== undefined ? updates.basicSalary : existing.basicSalary;
     const allowances = updates.allowances !== undefined ? updates.allowances : existing.allowances;
-    const grossSalary = updates.grossSalary !== undefined ? updates.grossSalary : (basic + allowances);
+    const baseCompensation = basic + allowances;
+    const grossSalary = baseCompensation + otAmount;
 
     const pt = existing.deductionBreakdown?.professionalTax ?? 200;
     const pf = existing.deductionBreakdown?.pfContribution ?? 1800;
     const health = existing.deductionBreakdown?.groupHealthInsurance ?? 1700;
     const standardDeductions = pt + pf + health;
 
-    const baseNet = grossSalary - standardDeductions;
-    const lopAmount = +( (baseNet / 30) * lopDays ).toFixed(2);
+    const baseNet = baseCompensation - standardDeductions;
+    const lopAmount = +((baseNet / 30) * lopDays).toFixed(2);
     const totalDeductions = standardDeductions + lopAmount;
     const netSalary = +(grossSalary - totalDeductions).toFixed(2);
+    const now = new Date().toISOString();
 
     const updatedRecord: PayrollRecord = {
       ...existing,
       ...updates,
       lopDays,
       lopAmount,
+      otAmount,
       deductions: totalDeductions,
       grossSalary,
       netSalary,
       deductionBreakdown: {
         ...(existing.deductionBreakdown || { professionalTax: pt, pfContribution: pf, groupHealthInsurance: health }),
         lop: lopAmount
-      }
+      },
+      ...({ updatedAt: now } as any)
     };
 
     // 2. Update React state immediately
@@ -2416,13 +2587,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       localStorage.setItem(STORAGE_KEYS.PAYROLL, JSON.stringify(list));
     } catch {}
 
-    // 4. Persist to Firestore database
-    try {
-      const cleanDoc = cleanFirestoreData(updatedRecord);
-      await setDoc(doc(db, 'payroll', id), cleanDoc, { merge: true });
-    } catch (e) {
+    // 4. Sync to backend API & Firestore database non-blockingly for real-time cross-device sync
+    fetch('/api/payroll', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedRecord)
+    }).catch(() => {});
+
+    const cleanDoc = cleanFirestoreData(updatedRecord);
+    setDoc(doc(db, 'payroll', id), cleanDoc, { merge: true }).catch(e => {
       console.warn('Firestore payroll update error:', e);
-    }
+    });
 
     return true;
   };
@@ -2463,13 +2638,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const paymentDate = nextStatus === 'PAID' ? (existing.paymentDate || new Date().toISOString().split('T')[0]) : '';
     const disbursedBy = nextStatus === 'PAID' ? (currentUser?.name || 'System Master Disburser') : '';
     const canonicalDocId = existing.id || id;
+    const now = new Date().toISOString();
     const updatedRecord: PayrollRecord = {
       ...existing,
       id: canonicalDocId,
       status: nextStatus,
       paymentDate,
       disbursedBy,
-      manualStatusOverride: true
+      manualStatusOverride: true,
+      ...({ updatedAt: now } as any)
     };
 
     const recordPersonKey = getPayrollPersonKey(updatedRecord);
@@ -2518,15 +2695,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       localStorage.setItem(STORAGE_KEYS.PAYROLL, JSON.stringify(list));
     } catch {}
 
-    // 4. Persist to Firestore database
-    try {
-      const cleanDoc = cleanFirestoreData(updatedRecord);
-      await setDoc(doc(db, 'payroll', canonicalDocId), cleanDoc, { merge: true });
-      if (id !== canonicalDocId) {
-        await setDoc(doc(db, 'payroll', id), cleanDoc, { merge: true });
-      }
-    } catch (e) {
+    // 4. Sync to backend API & Firestore database non-blockingly for real-time cross-device sync
+    fetch('/api/payroll', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedRecord)
+    }).catch(() => {});
+
+    const cleanDoc = cleanFirestoreData(updatedRecord);
+    setDoc(doc(db, 'payroll', canonicalDocId), cleanDoc, { merge: true }).catch(e => {
       console.warn('Firestore toggle payroll status error:', e);
+    });
+    if (id !== canonicalDocId) {
+      setDoc(doc(db, 'payroll', id), cleanDoc, { merge: true }).catch(() => {});
     }
 
     showToast('Status Updated', `Payroll record marked as ${updatedRecord.status}.`);

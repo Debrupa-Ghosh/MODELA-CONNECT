@@ -91,6 +91,7 @@ export const NewStaffRequestModal: React.FC<Props> = ({ isOpen, onClose }) => {
         department: empDept,
         designation: empDesignation,
         type: mappedType,
+        subType: requestType,
         title: title.trim(),
         description: detailedExplanation.trim() || `${requestType} requisition filed by ${empName}`,
         amountOrDays: formattedDates,

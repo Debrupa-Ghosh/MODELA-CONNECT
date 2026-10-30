@@ -44,6 +44,12 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
   const [pan, setPan] = useState('');
   const [bankAccount, setBankAccount] = useState('');
 
+  // Leave configuration state
+  const [sickLeave, setSickLeave] = useState('0');
+  const [privilegeLeave, setPrivilegeLeave] = useState('0');
+  const [maternityLeave, setMaternityLeave] = useState('0');
+  const [paternityLeave, setPaternityLeave] = useState('0');
+
   // Allowances state
   const [hra, setHra] = useState('0');
   const [medical, setMedical] = useState('0');
@@ -68,6 +74,11 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
       setStatus(employee.status || 'ACTIVE');
       setPan(employee.pan || '');
       setBankAccount(employee.bankAccount || '');
+
+      setSickLeave(String(employee.leaves?.sickLeave ?? employee.sickLeave ?? 0));
+      setPrivilegeLeave(String(employee.leaves?.privilegeLeave ?? employee.privilegeLeave ?? 0));
+      setMaternityLeave(String(employee.leaves?.maternityLeave ?? employee.maternityLeave ?? 0));
+      setPaternityLeave(String(employee.leaves?.paternityLeave ?? employee.paternityLeave ?? 0));
 
       const basicVal = employee.compensation?.basic ?? 50000;
       setBasic(String(basicVal));
@@ -119,6 +130,11 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
   const grossSalary = numBasic + totalAllowances;
   const netCompensation = grossSalary - totalDeductions;
 
+  const numSickLeave = Number(sickLeave) || 0;
+  const numPrivilegeLeave = Number(privilegeLeave) || 0;
+  const numMaternityLeave = Number(maternityLeave) || 0;
+  const numPaternityLeave = Number(paternityLeave) || 0;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -140,6 +156,16 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
       status,
       pan: pan.trim().toUpperCase(),
       bankAccount: bankAccount.trim(),
+      sickLeave: numSickLeave,
+      privilegeLeave: numPrivilegeLeave,
+      maternityLeave: numMaternityLeave,
+      paternityLeave: numPaternityLeave,
+      leaves: {
+        sickLeave: numSickLeave,
+        privilegeLeave: numPrivilegeLeave,
+        maternityLeave: numMaternityLeave,
+        paternityLeave: numPaternityLeave
+      },
       compensation: {
         basic: numBasic,
         allowances: totalAllowances,
@@ -350,6 +376,69 @@ export const EditEmployeeModal: React.FC<EditEmployeeModalProps> = ({
                 value={bankAccount}
                 onChange={e => setBankAccount(e.target.value)}
                 className="w-full px-3.5 py-2.5 bg-[#0B132B] border border-[#1E293B] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono"
+              />
+            </div>
+          </div>
+
+          {/* Row 6: Leave Inputs (Before Allowances Configuration) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-slate-400 font-semibold mb-1.5">
+                Sick Leave
+              </label>
+              <input
+                type="number"
+                min="0"
+                disabled={!canEditCompensation}
+                value={sickLeave}
+                onChange={e => setSickLeave(e.target.value)}
+                placeholder="0"
+                className="w-full px-3.5 py-2.5 bg-[#0B132B] border border-[#1E293B] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono disabled:opacity-50"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-400 font-semibold mb-1.5">
+                Privilege Leave
+              </label>
+              <input
+                type="number"
+                min="0"
+                disabled={!canEditCompensation}
+                value={privilegeLeave}
+                onChange={e => setPrivilegeLeave(e.target.value)}
+                placeholder="0"
+                className="w-full px-3.5 py-2.5 bg-[#0B132B] border border-[#1E293B] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono disabled:opacity-50"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-400 font-semibold mb-1.5">
+                Maternity Leave
+              </label>
+              <input
+                type="number"
+                min="0"
+                disabled={!canEditCompensation}
+                value={maternityLeave}
+                onChange={e => setMaternityLeave(e.target.value)}
+                placeholder="0"
+                className="w-full px-3.5 py-2.5 bg-[#0B132B] border border-[#1E293B] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono disabled:opacity-50"
+              />
+            </div>
+
+            <div>
+              <label className="block text-slate-400 font-semibold mb-1.5">
+                Paternity Leave
+              </label>
+              <input
+                type="number"
+                min="0"
+                disabled={!canEditCompensation}
+                value={paternityLeave}
+                onChange={e => setPaternityLeave(e.target.value)}
+                placeholder="0"
+                className="w-full px-3.5 py-2.5 bg-[#0B132B] border border-[#1E293B] rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono disabled:opacity-50"
               />
             </div>
           </div>

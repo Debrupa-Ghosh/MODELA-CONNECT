@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
-import { StaffWorkflowRequest, isRequestOwnedByUser, canUserApproveRequest, hasFullAccessRole } from '../types';
+import { StaffWorkflowRequest, isRequestOwnedByUser, canUserApproveRequest, isBucketHolidayRequest, hasFullAccessRole } from '../types';
 import { NewStaffRequestModal } from '../components/requests/NewStaffRequestModal';
 import {
   Search,
@@ -304,7 +304,7 @@ export const RequestsPage: React.FC = () => {
                 {/* Actions for Privileged Roles if Pending */}
                 {isPrivilegedAdmin && isPending && (
                   <div className="pt-2 border-t border-[#1E293B]/60 flex items-center justify-end gap-2 flex-wrap">
-                    {canUserApproveRequest(currentUser?.role, req.type) ? (
+                    {canUserApproveRequest(currentUser?.role, req.type, req) ? (
                       <>
                         <button
                           type="button"
@@ -324,7 +324,9 @@ export const RequestsPage: React.FC = () => {
                       </>
                     ) : (
                       <span className="text-[11px] font-medium text-amber-400/90 bg-[#2A1B02] border border-[#B45309]/60 px-2.5 py-1 rounded-lg">
-                        {req.type === 'LEAVE'
+                        {isBucketHolidayRequest(req.type, req)
+                          ? 'View Only • Super Admin or HR Approval Required'
+                          : req.type === 'LEAVE'
                           ? 'View Only • Manager Approval Required'
                           : 'View Only • Admin Approval Required'}
                       </span>

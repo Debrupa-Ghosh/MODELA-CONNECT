@@ -57,7 +57,8 @@ export const PayslipModal: React.FC<Props> = ({
   const medical = record.allowanceBreakdown?.medical ?? Math.round(record.allowances * 0.15);
   const special = record.allowanceBreakdown?.special ?? Math.round(record.allowances * 0.35);
   const internet = record.allowanceBreakdown?.internet ?? Math.max(0, record.allowances - (hra + medical + special));
-  const grossSalary = record.grossSalary || (basicAmt + record.allowances);
+  const otAmount = Number(record.otAmount) || 0;
+  const grossSalary = basicAmt + record.allowances + otAmount;
 
   const pt = record.deductionBreakdown?.professionalTax ?? 200;
   const pf = record.deductionBreakdown?.pfContribution ?? 1800;
@@ -66,7 +67,7 @@ export const PayslipModal: React.FC<Props> = ({
 
   const lopDays = record.lopDays || 0;
   const paidDays = Math.max(0, +((30 - lopDays).toFixed(2)));
-  const baseNet = grossSalary - standardDed;
+  const baseNet = (basicAmt + record.allowances) - standardDed;
   const lopAmount = record.lopAmount !== undefined ? record.lopAmount : +((baseNet / 30) * lopDays).toFixed(2);
   const totalDeductions = record.deductions || (standardDed + lopAmount);
   const netPayable = +(grossSalary - totalDeductions).toFixed(2);
@@ -248,6 +249,10 @@ export const PayslipModal: React.FC<Props> = ({
                 <span>Internet Allowance</span>
                 <span className="text-right font-mono">{formatCurr(internet)}</span>
               </div>
+              <div className="grid grid-cols-2 p-1.5">
+                <span>OT</span>
+                <span className="text-right font-mono">{formatCurr(otAmount)}</span>
+              </div>
             </div>
 
             <div className="divide-y divide-slate-800">
@@ -266,6 +271,10 @@ export const PayslipModal: React.FC<Props> = ({
               <div className="grid grid-cols-2 p-1.5">
                 <span>LOP ({lopDays} {lopDays === 1 ? 'day' : 'days'})</span>
                 <span className="text-right font-mono">{formatCurr(lopAmount)}</span>
+              </div>
+              <div className="grid grid-cols-2 p-1.5">
+                <span>&nbsp;</span>
+                <span className="text-right font-mono">&nbsp;</span>
               </div>
               <div className="grid grid-cols-2 p-1.5">
                 <span>&nbsp;</span>

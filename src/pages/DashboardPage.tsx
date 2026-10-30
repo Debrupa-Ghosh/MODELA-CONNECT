@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { NewStaffRequestModal } from '../components/requests/NewStaffRequestModal';
-import { isRequestOwnedByUser, getRoleLabel, canUserApproveRequest } from '../types';
+import { isRequestOwnedByUser, getRoleLabel, canUserApproveRequest, isBucketHolidayRequest } from '../types';
 import {
   Users,
   Calendar,
@@ -427,7 +427,7 @@ export const DashboardPage: React.FC = () => {
                   </button>
 
                   <div className="flex items-center gap-2">
-                    {canUserApproveRequest(currentUser?.role, req.type) ? (
+                    {canUserApproveRequest(currentUser?.role, req.type, req) ? (
                       <>
                         <button
                           onClick={() => updateStaffRequestStatus(req.id, 'REJECTED')}
@@ -446,7 +446,9 @@ export const DashboardPage: React.FC = () => {
                       </>
                     ) : (
                       <span className="text-[11px] font-medium text-amber-400/90 bg-[#2A1B02] border border-[#B45309]/60 px-2.5 py-1 rounded-lg">
-                        {req.type === 'LEAVE'
+                        {isBucketHolidayRequest(req.type, req)
+                          ? 'View Only • Super Admin or HR Approval Required'
+                          : req.type === 'LEAVE'
                           ? 'View Only • Manager Approval Required'
                           : 'View Only • Admin Approval Required'}
                       </span>
