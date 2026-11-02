@@ -12,6 +12,7 @@ import { PayrollPage } from './pages/PayrollPage';
 import { OnboardingPage } from './pages/OnboardingPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { ActivityLogsPage } from './pages/ActivityLogsPage';
+import { PolicyPage } from './pages/PolicyPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { LoginPage } from './pages/LoginPage';
 
@@ -175,6 +176,16 @@ export default function App() {
 
             {/* Removed Admin Nexus page: redirect to dashboard */}
             <Route path="/admin-nexus" element={<Navigate to="/dashboard" replace />} />
+
+            {/* Policy */}
+            <Route
+              path="/policy"
+              element={
+                <RequireAuth>
+                  <PolicyPage />
+                </RequireAuth>
+              }
+            />
 
             {/* Settings */}
             <Route

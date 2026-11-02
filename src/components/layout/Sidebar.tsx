@@ -19,6 +19,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Shield,
+  FileText,
   Settings
 } from 'lucide-react';
 
@@ -51,6 +52,11 @@ export const Sidebar: React.FC = () => {
       icon: ShieldAlert,
       badge: myPendingStaffCount > 0 ? `${myPendingStaffCount} Pending` : undefined,
       badgeStyle: 'bg-[#FACC15] text-slate-900 font-extrabold'
+    },
+    {
+      to: '/policy',
+      label: 'Policy',
+      icon: FileText
     },
     {
       to: '/settings',
@@ -111,6 +117,11 @@ export const Sidebar: React.FC = () => {
           }
         ]
       : []),
+    {
+      to: '/policy',
+      label: 'Policy',
+      icon: FileText
+    },
     {
       to: '/settings',
       label: 'Settings',
