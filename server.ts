@@ -102,6 +102,7 @@ const PROTECTED_ACTIVE_KEYS = new Set([
 let users: ServerUser[] = [...DEFAULT_SERVER_USERS];
 let serverDeletedIds = new Set<string>([
   ...PERMANENTLY_DELETED_REQUEST_KEYS,
+  'req-1572',
   'req-3779',
   'req-9074',
   'req-2709',
@@ -118,12 +119,14 @@ const isExcludedServerStaffRequest = (r: any): boolean => {
   const empName = String(r.employeeName || '').trim().toLowerCase();
   const reqTitle = String(r.title || '').trim().toLowerCase();
   if (
+    reqId === 'REQ-1572' ||
     reqId === 'REQ-2709' ||
     reqId === 'REQ-6425' ||
     reqId === 'REQ-3779' ||
     reqId === 'REQ-9074' ||
+    empId === 'MOD116' ||
     ((empId === 'MOD106' || empName === 'modela tech') && (reqTitle === 'bhaifota' || reqTitle === 'laptop')) ||
-    ((empId === 'MOD011' || empName === 'debrupa ghosh') && (reqTitle === 'laptop needed' || reqTitle === 'device needed'))
+    ((empId === 'MOD011' || empName === 'debrupa ghosh') && (reqTitle === 'laptop needed' || reqTitle === 'device needed' || reqTitle === 'sick leave'))
   ) {
     return true;
   }
@@ -681,8 +684,9 @@ async function reconcileFirestoreDatabase() {
       }
     }
 
-    // 3. Delete REQ-3779, REQ-9074, REQ-2709, and REQ-6425 from Firestore requests collection
+    // 3. Delete REQ-1572, REQ-3779, REQ-9074, REQ-2709, and REQ-6425 from Firestore requests collection
     try {
+      await withWriteTimeout(deleteDoc(doc(db, 'requests', 'REQ-1572')));
       await withWriteTimeout(deleteDoc(doc(db, 'requests', 'REQ-3779')));
       await withWriteTimeout(deleteDoc(doc(db, 'requests', 'REQ-9074')));
       await withWriteTimeout(deleteDoc(doc(db, 'requests', 'REQ-2709')));

@@ -21,7 +21,10 @@ export const UserManagementPage: React.FC = () => {
   const { showToast, deleteEmployee, updateEmployee } = useApp();
   const canApproveRequests = canUserApproveRequest(currentUser?.role);
 
-  const [activeTab, setActiveTab] = useState<'SIGNUP_QUEUE' | 'APPROVED_USERS'>('SIGNUP_QUEUE');
+  const isDirectorRole = Boolean(isDirector || currentUser?.role === 'DIRECTOR' || currentUser?.role === 'EXECUTIVE_DIRECTOR');
+  const [activeTab, setActiveTab] = useState<'SIGNUP_QUEUE' | 'APPROVED_USERS'>(() =>
+    isDirectorRole ? 'APPROVED_USERS' : 'SIGNUP_QUEUE'
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
@@ -160,7 +163,7 @@ export const UserManagementPage: React.FC = () => {
     (u.department && u.department.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  const currentTab = activeTab;
+  const currentTab = isDirectorRole ? 'APPROVED_USERS' : activeTab;
 
   return (
     <div className="space-y-6 max-w-[1550px] mx-auto antialiased font-sans text-white">
@@ -221,22 +224,24 @@ export const UserManagementPage: React.FC = () => {
 
       {/* 3. Sub-Tabs Bar: Identity Sign-Up Requests and Approved Users Directory (Dark Navy Box) */}
       <div className="bg-[#0B1528] border border-[#1E293B] rounded-2xl p-1.5 flex items-center gap-1.5 overflow-x-auto shadow-sm text-xs">
-        <button
-          onClick={() => setActiveTab('SIGNUP_QUEUE')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all cursor-pointer whitespace-nowrap ${
-            currentTab === 'SIGNUP_QUEUE'
-              ? 'bg-[#2563EB] text-white shadow-md'
-              : 'text-slate-300 hover:text-white hover:bg-[#131E36]'
-          }`}
-        >
-          <Mail className="w-4 h-4 text-amber-400" />
-          <span>Identity Sign-Up Requests</span>
-          <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-            currentTab === 'SIGNUP_QUEUE' ? 'bg-[#1D4ED8] text-white' : 'bg-slate-800 text-slate-300'
-          }`}>
-            {pendingUsers.length}
-          </span>
-        </button>
+        {!isDirectorRole && (
+          <button
+            onClick={() => setActiveTab('SIGNUP_QUEUE')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all cursor-pointer whitespace-nowrap ${
+              currentTab === 'SIGNUP_QUEUE'
+                ? 'bg-[#2563EB] text-white shadow-md'
+                : 'text-slate-300 hover:text-white hover:bg-[#131E36]'
+            }`}
+          >
+            <Mail className="w-4 h-4 text-amber-400" />
+            <span>Identity Sign-Up Requests</span>
+            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+              currentTab === 'SIGNUP_QUEUE' ? 'bg-[#1D4ED8] text-white' : 'bg-slate-800 text-slate-300'
+            }`}>
+              {pendingUsers.length}
+            </span>
+          </button>
+        )}
 
         <button
           onClick={() => setActiveTab('APPROVED_USERS')}

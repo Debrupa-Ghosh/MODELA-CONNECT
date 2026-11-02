@@ -50,11 +50,9 @@ export const PayrollPage: React.FC = () => {
       isSuperAdmin ||
       isHR ||
       isHRManager ||
-      isManager ||
       currentUser?.role === 'SUPER_ADMIN' ||
       currentUser?.role === 'HR' ||
-      currentUser?.role === 'HR_MANAGER' ||
-      currentUser?.role === 'MANAGER'
+      currentUser?.role === 'HR_MANAGER'
     );
 
   // Filter state for months and years (2026-2036)
@@ -82,6 +80,8 @@ export const PayrollPage: React.FC = () => {
     const list: PayrollRecord[] = [];
     const processedPersonKeys = new Set<string>();
     const isNovDec = selectedMonth.toLowerCase() === 'november' || selectedMonth.toLowerCase() === 'december';
+    const isUnpaidDefaultYear = Number(selectedYear) >= 2027 && Number(selectedYear) <= 2036;
+    const isDefaultUnpaid = isNovDec || isUnpaidDefaultYear;
 
     const blockedDocIds = new Set([
       'PAY-2026-OCT-MOD',
@@ -208,7 +208,15 @@ export const PayrollPage: React.FC = () => {
           return;
         }
 
-        list.push(p);
+        const resolvedStatus: PayrollRecord['status'] =
+          isUnpaidDefaultYear && !p.manualStatusOverride ? 'UNPAID' : p.status;
+
+        list.push({
+          ...p,
+          status: resolvedStatus,
+          paymentDate: resolvedStatus === 'PAID' ? p.paymentDate : '',
+          disbursedBy: resolvedStatus === 'PAID' ? p.disbursedBy : ''
+        });
         processedPersonKeys.add(pKey);
       }
     });
@@ -239,7 +247,7 @@ export const PayrollPage: React.FC = () => {
         const grossSalary = basic + totalAllowances;
         const netSalary = grossSalary - standardDeductions;
 
-        const defaultCycleStatus: 'PAID' | 'UNPAID' = isNovDec ? 'UNPAID' : 'PAID';
+        const defaultCycleStatus: 'PAID' | 'UNPAID' = isDefaultUnpaid ? 'UNPAID' : 'PAID';
         const paymentDate = defaultCycleStatus === 'PAID'
           ? `${selectedYear}-${String(MONTHS.indexOf(selectedMonth) + 1).padStart(2, '0')}-01`
           : '';
@@ -293,7 +301,7 @@ export const PayrollPage: React.FC = () => {
         const grossSalary = basic + totalAllowances;
         const netSalary = grossSalary - standardDeductions;
 
-        const defaultCycleStatus: 'PAID' | 'UNPAID' = isNovDec ? 'UNPAID' : 'PAID';
+        const defaultCycleStatus: 'PAID' | 'UNPAID' = isDefaultUnpaid ? 'UNPAID' : 'PAID';
         const paymentDate = defaultCycleStatus === 'PAID'
           ? `${selectedYear}-${String(MONTHS.indexOf(selectedMonth) + 1).padStart(2, '0')}-01`
           : '';

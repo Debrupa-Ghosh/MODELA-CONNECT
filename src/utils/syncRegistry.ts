@@ -27,13 +27,23 @@ const PERMANENTLY_EXCLUDED_KEYS = new Set([
   'req-deb_gmail_com',
   'vikram.sengupta@gmail.com',
   'usr-pending-03',
-  'req-vikram_sengupta_gmail_com'
+  'req-vikram_sengupta_gmail_com',
+  'req-1572',
+  'req-2709',
+  'req-6425',
+  'req-3779',
+  'req-9074'
 ]);
 
 const DEFAULT_DELETED_IDS = [
   'alex.morgan@modela.io',
   'elena.rostova@modela.io',
   'rani123@gmail.com',
+  'req-1572',
+  'req-2709',
+  'req-6425',
+  'req-3779',
+  'req-9074',
   'req-622',
   'req-719',
   'req-1042',

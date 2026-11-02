@@ -469,8 +469,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const empName = String(r.employeeName || '').trim().toLowerCase();
     const reqTitle = String(r.title || '').trim().toLowerCase();
 
-    // Always exclude mock / seed requests and specifically deleted requests (including REQ-3779, REQ-9074, REQ-2709, REQ-6425)
+    // Always exclude mock / seed requests and specifically deleted requests (including REQ-1572, REQ-3779, REQ-9074, REQ-2709, REQ-6425)
     if (
+      reqId === 'REQ-1572' ||
       reqId === 'REQ-2709' ||
       reqId === 'REQ-6425' ||
       reqId === 'REQ-3779' ||
@@ -485,7 +486,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       reqId === 'REQ-STF-003' ||
       reqId === 'REQ-STF-004' ||
       ((empId === 'MOD106' || empName === 'modela tech') && (reqTitle === 'bhaifota' || reqTitle === 'laptop')) ||
-      ((empId === 'MOD011' || empName === 'debrupa ghosh') && (reqTitle === 'laptop needed' || reqTitle === 'device needed')) ||
+      ((empId === 'MOD011' || empName === 'debrupa ghosh') && (reqTitle === 'laptop needed' || reqTitle === 'device needed' || reqTitle === 'sick leave')) ||
+      empId === 'MOD116' ||
       empId === 'MOD003' ||
       empId === 'MOD005' ||
       empId === 'MOD006' ||
@@ -663,11 +665,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     filtered.forEach(rawP => {
       const isNovDec = isNovDecMonth(rawP.month);
+      const isFutureUnpaidYear = Number(rawP.year) >= 2027 && Number(rawP.year) <= 2036;
       const personKey = getPayrollPersonKey(rawP);
-      const defaultStatus: 'PAID' | 'UNPAID' = isNovDec ? 'UNPAID' : 'PAID';
+      const defaultStatus: 'PAID' | 'UNPAID' = (isNovDec || isFutureUnpaidYear) ? 'UNPAID' : 'PAID';
 
       let finalStatus: 'PAID' | 'UNPAID' =
-        rawP.status === 'PAID' || rawP.status === 'UNPAID' ? rawP.status : defaultStatus;
+        rawP.manualStatusOverride && (rawP.status === 'PAID' || rawP.status === 'UNPAID')
+          ? rawP.status
+          : isFutureUnpaidYear
+          ? 'UNPAID'
+          : (rawP.status === 'PAID' || rawP.status === 'UNPAID' ? rawP.status : defaultStatus);
 
       if (personKey === 'debrupa-ghosh-surupa008' && isNovDec && !rawP.manualStatusOverride) {
         finalStatus = 'UNPAID';
@@ -1151,6 +1158,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } catch {}
     };
 
+    // Immediately purge REQ-1572 and other excluded requests from Firestore and backend
+    deleteDoc(doc(db, 'requests', 'REQ-1572')).catch(() => {});
+    fetch('/api/requests/REQ-1572', { method: 'DELETE' }).catch(() => {});
+
     const unsub = onSnapshot(
       collection(db, 'requests'),
       async snapshot => {
@@ -1159,13 +1170,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const fsReqs: StaffWorkflowRequest[] = [];
         snapshot.forEach(docSnap => {
           const data = docSnap.data() as StaffWorkflowRequest;
-          if (data && data.id) {
-            if (isExcludedStaffRequest(data)) {
-              deleteDoc(doc(db, 'requests', docSnap.id)).catch(() => {});
+          const mergedData = { ...data, id: data?.id || docSnap.id };
+          if (isExcludedStaffRequest(mergedData)) {
+            deleteDoc(doc(db, 'requests', docSnap.id)).catch(() => {});
+            fetch(`/api/requests/${encodeURIComponent(docSnap.id)}`, { method: 'DELETE' }).catch(() => {});
+            if (data?.id) {
               deleteDoc(doc(db, 'requests', data.id)).catch(() => {});
-            } else {
-              fsReqs.push(data);
+              fetch(`/api/requests/${encodeURIComponent(data.id)}`, { method: 'DELETE' }).catch(() => {});
             }
+          } else if (data && data.id) {
+            fsReqs.push(data);
           }
         });
 
@@ -2436,7 +2450,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const netSalary = +(cycleGrossSalary - totalDeductions).toFixed(2);
 
       const isNovDec = isNovDecMonth(m);
-      const defaultStatus: 'PAID' | 'UNPAID' = isNovDec ? 'UNPAID' : 'PAID';
+      const isFutureUnpaidYear = Number(cycleYear) >= 2027 && Number(cycleYear) <= 2036;
+      const defaultStatus: 'PAID' | 'UNPAID' = (isNovDec || isFutureUnpaidYear) ? 'UNPAID' : 'PAID';
       const finalStatus: 'PAID' | 'UNPAID' = existing?.manualStatusOverride
         ? (existing.status === 'UNPAID' ? 'UNPAID' : 'PAID')
         : defaultStatus;
@@ -2625,17 +2640,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const canManagePayrollStatus =
       currentUser?.role === 'SUPER_ADMIN' ||
-      currentUser?.role === 'DIRECTOR' ||
-      currentUser?.role === 'EXECUTIVE_DIRECTOR' ||
       currentUser?.role === 'HR' ||
       currentUser?.role === 'HR_MANAGER' ||
-      currentUser?.role === 'MANAGER' ||
       currentUser?.email === 'sushovand@modelatech.com' ||
       currentUser?.email === 'sushoovandas@gmail.com' ||
       currentUser?.email === 'modelatech2026@gmail.com';
 
     if (!canManagePayrollStatus) {
-      showToast('Action Restricted', 'Only Super Admin, Director, HR, or Manager can update payroll status.', 'error');
+      showToast('Action Restricted', 'Only HR or Super Admin can update payroll status.', 'error');
       return false;
     }
 
