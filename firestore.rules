@@ -74,5 +74,19 @@ service cloud.firestore {
       allow update: if false;
       allow delete: if false;
     }
+
+    // Policies Collection
+    match /policies/{policyId} {
+      allow read: if true;
+      allow create: if isValidId(policyId) &&
+                    request.resource.data.policyId is string &&
+                    request.resource.data.policyName is string &&
+                    request.resource.data.fileName is string;
+      allow update: if isValidId(policyId) &&
+                    request.resource.data.policyId is string &&
+                    request.resource.data.policyName is string &&
+                    request.resource.data.fileName is string;
+      allow delete: if isValidId(policyId);
+    }
   }
 }

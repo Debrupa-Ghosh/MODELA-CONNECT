@@ -186,6 +186,22 @@ export default function App() {
                 </RequireAuth>
               }
             />
+            <Route
+              path="/policy/add"
+              element={
+                <RequireAuth>
+                  <PolicyPage />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/policy/view"
+              element={
+                <RequireAuth>
+                  <PolicyPage />
+                </RequireAuth>
+              }
+            />
 
             {/* Settings */}
             <Route

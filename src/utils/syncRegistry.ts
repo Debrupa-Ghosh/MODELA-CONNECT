@@ -93,7 +93,13 @@ const SYSTEM_PROTECTED_KEYS = new Set([
   'aditi chakraborty'
 ]);
 
+let cachedUnblocked: Set<string> | null = null;
+let cachedDeleted: Set<string> | null = null;
+let cachedEmpIdMap: Record<string, string> | null = null;
+let persistTimer: ReturnType<typeof setTimeout> | null = null;
+
 export const getUnblockedRegistry = (): Set<string> => {
+  if (cachedUnblocked) return cachedUnblocked;
   const result = new Set<string>([
     'aditichakraborty2005@gmail.com',
     'aditichakrabarty2005@gmail.com',
@@ -114,10 +120,12 @@ export const getUnblockedRegistry = (): Set<string> => {
       }
     }
   } catch {}
+  cachedUnblocked = result;
   return result;
 };
 
 export const getDeletedRegistry = (): Set<string> => {
+  if (cachedDeleted) return cachedDeleted;
   const unblocked = getUnblockedRegistry();
   const result = new Set<string>(DEFAULT_DELETED_IDS.filter(k => !unblocked.has(k)));
   try {
@@ -134,44 +142,59 @@ export const getDeletedRegistry = (): Set<string> => {
       }
     }
   } catch {}
+  cachedDeleted = result;
   return result;
 };
 
 export const getCustomEmpIdMap = (): Record<string, string> => {
+  if (cachedEmpIdMap) return cachedEmpIdMap;
   try {
     const raw = localStorage.getItem(STORAGE_KEY_EMP_ID_MAP);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object') {
-        return parsed;
+        const validMap = parsed as Record<string, string>;
+        cachedEmpIdMap = validMap;
+        return validMap;
       }
     }
   } catch {}
-  return {};
+  const emptyMap: Record<string, string> = {};
+  cachedEmpIdMap = emptyMap;
+  return emptyMap;
 };
 
 export const persistSyncRegistryToFirestore = async (): Promise<void> => {
-  try {
-    const deletedIds = Array.from(getDeletedRegistry());
-    const empIdMap = getCustomEmpIdMap();
-    await setDoc(
-      doc(db, 'users', SYNC_REGISTRY_DOC_ID),
-      {
-        id: SYNC_REGISTRY_DOC_ID,
-        uid: SYNC_REGISTRY_DOC_ID,
-        name: 'System Sync Registry',
-        email: 'sync@system.internal',
-        status: 'REJECTED',
-        isSystemSync: true,
-        deletedIds,
-        empIdMap,
-        updatedAt: new Date().toISOString()
-      },
-      { merge: true }
-    );
-  } catch (e) {
-    console.warn('Firestore sync registry write notice:', e);
-  }
+  if (persistTimer) clearTimeout(persistTimer);
+  return new Promise(resolve => {
+    persistTimer = setTimeout(async () => {
+      persistTimer = null;
+      try {
+        const deletedIds = Array.from(getDeletedRegistry());
+        const unblockedIds = Array.from(getUnblockedRegistry());
+        const empIdMap = getCustomEmpIdMap();
+        await setDoc(
+          doc(db, 'users', SYNC_REGISTRY_DOC_ID),
+          {
+            id: SYNC_REGISTRY_DOC_ID,
+            uid: SYNC_REGISTRY_DOC_ID,
+            name: 'System Sync Registry',
+            email: 'sync@system.internal',
+            status: 'REJECTED',
+            isSystemSync: true,
+            deletedIds,
+            unblockedIds,
+            empIdMap,
+            updatedAt: new Date().toISOString()
+          },
+          { merge: true }
+        );
+      } catch (e) {
+        console.warn('Firestore sync registry write notice:', e);
+      }
+      resolve();
+    }, 150);
+  });
 };
 
 export const applyRemoteSyncRegistry = (data: any): boolean => {
@@ -179,34 +202,56 @@ export const applyRemoteSyncRegistry = (data: any): boolean => {
   let changed = false;
 
   try {
+    const unblocked = getUnblockedRegistry();
+    const currentDeleted = getDeletedRegistry();
+    let unblockedChanged = false;
+    let deletedChanged = false;
+
+    const remoteUnblockedSet = Array.isArray(data.unblockedIds)
+      ? new Set(data.unblockedIds.map((x: any) => String(x || '').toLowerCase().trim()).filter(Boolean))
+      : null;
+
     if (Array.isArray(data.deletedIds)) {
-      const unblocked = getUnblockedRegistry();
-      const currentDeleted = getDeletedRegistry();
-      const prevSize = currentDeleted.size;
       data.deletedIds.forEach((item: any) => {
         const clean = String(item || '').toLowerCase().trim();
-        if (clean && !SYSTEM_PROTECTED_KEYS.has(clean) && !unblocked.has(clean)) {
-          currentDeleted.add(clean);
+        if (clean && !SYSTEM_PROTECTED_KEYS.has(clean)) {
+          if (remoteUnblockedSet && !remoteUnblockedSet.has(clean) && unblocked.has(clean)) {
+            unblocked.delete(clean);
+            unblockedChanged = true;
+          }
+          if (!unblocked.has(clean) && !currentDeleted.has(clean)) {
+            currentDeleted.add(clean);
+            deletedChanged = true;
+          }
         }
       });
-      if (currentDeleted.size !== prevSize) {
-        changed = true;
-      }
+    }
+
+    if (unblockedChanged) {
+      changed = true;
+      localStorage.setItem(STORAGE_KEY_UNBLOCKED, JSON.stringify(Array.from(unblocked)));
+    }
+    if (deletedChanged) {
+      changed = true;
       localStorage.setItem(STORAGE_KEY_DELETED, JSON.stringify(Array.from(currentDeleted)));
     }
 
     if (data.empIdMap && typeof data.empIdMap === 'object') {
       const currentMap = getCustomEmpIdMap();
+      let mapChanged = false;
       Object.entries(data.empIdMap).forEach(([k, v]) => {
         if (k && typeof v === 'string' && v.trim()) {
           const cleanVal = v.trim().toUpperCase();
           if (currentMap[k] !== cleanVal) {
             currentMap[k] = cleanVal;
             changed = true;
+            mapChanged = true;
           }
         }
       });
-      localStorage.setItem(STORAGE_KEY_EMP_ID_MAP, JSON.stringify(currentMap));
+      if (mapChanged) {
+        localStorage.setItem(STORAGE_KEY_EMP_ID_MAP, JSON.stringify(currentMap));
+      }
     }
   } catch (e) {
     console.warn('Failed applying remote sync registry:', e);
@@ -222,18 +267,24 @@ export const recordDeletedRecord = (...identifiers: (string | undefined | null)[
   try {
     const unblocked = getUnblockedRegistry();
     const registry = getDeletedRegistry();
+    let changed = false;
     identifiers.forEach(id => {
       if (id && id.trim()) {
         const clean = id.toLowerCase().trim();
         if (!SYSTEM_PROTECTED_KEYS.has(clean)) {
-          unblocked.delete(clean);
-          registry.add(clean);
+          if (unblocked.delete(clean)) changed = true;
+          if (!registry.has(clean)) {
+            registry.add(clean);
+            changed = true;
+          }
         }
       }
     });
-    localStorage.setItem(STORAGE_KEY_UNBLOCKED, JSON.stringify(Array.from(unblocked)));
-    localStorage.setItem(STORAGE_KEY_DELETED, JSON.stringify(Array.from(registry)));
-    persistSyncRegistryToFirestore().catch(() => {});
+    if (changed) {
+      localStorage.setItem(STORAGE_KEY_UNBLOCKED, JSON.stringify(Array.from(unblocked)));
+      localStorage.setItem(STORAGE_KEY_DELETED, JSON.stringify(Array.from(registry)));
+      persistSyncRegistryToFirestore().catch(() => {});
+    }
   } catch (e) {
     console.warn('Failed recording deleted identifier:', e);
   }
@@ -257,9 +308,9 @@ export const removeDeletedRecord = (...identifiers: (string | undefined | null)[
         }
       }
     });
-    localStorage.setItem(STORAGE_KEY_UNBLOCKED, JSON.stringify(Array.from(unblocked)));
-    localStorage.setItem(STORAGE_KEY_DELETED, JSON.stringify(Array.from(registry)));
     if (changed) {
+      localStorage.setItem(STORAGE_KEY_UNBLOCKED, JSON.stringify(Array.from(unblocked)));
+      localStorage.setItem(STORAGE_KEY_DELETED, JSON.stringify(Array.from(registry)));
       persistSyncRegistryToFirestore().catch(() => {});
     }
   } catch (e) {
@@ -333,8 +384,8 @@ export const recordCustomEmpId = (email?: string | null, oldId?: string | null, 
         }
       });
     }
-    localStorage.setItem(STORAGE_KEY_EMP_ID_MAP, JSON.stringify(map));
     if (changed) {
+      localStorage.setItem(STORAGE_KEY_EMP_ID_MAP, JSON.stringify(map));
       persistSyncRegistryToFirestore().catch(() => {});
     }
   } catch (e) {

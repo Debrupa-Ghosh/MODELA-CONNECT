@@ -105,6 +105,22 @@
         "bankAccount": { "type": "string", "maxLength": 64 }
       },
       "required": ["id", "employeeId", "month", "year", "status"]
+    },
+    "Policy": {
+      "title": "Policy",
+      "description": "Organization policy documents uploaded by Super Admin",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "policyId": { "type": "string", "maxLength": 128 },
+        "policyName": { "type": "string", "maxLength": 256 },
+        "fileName": { "type": "string", "maxLength": 256 },
+        "fileType": { "type": "string", "maxLength": 128 },
+        "fileData": { "type": "string" },
+        "pdfData": { "type": "string" },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["id", "policyId", "policyName", "fileName"]
     }
   },
   "firestore": {
@@ -127,6 +143,10 @@
     "/payroll/{payrollId}": {
       "schema": "PayrollRecord",
       "description": "Monthly payroll disbursement ledger"
+    },
+    "/policies/{policyId}": {
+      "schema": "Policy",
+      "description": "Uploaded company policy files and metadata"
     }
   }
 }

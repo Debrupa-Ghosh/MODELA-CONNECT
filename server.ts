@@ -30,7 +30,7 @@ interface ServerUser {
 
 const PORT = Number(process.env.PORT) || 3000;
 
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 
 const STATE_FILE_PATH = path.resolve(__dirname, '.server-users-state.json');
 
@@ -111,6 +111,7 @@ let serverDeletedIds = new Set<string>([
 let persistedEmployees: any[] = [];
 let persistedPayroll: any[] = [];
 let persistedRequests: any[] = [];
+let persistedPolicies: any[] = [];
 
 const isExcludedServerStaffRequest = (r: any): boolean => {
   if (!r) return true;
@@ -166,6 +167,9 @@ try {
     }
     if (Array.isArray(parsed.staffRequests)) {
       persistedRequests = parsed.staffRequests.filter((r: any) => !isExcludedServerStaffRequest(r));
+    }
+    if (Array.isArray(parsed.policies)) {
+      persistedPolicies = parsed.policies;
     }
   }
 } catch {}
@@ -258,6 +262,7 @@ interface ServerStaffRequest {
 
 let staffRequests: ServerStaffRequest[] = [...persistedRequests];
 let payrollRecords: any[] = [...persistedPayroll];
+let policyRecords: any[] = [...persistedPolicies];
 
 if (persistedEmployees.length > 0) {
   persistedEmployees.forEach(pe => {
@@ -273,24 +278,24 @@ if (persistedEmployees.length > 0) {
   });
 }
 
+let saveStateTimer: ReturnType<typeof setTimeout> | null = null;
+
 const saveServerState = () => {
-  try {
-    fs.writeFileSync(
-      STATE_FILE_PATH,
-      JSON.stringify(
-        {
-          users,
-          deletedIds: Array.from(serverDeletedIds),
-          employees,
-          payroll: payrollRecords,
-          staffRequests: staffRequests.filter(r => !isExcludedServerStaffRequest(r))
-        },
-        null,
-        2
-      ),
-      'utf-8'
-    );
-  } catch {}
+  if (saveStateTimer) clearTimeout(saveStateTimer);
+  saveStateTimer = setTimeout(() => {
+    saveStateTimer = null;
+    try {
+      const payload = JSON.stringify({
+        users,
+        deletedIds: Array.from(serverDeletedIds),
+        employees,
+        payroll: payrollRecords,
+        staffRequests: staffRequests.filter(r => !isExcludedServerStaffRequest(r)),
+        policies: policyRecords
+      });
+      fs.promises.writeFile(STATE_FILE_PATH, payload, 'utf-8').catch(() => {});
+    } catch {}
+  }, 200);
 };
 
 saveServerState();
@@ -310,6 +315,13 @@ const broadcastUsers = () => {
 
 // API Endpoints
 app.get('/api/users', (req: Request, res: Response) => {
+  users = users.filter(
+    u =>
+      u &&
+      u.status !== 'REJECTED' &&
+      !serverDeletedIds.has(String(u.id || '').toLowerCase().trim()) &&
+      !serverDeletedIds.has(String(u.email || '').toLowerCase().trim())
+  );
   res.json({
     success: true,
     users,
@@ -346,7 +358,9 @@ app.post('/api/users/request', (req: Request, res: Response) => {
   };
 
   serverDeletedIds.delete(emailLower);
+  serverDeletedIds.delete(`req-${emailLower.replace(/[^a-z0-9]/g, '_')}`);
   if (record.id) serverDeletedIds.delete(record.id.toLowerCase());
+  if (record.uid) serverDeletedIds.delete(record.uid.toLowerCase());
   if (record.employeeId) serverDeletedIds.delete(record.employeeId.toLowerCase());
 
   users = [
@@ -363,7 +377,10 @@ app.post('/api/users/approve', (req: Request, res: Response) => {
   const now = new Date().toISOString();
   const cleanEmail = email ? String(email).toLowerCase().trim() : '';
 
-  if (cleanEmail) serverDeletedIds.delete(cleanEmail);
+  if (cleanEmail) {
+    serverDeletedIds.delete(cleanEmail);
+    serverDeletedIds.delete(`req-${cleanEmail.replace(/[^a-z0-9]/g, '_')}`);
+  }
   if (userId) serverDeletedIds.delete(String(userId).toLowerCase());
   if (employeeId) serverDeletedIds.delete(String(employeeId).toLowerCase());
 
@@ -419,23 +436,46 @@ app.post('/api/users/approve', (req: Request, res: Response) => {
 });
 
 app.post('/api/users/reject', (req: Request, res: Response) => {
-  const { userId, email, reviewer, reason } = req.body;
-  const now = new Date().toISOString();
+  const { userId, targetId, email } = req.body;
+  const cleanId = userId ? String(userId).toLowerCase().trim() : '';
+  const cleanTargetId = targetId ? String(targetId).toLowerCase().trim() : '';
   const cleanEmail = email ? String(email).toLowerCase().trim() : '';
-  users = users.map(u => {
-    if (u.id === userId || u.uid === userId || (cleanEmail && u.email?.toLowerCase().trim() === cleanEmail)) {
-      return {
-        ...u,
-        status: 'REJECTED',
-        reviewedAt: now,
-        reviewedBy: reviewer || 'Super Admin',
-        remarks: reason || 'Rejected',
-        updatedAt: now,
-        isLiveRequest: false
-      };
+
+  if (cleanId && !PROTECTED_ACTIVE_KEYS.has(cleanId)) serverDeletedIds.add(cleanId);
+  if (cleanTargetId && !PROTECTED_ACTIVE_KEYS.has(cleanTargetId)) serverDeletedIds.add(cleanTargetId);
+  if (cleanEmail && !PROTECTED_ACTIVE_KEYS.has(cleanEmail)) {
+    serverDeletedIds.add(cleanEmail);
+    serverDeletedIds.add(`req-${cleanEmail.replace(/[^a-z0-9]/g, '_')}`);
+  }
+
+  users.forEach(u => {
+    const uId = String(u.id || '').toLowerCase().trim();
+    const uUid = String(u.uid || '').toLowerCase().trim();
+    const uEmail = String(u.email || '').toLowerCase().trim();
+    if (
+      (cleanId && (uId === cleanId || uUid === cleanId)) ||
+      (cleanTargetId && (uId === cleanTargetId || uUid === cleanTargetId)) ||
+      (cleanEmail && uEmail === cleanEmail)
+    ) {
+      if (uId && !PROTECTED_ACTIVE_KEYS.has(uId)) serverDeletedIds.add(uId);
+      if (uUid && !PROTECTED_ACTIVE_KEYS.has(uUid)) serverDeletedIds.add(uUid);
+      if (uEmail && !PROTECTED_ACTIVE_KEYS.has(uEmail)) {
+        serverDeletedIds.add(uEmail);
+        serverDeletedIds.add(`req-${uEmail.replace(/[^a-z0-9]/g, '_')}`);
+      }
     }
-    return u;
   });
+
+  users = users.filter(u => {
+    const uId = String(u.id || '').toLowerCase().trim();
+    const uUid = String(u.uid || '').toLowerCase().trim();
+    const uEmail = String(u.email || '').toLowerCase().trim();
+    if (cleanId && (uId === cleanId || uUid === cleanId)) return false;
+    if (cleanTargetId && (uId === cleanTargetId || uUid === cleanTargetId)) return false;
+    if (cleanEmail && uEmail === cleanEmail) return false;
+    return true;
+  });
+
   saveServerState();
   broadcastUsers();
   res.json({ success: true });
@@ -503,7 +543,6 @@ app.post('/api/employees', (req: Request, res: Response) => {
     employees.unshift(newEmp);
   }
   saveServerState();
-  reconcileFirestoreDatabase();
   res.json({ success: true, employee: newEmp });
 });
 
@@ -550,7 +589,6 @@ app.post('/api/payroll', (req: Request, res: Response) => {
     payrollRecords.unshift(rec);
   }
   saveServerState();
-  reconcileFirestoreDatabase();
   res.json({ success: true, record: rec });
 });
 
@@ -602,6 +640,52 @@ app.delete('/api/requests/:id', (req: Request, res: Response) => {
   staffRequests = staffRequests.filter(r => r.id !== id && !isExcludedServerStaffRequest(r));
   saveServerState();
   res.json({ success: true, message: `Request ${id} deleted` });
+});
+
+// Policy endpoints
+app.get('/api/policies', (_req: Request, res: Response) => {
+  res.json({ success: true, policies: policyRecords });
+});
+
+app.post('/api/policies', (req: Request, res: Response) => {
+  const policy = req.body;
+  if (!policy || !policy.policyId || !policy.policyName || !policy.fileName) {
+    return res.status(400).json({ success: false, message: 'Invalid policy payload' });
+  }
+  const cleanId = String(policy.id || policy.policyId).trim();
+  const record = {
+    ...policy,
+    id: cleanId,
+    policyId: String(policy.policyId).trim(),
+    policyName: String(policy.policyName).trim(),
+    fileName: String(policy.fileName).trim(),
+    createdAt: policy.createdAt || new Date().toISOString()
+  };
+  const idx = policyRecords.findIndex(
+    p =>
+      String(p.id).toLowerCase() === cleanId.toLowerCase() ||
+      String(p.policyId).toLowerCase() === record.policyId.toLowerCase()
+  );
+  if (idx >= 0) {
+    policyRecords[idx] = { ...policyRecords[idx], ...record };
+  } else {
+    policyRecords.unshift(record);
+  }
+  saveServerState();
+  res.json({ success: true, policy: record });
+});
+
+app.delete('/api/policies/:id', (req: Request, res: Response) => {
+  const { id } = req.params;
+  const cleanId = decodeURIComponent(id).trim().toLowerCase();
+  policyRecords = policyRecords.filter(
+    p =>
+      String(p.id || '').trim().toLowerCase() !== cleanId &&
+      String(p.policyId || '').trim().toLowerCase() !== cleanId &&
+      String(p.policyName || '').trim().toLowerCase() !== cleanId
+  );
+  saveServerState();
+  res.json({ success: true, message: `Policy ${id} deleted` });
 });
 
 // Server-Sent Events endpoint (closes cleanly to avoid holding Cloud Run proxy slots)
@@ -722,6 +806,43 @@ async function reconcileFirestoreDatabase() {
         needsRetry = true;
         break;
       }
+    }
+
+    // 6. Sync policies collection between Firestore and server state so /api/policies is always populated
+    try {
+      const policiesSnap = await getDocs(collection(db, 'policies'));
+      let policiesChanged = false;
+      for (const pDoc of policiesSnap.docs) {
+        const pData = pDoc.data();
+        if (pData && pData.policyId && pData.policyName && pData.fileName) {
+          const cleanId = String(pData.id || pDoc.id).trim();
+          const idx = policyRecords.findIndex(
+            p =>
+              String(p.id || '').toLowerCase() === cleanId.toLowerCase() ||
+              String(p.policyId || '').toLowerCase() === String(pData.policyId).toLowerCase()
+          );
+          if (idx >= 0) {
+            policyRecords[idx] = {
+              ...pData,
+              ...policyRecords[idx],
+              id: cleanId,
+              fileData: policyRecords[idx].fileData || pData.fileData || '',
+              docxHtml: policyRecords[idx].docxHtml || pData.docxHtml || ''
+            };
+          } else {
+            policyRecords.push({
+              ...pData,
+              id: cleanId
+            });
+            policiesChanged = true;
+          }
+        }
+      }
+      if (policiesChanged) {
+        saveServerState();
+      }
+    } catch {
+      needsRetry = true;
     }
 
     if (needsRetry) {

@@ -1,5 +1,5 @@
-import React from 'react';
-import { NavLink } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useApp } from '../../context/AppContext';
 import { isRequestOwnedByUser, getRoleLabel } from '../../types';
@@ -18,6 +18,7 @@ import {
   Terminal,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Shield,
   FileText,
   Settings
@@ -32,8 +33,20 @@ interface NavItem {
 }
 
 export const Sidebar: React.FC = () => {
-  const { currentUser, hasFullAccess, isEmployee, isHR, isDirector, pendingUsers } = useAuth();
+  const { currentUser, hasFullAccess, isEmployee, isHR, isDirector, isSuperAdmin, pendingUsers } = useAuth();
   const { staffRequests, isSidebarCollapsed, toggleSidebar } = useApp();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const isSuperAdminRole = Boolean(isSuperAdmin || currentUser?.role === 'SUPER_ADMIN');
+  const isPolicyRouteActive = location.pathname.startsWith('/policy');
+  const [isPolicyMenuOpen, setIsPolicyMenuOpen] = useState<boolean>(() => location.pathname.startsWith('/policy'));
+
+  useEffect(() => {
+    if (location.pathname.startsWith('/policy')) {
+      setIsPolicyMenuOpen(true);
+    }
+  }, [location.pathname]);
 
   const myPendingStaffCount = staffRequests.filter(r => r.status === 'PENDING' && isRequestOwnedByUser(r, currentUser)).length;
   const pendingStaffCount = staffRequests.filter(r => r.status === 'PENDING').length;
@@ -177,6 +190,77 @@ export const Sidebar: React.FC = () => {
 
         {navItems.map(item => {
           const Icon = item.icon;
+
+          // For Super Admin Role: Policy item expands into two sub-pages (Add Policy & View Policy) in the format shown in the image
+          if (item.to === '/policy' && isSuperAdminRole) {
+            return (
+              <div key={item.to} className="space-y-1.5">
+                <button
+                  type="button"
+                  title={isSidebarCollapsed ? item.label : undefined}
+                  onClick={() => {
+                    if (isSidebarCollapsed) {
+                      navigate('/policy/add');
+                    } else {
+                      setIsPolicyMenuOpen(prev => !prev);
+                      if (!location.pathname.startsWith('/policy')) {
+                        navigate('/policy/add');
+                      }
+                    }
+                  }}
+                  className={`w-full flex items-center ${
+                    isSidebarCollapsed ? 'justify-center p-2.5' : 'justify-between px-3 py-2.5'
+                  } rounded-xl text-xs font-semibold transition-all duration-150 cursor-pointer ${
+                    isPolicyRouteActive
+                      ? 'bg-[#0C2240] text-[#38BDF8] border border-[#38BDF8]/40 shadow-[0_0_15px_rgba(56,189,248,0.15)] font-bold'
+                      : 'text-slate-300 hover:bg-[#0D182E] hover:text-white'
+                  }`}
+                >
+                  <div className={`flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'}`}>
+                    <Icon className={`${isSidebarCollapsed ? 'w-5 h-5' : 'w-4 h-4'} shrink-0`} />
+                    {!isSidebarCollapsed && <span>{item.label}</span>}
+                  </div>
+                  {!isSidebarCollapsed && (
+                    <ChevronDown
+                      className={`w-4 h-4 shrink-0 transition-transform duration-200 ${
+                        isPolicyMenuOpen ? 'rotate-0' : '-rotate-90'
+                      }`}
+                    />
+                  )}
+                </button>
+
+                {!isSidebarCollapsed && isPolicyMenuOpen && (
+                  <div className="bg-white rounded-lg py-2 px-3 mx-1 shadow-lg flex flex-col gap-1">
+                    <NavLink
+                      to="/policy/add"
+                      className={({ isActive }) => {
+                        const active = isActive || location.pathname === '/policy';
+                        return `block px-3 py-1.5 rounded-md text-xs transition-colors ${
+                          active
+                            ? 'text-slate-900 font-bold bg-slate-100'
+                            : 'text-slate-700 font-medium hover:bg-slate-100 hover:text-slate-900'
+                        }`;
+                      }}
+                    >
+                      Add Policy
+                    </NavLink>
+                    <NavLink
+                      to="/policy/view"
+                      className={({ isActive }) =>
+                        `block px-3 py-1.5 rounded-md text-xs transition-colors ${
+                          isActive
+                            ? 'text-slate-900 font-bold bg-slate-100'
+                            : 'text-slate-700 font-medium hover:bg-slate-100 hover:text-slate-900'
+                        }`
+                      }
+                    >
+                      View Policy
+                    </NavLink>
+                  </div>
+                )}
+              </div>
+            );
+          }
 
           return (
             <NavLink

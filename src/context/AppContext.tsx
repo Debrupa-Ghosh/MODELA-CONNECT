@@ -793,6 +793,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Real-time Firestore synchronization for employees across all devices
   useEffect(() => {
     let isSubscribed = true;
+    const cleanedEmpIds = new Set<string>();
+    const seededEmpIds = new Set<string>();
 
     const unsub = onSnapshot(
       collection(db, 'employees'),
@@ -803,7 +805,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             for (const emp of INITIAL_EMPLOYEES) {
               if (!isRecordDeleted(emp.id, emp.email)) {
                 const resolvedId = resolveEmpId(emp.email, emp.id) || emp.id;
-                await setDoc(doc(db, 'employees', resolvedId), cleanFirestoreData({ ...emp, id: resolvedId }));
+                if (!seededEmpIds.has(resolvedId)) {
+                  seededEmpIds.add(resolvedId);
+                  await setDoc(doc(db, 'employees', resolvedId), cleanFirestoreData({ ...emp, id: resolvedId }));
+                }
               }
             }
           } catch (e) {
@@ -844,7 +849,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             (fullName.includes('piu') && fullName.includes('roy')) ||
             lowerEmail.includes('piuroy') ||
             lowerEmail.includes('piu.roy');
-          if (isPiu || isRemovedEmployee) {
+          if ((isPiu || isRemovedEmployee) && !cleanedEmpIds.has(`pay-${upperId}`)) {
+            cleanedEmpIds.add(`pay-${upperId}`);
             ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'].forEach(mCode => {
               deleteDoc(doc(db, 'payroll', `PAY-2026-${mCode}-${upperId}`)).catch(() => {});
             });
@@ -857,7 +863,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             lowerEmail.includes('tony.stark') ||
             isRecordDeleted(docSnap.id, data.id, data.email, resolveEmpId(data.email, data.id))
           ) {
-            deleteDoc(doc(db, 'employees', docSnap.id)).catch(() => {});
+            if (!cleanedEmpIds.has(docSnap.id)) {
+              cleanedEmpIds.add(docSnap.id);
+              deleteDoc(doc(db, 'employees', docSnap.id)).catch(() => {});
+            }
             return;
           }
           remoteDocs.push({ docId: docSnap.id, data });
@@ -898,7 +907,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
             if (shouldReplace) {
               const oldDocId = personDocIdMap.get(key);
-              if (oldDocId && oldDocId !== docId) {
+              if (oldDocId && oldDocId !== docId && !cleanedEmpIds.has(oldDocId)) {
+                cleanedEmpIds.add(oldDocId);
                 deleteDoc(doc(db, 'employees', oldDocId)).catch(() => {});
               }
               const resolvedId = cleanEmail ? (resolveEmpId(cleanEmail, upperId) || upperId) : upperId;
@@ -907,7 +917,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               seenIds.add(resolvedId);
             } else {
               // Current doc is stale duplicate of existing; clean it up from Firestore
-              if (docId !== personDocIdMap.get(key)) {
+              if (docId !== personDocIdMap.get(key) && !cleanedEmpIds.has(docId)) {
+                cleanedEmpIds.add(docId);
                 deleteDoc(doc(db, 'employees', docId)).catch(() => {});
               }
             }
@@ -933,8 +944,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const initRecord: Employee = { ...initEmp, id: resolvedInitId };
           personMap.set(cleanEmail || resolvedInitId, initRecord);
           seenIds.add(resolvedInitId);
-          // Persist missing baseline employee (such as MOD008) to Firestore employees collection
-          if (!remoteDocs.some(d => d.docId.toUpperCase() === resolvedInitId || (cleanEmail && d.data.email?.toLowerCase().trim() === cleanEmail))) {
+          // Persist missing baseline employee (such as MOD008) to Firestore employees collection once
+          if (
+            !seededEmpIds.has(resolvedInitId) &&
+            !remoteDocs.some(d => d.docId.toUpperCase() === resolvedInitId || (cleanEmail && d.data.email?.toLowerCase().trim() === cleanEmail))
+          ) {
+            seededEmpIds.add(resolvedInitId);
             setDoc(doc(db, 'employees', resolvedInitId), cleanFirestoreData(initRecord), { merge: true }).catch(() => {});
           }
         });
@@ -1013,7 +1028,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               avatar: u.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || u.email)}&background=0284c7&color=fff`
             };
             personMap.set(cleanEmail, newEmp);
-            setDoc(doc(db, 'employees', empId), cleanFirestoreData(newEmp), { merge: true }).catch(() => {});
+            if (!seededEmpIds.has(empId)) {
+              seededEmpIds.add(empId);
+              setDoc(doc(db, 'employees', empId), cleanFirestoreData(newEmp), { merge: true }).catch(() => {});
+            }
           }
         });
 
@@ -1043,10 +1061,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const mergedEmployees = Array.from(personMap.values()).filter(
           e => !isRecordDeleted(e.id, e.email, resolveEmpId(e.email, e.id))
         );
-        setEmployees(mergedEmployees);
-        try {
-          localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(mergedEmployees));
-        } catch {}
+        setEmployees(prev => {
+          if (JSON.stringify(prev) === JSON.stringify(mergedEmployees)) {
+            return prev;
+          }
+          try {
+            localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(mergedEmployees));
+          } catch {}
+          return mergedEmployees;
+        });
       },
       err => {
         console.warn('Firestore employees sync notice:', err);
@@ -1054,6 +1077,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
 
     const pollServerEmployees = async () => {
+      if (document.visibilityState !== 'visible') return;
       try {
         const res = await fetch('/api/employees');
         if (!res.ok) return;
@@ -1089,7 +1113,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } catch {}
     };
 
-    const empPollTimer = setInterval(pollServerEmployees, 4000);
+    const empPollTimer = setInterval(pollServerEmployees, 15000);
 
     return () => {
       isSubscribed = false;
@@ -1139,15 +1163,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           (a, b) => new Date(b.submittedAt || 0).getTime() - new Date(a.submittedAt || 0).getTime()
         );
 
-      setStaffRequests(combined);
-      try {
-        localStorage.setItem(STORAGE_KEYS.REQUESTS, JSON.stringify(combined));
-      } catch {}
+      setStaffRequests(prev => {
+        if (JSON.stringify(prev) === JSON.stringify(combined)) {
+          return prev;
+        }
+        try {
+          localStorage.setItem(STORAGE_KEYS.REQUESTS, JSON.stringify(combined));
+        } catch {}
+        return combined;
+      });
     };
 
     let latestFirestoreRequests: StaffWorkflowRequest[] = [];
+    const cleanedReqIds = new Set<string>();
 
     const pollApiRequests = async () => {
+      if (document.visibilityState !== 'visible') return;
       try {
         const res = await fetch('/api/requests');
         if (res.ok) {
@@ -1172,11 +1203,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const data = docSnap.data() as StaffWorkflowRequest;
           const mergedData = { ...data, id: data?.id || docSnap.id };
           if (isExcludedStaffRequest(mergedData)) {
-            deleteDoc(doc(db, 'requests', docSnap.id)).catch(() => {});
-            fetch(`/api/requests/${encodeURIComponent(docSnap.id)}`, { method: 'DELETE' }).catch(() => {});
-            if (data?.id) {
-              deleteDoc(doc(db, 'requests', data.id)).catch(() => {});
-              fetch(`/api/requests/${encodeURIComponent(data.id)}`, { method: 'DELETE' }).catch(() => {});
+            if (!cleanedReqIds.has(docSnap.id)) {
+              cleanedReqIds.add(docSnap.id);
+              deleteDoc(doc(db, 'requests', docSnap.id)).catch(() => {});
+              fetch(`/api/requests/${encodeURIComponent(docSnap.id)}`, { method: 'DELETE' }).catch(() => {});
+              if (data?.id && data.id !== docSnap.id) {
+                deleteDoc(doc(db, 'requests', data.id)).catch(() => {});
+                fetch(`/api/requests/${encodeURIComponent(data.id)}`, { method: 'DELETE' }).catch(() => {});
+              }
             }
           } else if (data && data.id) {
             fsReqs.push(data);
@@ -1201,7 +1235,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
 
     pollApiRequests();
-    const pollTimer = setInterval(pollApiRequests, 4000);
+    const pollTimer = setInterval(pollApiRequests, 15000);
 
     return () => {
       isSubscribed = false;
@@ -1213,6 +1247,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Real-time Firestore synchronization for payroll ledger records across all devices
   useEffect(() => {
     let isSubscribed = true;
+    const cleanedPayrollIds = new Set<string>();
+    const seededPayrollIds = new Set<string>();
+
     const unsub = onSnapshot(
       collection(db, 'payroll'),
       async snapshot => {
@@ -1221,7 +1258,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (snapshot.empty) {
           try {
             for (const p of INITIAL_PAYROLL) {
-              await setDoc(doc(db, 'payroll', p.id), p);
+              if (!seededPayrollIds.has(p.id)) {
+                seededPayrollIds.add(p.id);
+                await setDoc(doc(db, 'payroll', p.id), p);
+              }
             }
           } catch (e) {
             console.warn('Initial payroll seed error:', e);
@@ -1233,8 +1273,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         snapshot.forEach(docSnap => {
           const data = docSnap.data() as PayrollRecord;
           if (!data || !data.id || isExcludedPayrollRecord(data) || BLOCKED_PAYROLL_DOC_IDS.has(docSnap.id.toUpperCase())) {
-            // Permanently remove excluded / duplicate payslips from Firestore database
-            deleteDoc(doc(db, 'payroll', docSnap.id)).catch(() => {});
+            // Permanently remove excluded / duplicate payslips from Firestore database once
+            if (!cleanedPayrollIds.has(docSnap.id)) {
+              cleanedPayrollIds.add(docSnap.id);
+              deleteDoc(doc(db, 'payroll', docSnap.id)).catch(() => {});
+            }
             return;
           }
           validDocs.push({ docId: docSnap.id, data });
@@ -1267,10 +1310,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               (!isExCanonical && newMatchesPreferred && !exMatchesPreferred);
 
             if (shouldReplace) {
-              deleteDoc(doc(db, 'payroll', existing.docId)).catch(() => {});
+              if (!cleanedPayrollIds.has(existing.docId)) {
+                cleanedPayrollIds.add(existing.docId);
+                deleteDoc(doc(db, 'payroll', existing.docId)).catch(() => {});
+              }
               cycleWinnerMap.set(cycleKey, { docId, data });
             } else {
-              deleteDoc(doc(db, 'payroll', docId)).catch(() => {});
+              if (!cleanedPayrollIds.has(docId)) {
+                cleanedPayrollIds.add(docId);
+                deleteDoc(doc(db, 'payroll', docId)).catch(() => {});
+              }
             }
           }
         });
@@ -1288,7 +1337,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 : initP.employeeId;
             const seededRecord: PayrollRecord = { ...initP, employeeId: resolvedId };
             cycleWinnerMap.set(cycleKey, { docId: seededRecord.id, data: seededRecord });
-            setDoc(doc(db, 'payroll', seededRecord.id), seededRecord, { merge: true }).catch(() => {});
+            if (!seededPayrollIds.has(seededRecord.id)) {
+              seededPayrollIds.add(seededRecord.id);
+              setDoc(doc(db, 'payroll', seededRecord.id), seededRecord, { merge: true }).catch(() => {});
+            }
           }
         });
 
@@ -1379,7 +1431,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               const cycleKey = `${m.toLowerCase()}-2026-${pKey}`;
               if (!cycleWinnerMap.has(cycleKey)) {
                 cycleWinnerMap.set(cycleKey, { docId: candidateRecord.id, data: candidateRecord });
-                setDoc(doc(db, 'payroll', candidateRecord.id), candidateRecord, { merge: true }).catch(() => {});
+                if (!seededPayrollIds.has(candidateRecord.id)) {
+                  seededPayrollIds.add(candidateRecord.id);
+                  setDoc(doc(db, 'payroll', candidateRecord.id), candidateRecord, { merge: true }).catch(() => {});
+                }
               }
             });
           });
@@ -1401,7 +1456,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               disbursedBy: ''
             };
             cycleWinnerMap.set(cycleKey, { docId: item.docId, data: updatedRecord });
-            setDoc(doc(db, 'payroll', item.docId), cleanFirestoreData(updatedRecord), { merge: true }).catch(() => {});
+            if (!seededPayrollIds.has(`unpaid-${item.docId}`)) {
+              seededPayrollIds.add(`unpaid-${item.docId}`);
+              setDoc(doc(db, 'payroll', item.docId), cleanFirestoreData(updatedRecord), { merge: true }).catch(() => {});
+            }
           }
         });
 
@@ -1431,10 +1489,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         const remotePayroll = Array.from(cycleWinnerMap.values()).map(item => item.data);
         const normalized = enforceMonthPayrollRules(remotePayroll.length > 0 ? remotePayroll : INITIAL_PAYROLL);
-        setPayroll(normalized);
-        try {
-          localStorage.setItem(STORAGE_KEYS.PAYROLL, JSON.stringify(normalized));
-        } catch {}
+        setPayroll(prev => {
+          if (JSON.stringify(prev) === JSON.stringify(normalized)) {
+            return prev;
+          }
+          try {
+            localStorage.setItem(STORAGE_KEYS.PAYROLL, JSON.stringify(normalized));
+          } catch {}
+          return normalized;
+        });
       },
       err => {
         console.warn('Firestore payroll sync notice:', err);
@@ -1442,6 +1505,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
 
     const pollServerPayroll = async () => {
+      if (document.visibilityState !== 'visible') return;
       try {
         const res = await fetch('/api/payroll');
         if (!res.ok) return;
@@ -1482,6 +1546,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
           if (changed) {
             const next = enforceMonthPayrollRules(Array.from(map.values()));
+            if (JSON.stringify(prev) === JSON.stringify(next)) {
+              return prev;
+            }
             try {
               localStorage.setItem(STORAGE_KEYS.PAYROLL, JSON.stringify(next));
             } catch {}
@@ -1493,7 +1560,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     pollServerPayroll();
-    const payrollPollTimer = setInterval(pollServerPayroll, 4000);
+    const payrollPollTimer = setInterval(pollServerPayroll, 15000);
 
     return () => {
       isSubscribed = false;
@@ -1582,18 +1649,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [selectedStaffRequest, setSelectedStaffRequest] = useState<StaffWorkflowRequest | null>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
 
-  // Sync to localStorage
+  // Sync individual slices to localStorage only when that specific slice changes
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(employees));
-      localStorage.setItem(STORAGE_KEYS.REQUESTS, JSON.stringify(staffRequests));
       localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(attendance));
-      // NOTE: Payroll data is stored directly in and loaded from Firestore database, never in localStorage.
+    } catch {}
+  }, [attendance]);
+
+  useEffect(() => {
+    try {
       localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(auditLogs));
+    } catch {}
+  }, [auditLogs]);
+
+  useEffect(() => {
+    try {
       localStorage.setItem(STORAGE_KEYS.ONBOARDING, JSON.stringify(onboarding));
+    } catch {}
+  }, [onboarding]);
+
+  useEffect(() => {
+    try {
       localStorage.setItem(STORAGE_KEYS.THEME, String(isDarkMode));
     } catch {}
-  }, [employees, staffRequests, attendance, auditLogs, onboarding, isDarkMode]);
+  }, [isDarkMode]);
 
   // Handle dark mode class on document
   useEffect(() => {

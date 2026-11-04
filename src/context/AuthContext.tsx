@@ -104,38 +104,69 @@ const isDeletedSeedSignupRequest = (u?: Partial<User> | null, docId?: string): b
   return false;
 };
 
+let cachedLiveRequestsMap: Map<string, User> | null = null;
+let lastSavedLiveRequestsJson = '';
+
 const getLiveRequestsMap = (): Map<string, User> => {
+  if (cachedLiveRequestsMap) return cachedLiveRequestsMap;
   const map = new Map<string, User>();
   try {
     const raw = localStorage.getItem(STORAGE_KEY_LIVE_REQUESTS);
     if (raw) {
+      lastSavedLiveRequestsJson = raw;
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
         let modified = false;
         parsed.forEach((u: User) => {
           if (u && u.email) {
-            if (isDeletedSeedSignupRequest(u)) {
+            const emailKey = u.email.toLowerCase().trim();
+            const reqDocId = `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
+            if (
+              isDeletedSeedSignupRequest(u) ||
+              u.status === 'REJECTED' ||
+              isRecordDeleted(u.id, u.uid, emailKey, reqDocId, u.employeeId)
+            ) {
               modified = true;
               return;
             }
-            map.set(u.email.toLowerCase().trim(), u);
+            map.set(emailKey, u);
           }
         });
         if (modified) {
-          localStorage.setItem(STORAGE_KEY_LIVE_REQUESTS, JSON.stringify(Array.from(map.values())));
+          const nextJson = JSON.stringify(Array.from(map.values()));
+          lastSavedLiveRequestsJson = nextJson;
+          localStorage.setItem(STORAGE_KEY_LIVE_REQUESTS, nextJson);
         }
       }
     }
   } catch {}
+  cachedLiveRequestsMap = map;
   return map;
 };
 
 const saveLiveRequestsMap = (map: Map<string, User>) => {
+  cachedLiveRequestsMap = map;
   try {
-    const cleanValues = Array.from(map.values()).filter(u => !isDeletedSeedSignupRequest(u));
-    localStorage.setItem(STORAGE_KEY_LIVE_REQUESTS, JSON.stringify(cleanValues));
+    const cleanValues = Array.from(map.values()).filter(u => {
+      if (!u || !u.email) return false;
+      const emailKey = u.email.toLowerCase().trim();
+      const reqDocId = `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      return (
+        u.status !== 'REJECTED' &&
+        !isDeletedSeedSignupRequest(u) &&
+        !isRecordDeleted(u.id, u.uid, emailKey, reqDocId, u.employeeId)
+      );
+    });
+    const nextJson = JSON.stringify(cleanValues);
+    if (nextJson !== lastSavedLiveRequestsJson) {
+      lastSavedLiveRequestsJson = nextJson;
+      localStorage.setItem(STORAGE_KEY_LIVE_REQUESTS, nextJson);
+    }
   } catch {}
 };
+
+const cleanedFirestoreUserDocIds = new Set<string>();
+const seededFirestoreUserDocIds = new Set<string>();
 
 const isLegacyExcludedUser = (u: Partial<User>, docId?: string): boolean => {
   if (isDeletedSeedSignupRequest(u, docId)) return true;
@@ -183,17 +214,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
+          parsed.forEach((u: any) => {
+            if (u && u.status === 'REJECTED' && u.id !== SYNC_REGISTRY_DOC_ID && u.email !== 'sync@system.internal') {
+              const emailKey = String(u.email || '').toLowerCase().trim();
+              const reqDocId = emailKey ? `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}` : undefined;
+              recordDeletedRecord(u.id, u.uid, emailKey, reqDocId);
+            }
+          });
           list = parsed
-            .filter(
-              u =>
-                u &&
-                u.id !== SYNC_REGISTRY_DOC_ID &&
-                u.email !== 'sync@system.internal' &&
+            .filter(u => {
+              if (!u || u.id === SYNC_REGISTRY_DOC_ID || u.email === 'sync@system.internal') return false;
+              if (u.status === 'REJECTED') return false;
+              const emailKey = String(u.email || '').toLowerCase().trim();
+              const reqDocId = emailKey ? `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}` : undefined;
+              return (
                 !isDeletedSeedSignupRequest(u) &&
                 !isLegacyExcludedUser(u) &&
-                ((u as any).isLiveRequest ||
-                  !isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolveEmpId(u.email, u.employeeId)))
-            )
+                !isRecordDeleted(u.id, u.uid, emailKey, reqDocId, u.employeeId, resolveEmpId(emailKey, u.employeeId))
+              );
+            })
             .map(u => ({
               ...u,
               employeeId: resolveEmpId(u.email, u.employeeId)
@@ -213,10 +252,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }));
     }
 
-    // Merge any locally submitted live sign-up requests so they never disappear
+    // Merge any locally submitted live sign-up requests that have not been rejected or deleted
     const liveMap = getLiveRequestsMap();
+    let liveCleaned = false;
     liveMap.forEach((liveUser, emailKey) => {
-      if (isDeletedSeedSignupRequest(liveUser)) return;
+      const reqDocId = `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      if (
+        isDeletedSeedSignupRequest(liveUser) ||
+        liveUser.status === 'REJECTED' ||
+        isRecordDeleted(liveUser.id, liveUser.uid, emailKey, reqDocId, liveUser.employeeId)
+      ) {
+        liveMap.delete(emailKey);
+        liveCleaned = true;
+        return;
+      }
       const idx = list.findIndex(u => u.email?.toLowerCase().trim() === emailKey);
       if (idx >= 0) {
         const curUpdated = String((list[idx] as any).updatedAt || list[idx].requestedAt || '');
@@ -228,6 +277,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         list.unshift(liveUser);
       }
     });
+    if (liveCleaned) {
+      saveLiveRequestsMap(liveMap);
+    }
 
     const sushoovanUser: User = {
       id: "USR-Q94BIIQ5",
@@ -335,19 +387,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const handleSyncRegistryUpdated = () => {
       const liveMap = getLiveRequestsMap();
+      let liveModified = false;
+      liveMap.forEach((liveU, emailKey) => {
+        const reqDocId = `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        if (
+          liveU.status === 'REJECTED' ||
+          isRecordDeleted(liveU.id, liveU.uid, emailKey, reqDocId, liveU.employeeId)
+        ) {
+          liveMap.delete(emailKey);
+          liveModified = true;
+        }
+      });
+      if (liveModified) {
+        saveLiveRequestsMap(liveMap);
+      }
+
       setUsers(prev => {
         const next = prev
-          .filter(
-            u =>
-              u &&
-              u.id !== SYNC_REGISTRY_DOC_ID &&
-              u.email !== 'sync@system.internal' &&
+          .filter(u => {
+            if (!u || u.id === SYNC_REGISTRY_DOC_ID || u.email === 'sync@system.internal') return false;
+            if (u.status === 'REJECTED') return false;
+            const emailKey = String(u.email || '').toLowerCase().trim();
+            const reqDocId = emailKey ? `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}` : undefined;
+            return (
               !isDeletedSeedSignupRequest(u) &&
               !isLegacyExcludedUser(u) &&
-              ((u as any).isLiveRequest ||
-                liveMap.has(u.email.toLowerCase().trim()) ||
-                !isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolveEmpId(u.email, u.employeeId)))
-          )
+              !isRecordDeleted(u.id, u.uid, emailKey, reqDocId, u.employeeId, resolveEmpId(emailKey, u.employeeId))
+            );
+          })
           .map(u => ({
             ...u,
             employeeId: resolveEmpId(u.email, u.employeeId)
@@ -372,18 +439,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Sync to localStorage
   useEffect(() => {
     try {
-      const liveMap = getLiveRequestsMap();
-      const sanitized = users.filter(
-        u =>
-          u &&
-          u.id !== SYNC_REGISTRY_DOC_ID &&
-          u.email !== 'sync@system.internal' &&
+      const sanitized = users.filter(u => {
+        if (!u || u.id === SYNC_REGISTRY_DOC_ID || u.email === 'sync@system.internal') return false;
+        if (u.status === 'REJECTED') return false;
+        const emailKey = String(u.email || '').toLowerCase().trim();
+        const reqDocId = emailKey ? `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}` : undefined;
+        return (
           !isDeletedSeedSignupRequest(u) &&
           !isLegacyExcludedUser(u) &&
-          ((u as any).isLiveRequest ||
-            liveMap.has(u.email.toLowerCase().trim()) ||
-            !isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolveEmpId(u.email, u.employeeId)))
-      );
+          !isRecordDeleted(u.id, u.uid, emailKey, reqDocId, u.employeeId, resolveEmpId(emailKey, u.employeeId))
+        );
+      });
       localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(sanitized));
     } catch (e) {
       console.warn('Failed saving users to localStorage:', e);
@@ -392,17 +458,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const mergeServerUsers = useCallback((incomingUsers: any[], deletedIds?: string[]) => {
     if (!Array.isArray(incomingUsers)) return;
+    const liveMap = getLiveRequestsMap();
+    let liveModified = false;
+
     if (Array.isArray(deletedIds) && deletedIds.length > 0) {
-      const liveMap = getLiveRequestsMap();
       deletedIds.forEach(dId => {
         const clean = String(dId || '').toLowerCase().trim();
-        if (clean && !liveMap.has(clean)) {
+        if (clean) {
+          if (liveMap.delete(clean)) liveModified = true;
+          liveMap.forEach((val, key) => {
+            if (
+              String(val.id || '').toLowerCase().trim() === clean ||
+              String(val.uid || '').toLowerCase().trim() === clean
+            ) {
+              liveMap.delete(key);
+              liveModified = true;
+            }
+          });
           recordDeletedRecord(clean);
         }
       });
     }
 
-    const liveMap = getLiveRequestsMap();
     const validServerUsers: User[] = [];
 
     incomingUsers.forEach((rawU: any) => {
@@ -411,50 +488,60 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (emailKey === 'sync@system.internal') return;
       if (isDeletedSeedSignupRequest(rawU)) return;
 
-      if (rawU.isLiveRequest || rawU.status === 'PENDING') {
-        if (rawU.isLiveRequest) {
-          removeDeletedRecord(emailKey, rawU.id, rawU.uid, rawU.employeeId);
-          liveMap.set(emailKey, rawU);
+      const reqDocId = `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      if (
+        rawU.status === 'REJECTED' ||
+        isLegacyExcludedUser(rawU) ||
+        isRecordDeleted(rawU.id, rawU.uid, emailKey, reqDocId, rawU.employeeId, resolveEmpId(emailKey, rawU.employeeId))
+      ) {
+        if (rawU.status === 'REJECTED') {
+          recordDeletedRecord(rawU.id, rawU.uid, emailKey, reqDocId);
         }
+        if (liveMap.delete(emailKey)) liveModified = true;
+        return;
       }
 
-      if (
-        !rawU.isLiveRequest &&
-        !liveMap.has(emailKey) &&
-        (isLegacyExcludedUser(rawU) ||
-          isRecordDeleted(rawU.id, rawU.uid, emailKey, rawU.employeeId, resolveEmpId(emailKey, rawU.employeeId)))
-      ) {
-        return;
+      if (rawU.isLiveRequest && rawU.status === 'PENDING') {
+        liveMap.set(emailKey, rawU);
+        liveModified = true;
       }
 
       validServerUsers.push(rawU as User);
     });
 
-    saveLiveRequestsMap(liveMap);
+    if (liveModified) {
+      saveLiveRequestsMap(liveMap);
+    }
     serverUsersRef.current = validServerUsers;
 
     setUsers(prev => {
       const map = new Map<string, User>();
       prev.forEach(u => {
-        if (u && u.email && !isDeletedSeedSignupRequest(u) && !isLegacyExcludedUser(u)) {
-          map.set(u.email.toLowerCase().trim(), u);
+        if (!u || !u.email || u.status === 'REJECTED') return;
+        const emailKey = u.email.toLowerCase().trim();
+        const reqDocId = `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        if (
+          !isDeletedSeedSignupRequest(u) &&
+          !isLegacyExcludedUser(u) &&
+          !isRecordDeleted(u.id, u.uid, emailKey, reqDocId, u.employeeId, resolveEmpId(emailKey, u.employeeId))
+        ) {
+          map.set(emailKey, u);
         }
       });
 
       // Merge server users
       validServerUsers.forEach(rawU => {
-        if (isDeletedSeedSignupRequest(rawU)) return;
+        if (isDeletedSeedSignupRequest(rawU) || rawU.status === 'REJECTED') return;
         const emailKey = rawU.email.toLowerCase().trim();
+        const reqDocId = `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        if (isRecordDeleted(rawU.id, rawU.uid, emailKey, reqDocId, rawU.employeeId, resolveEmpId(emailKey, rawU.employeeId))) {
+          return;
+        }
         const existing = map.get(emailKey);
         const rawUpdated = String((rawU as any).updatedAt || rawU.requestedAt || '');
         const exUpdated = existing ? String((existing as any).updatedAt || existing.requestedAt || '') : '';
 
-        if (
-          !existing ||
-          rawUpdated >= exUpdated ||
-          (rawU as any).isLiveRequest ||
-          (rawU.status === 'PENDING' && existing.status !== 'APPROVED')
-        ) {
+        if (!existing || rawUpdated >= exUpdated) {
           map.set(emailKey, {
             ...(existing || {}),
             ...rawU,
@@ -463,9 +550,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       });
 
-      // Ensure all local live requests are also present
+      // Ensure all valid local live requests are also present
       liveMap.forEach((liveU, emailKey) => {
-        if (isDeletedSeedSignupRequest(liveU)) return;
+        const reqDocId = `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        if (
+          isDeletedSeedSignupRequest(liveU) ||
+          liveU.status === 'REJECTED' ||
+          isRecordDeleted(liveU.id, liveU.uid, emailKey, reqDocId, liveU.employeeId)
+        ) {
+          return;
+        }
         const existing = map.get(emailKey);
         const liveUpdated = String((liveU as any).updatedAt || liveU.requestedAt || '');
         const exUpdated = existing ? String((existing as any).updatedAt || existing.requestedAt || '') : '';
@@ -478,17 +572,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       });
 
-      const next = Array.from(map.values()).filter(
-        u =>
-          u &&
-          u.id !== SYNC_REGISTRY_DOC_ID &&
-          u.email !== 'sync@system.internal' &&
+      const next = Array.from(map.values()).filter(u => {
+        if (!u || u.id === SYNC_REGISTRY_DOC_ID || u.email === 'sync@system.internal') return false;
+        if (u.status === 'REJECTED') return false;
+        const emailKey = u.email.toLowerCase().trim();
+        const reqDocId = `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        return (
           !isDeletedSeedSignupRequest(u) &&
           !isLegacyExcludedUser(u) &&
-          ((u as any).isLiveRequest ||
-            liveMap.has(u.email.toLowerCase().trim()) ||
-            !isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolveEmpId(u.email, u.employeeId)))
-      );
+          !isRecordDeleted(u.id, u.uid, emailKey, reqDocId, u.employeeId, resolveEmpId(emailKey, u.employeeId))
+        );
+      });
       if (JSON.stringify(prev) === JSON.stringify(next)) {
         return prev;
       }
@@ -525,43 +619,75 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return;
         }
 
-        // First pass: apply global sync registry document if present so deletions/EMP IDs are synced before filtering
+        // First pass: apply global sync registry document and record any REJECTED user docs before filtering
         snapshot.forEach(docSnap => {
           const raw = docSnap.data();
           if (docSnap.id === SYNC_REGISTRY_DOC_ID || raw?.id === SYNC_REGISTRY_DOC_ID || raw?.isSystemSync) {
             applyRemoteSyncRegistry(raw);
+            return;
+          }
+          if (raw && raw.status === 'REJECTED') {
+            const emailKey = String(raw.email || '').toLowerCase().trim();
+            const reqDocId = emailKey ? `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}` : undefined;
+            recordDeletedRecord(docSnap.id, raw.id, raw.uid, emailKey, reqDocId);
+            if (!cleanedFirestoreUserDocIds.has(docSnap.id)) {
+              cleanedFirestoreUserDocIds.add(docSnap.id);
+              deleteDoc(doc(db, 'users', docSnap.id)).catch(() => {});
+            }
           }
         });
 
         const liveMap = getLiveRequestsMap();
+        let liveModified = false;
         const remoteList: User[] = [];
         snapshot.forEach(docSnap => {
-          const item = docSnap.data() as User;
-          if (!item || !item.id || !item.email) return;
+          const rawItem = docSnap.data() as User;
+          if (!rawItem || (!rawItem.id && !docSnap.id) || !rawItem.email) return;
+          const item: User = { ...rawItem, id: rawItem.id || docSnap.id };
           if (docSnap.id === SYNC_REGISTRY_DOC_ID || item.id === SYNC_REGISTRY_DOC_ID || item.email === 'sync@system.internal' || (item as any).isSystemSync) {
             return;
           }
           if (isDeletedSeedSignupRequest(item, docSnap.id)) {
-            deleteDoc(doc(db, 'users', docSnap.id)).catch(() => {});
+            if (!cleanedFirestoreUserDocIds.has(docSnap.id)) {
+              cleanedFirestoreUserDocIds.add(docSnap.id);
+              deleteDoc(doc(db, 'users', docSnap.id)).catch(() => {});
+            }
             return;
           }
           const lowerEmail = (item.email || '').trim().toLowerCase();
-          if ((item as any).isLiveRequest) {
-            liveMap.set(lowerEmail, item);
-          }
+          const reqDocId = `REQ-${lowerEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
           if (
-            !(item as any).isLiveRequest &&
-            !liveMap.has(lowerEmail) &&
-            (isLegacyExcludedUser(item, docSnap.id) ||
-              isRecordDeleted(docSnap.id, item.id, item.uid, item.email, item.employeeId, resolveEmpId(item.email, item.employeeId)))
+            item.status === 'REJECTED' ||
+            isLegacyExcludedUser(item, docSnap.id) ||
+            isRecordDeleted(docSnap.id, item.id, item.uid, lowerEmail, reqDocId, item.employeeId, resolveEmpId(lowerEmail, item.employeeId))
           ) {
+            if (liveMap.delete(lowerEmail)) {
+              liveModified = true;
+            }
+            if (
+              item.status === 'REJECTED' ||
+              isRecordDeleted(docSnap.id, item.id, item.uid, lowerEmail, reqDocId)
+            ) {
+              if (!cleanedFirestoreUserDocIds.has(docSnap.id)) {
+                cleanedFirestoreUserDocIds.add(docSnap.id);
+                deleteDoc(doc(db, 'users', docSnap.id)).catch(() => {});
+              }
+            }
             return;
+          }
+          if ((item as any).isLiveRequest && item.status === 'PENDING') {
+            liveMap.set(lowerEmail, item);
+            liveModified = true;
           }
           remoteList.push(item);
         });
 
+        if (liveModified) {
+          saveLiveRequestsMap(liveMap);
+        }
+
         const map = new Map<string, User>();
-        // Ensure default accounts exist ONLY if not deleted, and persist missing baseline users (such as MOD008) to Firestore
+        // Ensure default accounts exist ONLY if not deleted, and persist missing baseline users (such as MOD008) to Firestore once
         INITIAL_USERS.filter(
           u =>
             !isDeletedSeedSignupRequest(u) &&
@@ -574,20 +700,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             employeeId: resolvedId
           };
           map.set(emailKey, userObj);
-          if (!remoteList.some(r => r.email?.toLowerCase().trim() === emailKey)) {
+          if (!remoteList.some(r => r.email?.toLowerCase().trim() === emailKey) && !seededFirestoreUserDocIds.has(u.id)) {
+            seededFirestoreUserDocIds.add(u.id);
             setDoc(doc(db, 'users', u.id), cleanFirestoreUser(userObj), { merge: true }).catch(() => {});
           }
         });
 
         // Override and add real-time remote accounts & requests from Firestore
         remoteList.forEach(u => {
-          if (isDeletedSeedSignupRequest(u)) return;
+          if (isDeletedSeedSignupRequest(u) || u.status === 'REJECTED') return;
           const emailKey = u.email.toLowerCase().trim();
-          if (
-            !(u as any).isLiveRequest &&
-            !liveMap.has(emailKey) &&
-            isRecordDeleted(u.id, u.uid, emailKey, u.employeeId, resolveEmpId(emailKey, u.employeeId))
-          ) {
+          const reqDocId = `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
+          if (isRecordDeleted(u.id, u.uid, emailKey, reqDocId, u.employeeId, resolveEmpId(emailKey, u.employeeId))) {
             return;
           }
           const existing = map.get(emailKey);
@@ -619,19 +743,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // Merge server-backed users & updates so Firestore write quota rollbacks NEVER erase pending sign-up requests
         serverUsersRef.current.forEach(srvU => {
-          if (!srvU || !srvU.email || isDeletedSeedSignupRequest(srvU)) return;
+          if (!srvU || !srvU.email || isDeletedSeedSignupRequest(srvU) || srvU.status === 'REJECTED') return;
           const emailKey = srvU.email.toLowerCase().trim();
-          if (
-            !(srvU as any).isLiveRequest &&
-            !liveMap.has(emailKey) &&
-            isRecordDeleted(srvU.id, srvU.uid, emailKey, srvU.employeeId, resolveEmpId(emailKey, srvU.employeeId))
-          ) {
+          const reqDocId = `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
+          if (isRecordDeleted(srvU.id, srvU.uid, emailKey, reqDocId, srvU.employeeId, resolveEmpId(emailKey, srvU.employeeId))) {
             return;
           }
           const existing = map.get(emailKey);
           const srvUpdated = String((srvU as any).updatedAt || srvU.requestedAt || '');
           const exUpdated = existing ? String((existing as any).updatedAt || existing.requestedAt || '') : '';
-          if (!existing || srvUpdated >= exUpdated || (srvU as any).isLiveRequest) {
+          if (!existing || srvUpdated >= exUpdated) {
             map.set(emailKey, {
               ...(existing || {}),
               ...srvU,
@@ -642,7 +763,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // Merge persistent local live sign-up requests
         liveMap.forEach((liveU, emailKey) => {
-          if (isDeletedSeedSignupRequest(liveU)) return;
+          const reqDocId = `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
+          if (
+            isDeletedSeedSignupRequest(liveU) ||
+            liveU.status === 'REJECTED' ||
+            isRecordDeleted(liveU.id, liveU.uid, emailKey, reqDocId, liveU.employeeId)
+          ) {
+            return;
+          }
           const existing = map.get(emailKey);
           const liveUpdated = String((liveU as any).updatedAt || liveU.requestedAt || '');
           const exUpdated = existing ? String((existing as any).updatedAt || existing.requestedAt || '') : '';
@@ -685,21 +813,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           });
         }
 
-        const updatedUsers = Array.from(map.values()).filter(
-          u =>
-            u &&
-            u.id !== SYNC_REGISTRY_DOC_ID &&
-            u.email !== 'sync@system.internal' &&
+        const updatedUsers = Array.from(map.values()).filter(u => {
+          if (!u || u.id === SYNC_REGISTRY_DOC_ID || u.email === 'sync@system.internal') return false;
+          if (u.status === 'REJECTED') return false;
+          const emailKey = u.email.toLowerCase().trim();
+          const reqDocId = `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
+          return (
             !isDeletedSeedSignupRequest(u) &&
             !isLegacyExcludedUser(u) &&
-            ((u as any).isLiveRequest ||
-              liveMap.has(u.email.toLowerCase().trim()) ||
-              !isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolveEmpId(u.email, u.employeeId)))
-        );
-        setUsers(updatedUsers);
-        try {
-          localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(updatedUsers));
-        } catch {}
+            !isRecordDeleted(u.id, u.uid, emailKey, reqDocId, u.employeeId, resolveEmpId(emailKey, u.employeeId))
+          );
+        });
+        setUsers(prev => {
+          if (JSON.stringify(prev) === JSON.stringify(updatedUsers)) {
+            return prev;
+          }
+          try {
+            localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(updatedUsers));
+          } catch {}
+          return updatedUsers;
+        });
       },
       error => {
         console.warn('Firestore real-time sync notification:', error);
@@ -724,7 +857,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (document.visibilityState === 'visible') {
         fetchFromBackend();
       }
-    }, 6000);
+    }, 15000);
 
     return () => {
       isSubscribed = false;
@@ -766,6 +899,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const raw = docSnap.data();
           if (docSnap.id === SYNC_REGISTRY_DOC_ID || raw?.id === SYNC_REGISTRY_DOC_ID || raw?.isSystemSync) {
             applyRemoteSyncRegistry(raw);
+            return;
+          }
+          if (raw && raw.status === 'REJECTED') {
+            const emailKey = String(raw.email || '').toLowerCase().trim();
+            const reqDocId = emailKey ? `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}` : undefined;
+            recordDeletedRecord(docSnap.id, raw.id, raw.uid, emailKey, reqDocId);
+            deleteDoc(doc(db, 'users', docSnap.id)).catch(() => {});
           }
         });
       }
@@ -794,11 +934,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       const liveMap = getLiveRequestsMap();
+      let liveModified = false;
       const remoteUsers: User[] = [];
       if (userSnap) {
         userSnap.forEach(docSnap => {
-          const uData = docSnap.data() as User;
-          if (!uData || !uData.id || !uData.email) return;
+          const rawUData = docSnap.data() as User;
+          if (!rawUData || (!rawUData.id && !docSnap.id) || !rawUData.email) return;
+          const uData: User = { ...rawUData, id: rawUData.id || docSnap.id };
           if (docSnap.id === SYNC_REGISTRY_DOC_ID || uData.id === SYNC_REGISTRY_DOC_ID || uData.email === 'sync@system.internal' || (uData as any).isSystemSync) {
             return;
           }
@@ -807,25 +949,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return;
           }
           const emailKey = uData.email.toLowerCase().trim();
+          const reqDocId = `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
           if (
-            !(uData as any).isLiveRequest &&
-            !liveMap.has(emailKey) &&
-            (isLegacyExcludedUser(uData, docSnap.id) ||
-              isRecordDeleted(docSnap.id, uData.id, uData.uid, uData.email, uData.employeeId, resolveEmpId(uData.email, uData.employeeId)))
+            uData.status === 'REJECTED' ||
+            isLegacyExcludedUser(uData, docSnap.id) ||
+            isRecordDeleted(docSnap.id, uData.id, uData.uid, emailKey, reqDocId, uData.employeeId, resolveEmpId(emailKey, uData.employeeId))
           ) {
+            if (liveMap.delete(emailKey)) liveModified = true;
+            if (
+              uData.status === 'REJECTED' ||
+              isRecordDeleted(docSnap.id, uData.id, uData.uid, emailKey, reqDocId)
+            ) {
+              deleteDoc(doc(db, 'users', docSnap.id)).catch(() => {});
+            }
             return;
           }
           remoteUsers.push(uData);
         });
       }
 
+      if (liveModified) {
+        saveLiveRequestsMap(liveMap);
+      }
+
       serverUsersRef.current.forEach(apiU => {
-        if (!apiU || !apiU.id || !apiU.email || isDeletedSeedSignupRequest(apiU)) return;
+        if (!apiU || !apiU.id || !apiU.email || isDeletedSeedSignupRequest(apiU) || apiU.status === 'REJECTED') return;
         remoteUsers.push(apiU);
       });
 
       liveMap.forEach(liveU => {
-        if (!liveU || !liveU.id || !liveU.email || isDeletedSeedSignupRequest(liveU)) return;
+        if (!liveU || !liveU.id || !liveU.email || isDeletedSeedSignupRequest(liveU) || liveU.status === 'REJECTED') return;
         remoteUsers.push(liveU);
       });
 
@@ -844,13 +997,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       remoteUsers.forEach(u => {
-        if (isDeletedSeedSignupRequest(u)) return;
+        if (isDeletedSeedSignupRequest(u) || u.status === 'REJECTED') return;
         const emailKey = u.email.toLowerCase().trim();
-        if (
-          !(u as any).isLiveRequest &&
-          !liveMap.has(emailKey) &&
-          isRecordDeleted(u.id, u.uid, emailKey, u.employeeId, resolveEmpId(emailKey, u.employeeId))
-        ) {
+        const reqDocId = `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        if (isRecordDeleted(u.id, u.uid, emailKey, reqDocId, u.employeeId, resolveEmpId(emailKey, u.employeeId))) {
           return;
         }
         const existing = map.get(emailKey);
@@ -859,7 +1009,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (uUpdatedAt && u.employeeId) {
           recordCustomEmpId(emailKey, undefined, u.employeeId);
         }
-        if (!existing || uUpdatedAt >= exUpdatedAt || (u as any).isLiveRequest) {
+        if (!existing || uUpdatedAt >= exUpdatedAt) {
           map.set(emailKey, {
             ...(existing || {}),
             ...u,
@@ -877,17 +1027,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       });
 
-      const nextList = Array.from(map.values()).filter(
-        u =>
-          u &&
-          u.id !== SYNC_REGISTRY_DOC_ID &&
-          u.email !== 'sync@system.internal' &&
+      const nextList = Array.from(map.values()).filter(u => {
+        if (!u || u.id === SYNC_REGISTRY_DOC_ID || u.email === 'sync@system.internal') return false;
+        if (u.status === 'REJECTED') return false;
+        const emailKey = u.email.toLowerCase().trim();
+        const reqDocId = `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        return (
           !isDeletedSeedSignupRequest(u) &&
           !isLegacyExcludedUser(u) &&
-          ((u as any).isLiveRequest ||
-            liveMap.has(u.email.toLowerCase().trim()) ||
-            !isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolveEmpId(u.email, u.employeeId)))
-      );
+          !isRecordDeleted(u.id, u.uid, emailKey, reqDocId, u.employeeId, resolveEmpId(emailKey, u.employeeId))
+        );
+      });
       setUsers(nextList);
       try {
         localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(nextList));
@@ -1356,53 +1506,131 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const rejectUserRequest = async (userId: string, reason?: string): Promise<boolean> => {
     setIsLoading(true);
     try {
-      const now = new Date().toISOString();
       const reviewer = currentUser?.email || 'System Super Admin';
-      let targetEmail = '';
+      const cleanUserId = String(userId || '').trim();
+      const lowerUserId = cleanUserId.toLowerCase();
 
+      const liveMap = getLiveRequestsMap();
+      let liveMatchedUser: User | undefined;
+      liveMap.forEach(u => {
+        if (
+          u.id === cleanUserId ||
+          u.uid === cleanUserId ||
+          u.email?.toLowerCase().trim() === lowerUserId
+        ) {
+          liveMatchedUser = u;
+        }
+      });
+
+      const targetUser =
+        users.find(
+          u =>
+            u.id === cleanUserId ||
+            u.uid === cleanUserId ||
+            (u.email && u.email.toLowerCase().trim() === lowerUserId)
+        ) ||
+        serverUsersRef.current.find(
+          u =>
+            u.id === cleanUserId ||
+            u.uid === cleanUserId ||
+            (u.email && u.email.toLowerCase().trim() === lowerUserId)
+        ) ||
+        liveMatchedUser;
+
+      const targetEmail = (targetUser?.email || (cleanUserId.includes('@') ? cleanUserId : '')).trim().toLowerCase();
+      const reqDocId = targetEmail ? `REQ-${targetEmail.replace(/[^a-zA-Z0-9]/g, '_')}` : '';
+
+      // 1. Record in persistent deleted registry & sync to Firestore SYNC-REGISTRY-GLOBAL immediately
+      recordDeletedRecord(
+        cleanUserId,
+        targetUser?.id,
+        targetUser?.uid,
+        targetEmail,
+        reqDocId
+      );
+      persistSyncRegistryToFirestore().catch(() => {});
+
+      // 2. Remove from live sign-up requests registry immediately
+      let liveChanged = false;
+      if (targetEmail && liveMap.delete(targetEmail)) {
+        liveChanged = true;
+      }
+      liveMap.forEach((val, key) => {
+        if (
+          val.id === cleanUserId ||
+          val.uid === cleanUserId ||
+          (targetUser?.id && val.id === targetUser.id) ||
+          (targetEmail && key === targetEmail)
+        ) {
+          liveMap.delete(key);
+          liveChanged = true;
+        }
+      });
+      if (liveChanged) {
+        saveLiveRequestsMap(liveMap);
+      }
+
+      const rejectedKeys = new Set(
+        [cleanUserId, targetUser?.id, targetUser?.uid, targetEmail, reqDocId]
+          .filter(Boolean)
+          .map(s => String(s).toLowerCase().trim())
+      );
+
+      // 3. Remove from serverUsersRef immediately
+      serverUsersRef.current = serverUsersRef.current.filter(
+        u =>
+          !rejectedKeys.has(String(u.id || '').toLowerCase().trim()) &&
+          !rejectedKeys.has(String(u.uid || '').toLowerCase().trim()) &&
+          !rejectedKeys.has(String(u.email || '').toLowerCase().trim())
+      );
+
+      // 4. Remove from users state and localStorage immediately
       setUsers(prev => {
-        const next = prev.map(u => {
-          if (u.id === userId || u.uid === userId) {
-            targetEmail = u.email.toLowerCase().trim();
-            const updated = {
-              ...u,
-              status: 'REJECTED' as const,
-              reviewedAt: now,
-              reviewedBy: reviewer,
-              statusUpdatedAt: now,
-              notificationUnread: false,
-              remarks: reason || 'Access request rejected by security policy',
-              ...({ updatedAt: now, isLiveRequest: false } as any)
-            };
-            setDoc(doc(db, 'users', u.id), updated).catch(() => {});
-            return updated;
-          }
-          return u;
-        });
+        const next = prev.filter(
+          u =>
+            !rejectedKeys.has(String(u.id || '').toLowerCase().trim()) &&
+            !rejectedKeys.has(String(u.uid || '').toLowerCase().trim()) &&
+            !rejectedKeys.has(String(u.email || '').toLowerCase().trim())
+        );
         try {
           localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(next));
         } catch {}
         return next;
       });
 
-      if (targetEmail) {
-        const liveMap = getLiveRequestsMap();
-        if (liveMap.delete(targetEmail)) {
-          saveLiveRequestsMap(liveMap);
-        }
-      }
-
-      serverUsersRef.current = serverUsersRef.current.map(u =>
-        u.id === userId || u.uid === userId || (targetEmail && u.email?.toLowerCase().trim() === targetEmail)
-          ? { ...u, status: 'REJECTED', reviewedAt: now, reviewedBy: reviewer, ...({ updatedAt: now, isLiveRequest: false } as any) }
-          : u
-      );
-
+      // 5. Notify backend server to reject and record in serverDeletedIds
       fetch('/api/users/reject', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, email: targetEmail, reviewer, reason })
+        body: JSON.stringify({
+          userId: cleanUserId,
+          targetId: targetUser?.id,
+          email: targetEmail,
+          reviewer,
+          reason
+        })
       }).catch(() => {});
+
+      // 6. Permanently delete all matching pending request documents from Firestore
+      deleteDoc(doc(db, 'users', cleanUserId)).catch(() => {});
+      if (targetUser?.id && targetUser.id !== cleanUserId) {
+        deleteDoc(doc(db, 'users', targetUser.id)).catch(() => {});
+      }
+      if (targetUser?.uid && targetUser.uid !== cleanUserId && targetUser.uid !== targetUser?.id) {
+        deleteDoc(doc(db, 'users', targetUser.uid)).catch(() => {});
+      }
+      if (reqDocId) {
+        deleteDoc(doc(db, 'users', reqDocId)).catch(() => {});
+      }
+      if (targetEmail) {
+        getDocs(query(collection(db, 'users'), where('email', '==', targetEmail)))
+          .then(snap => {
+            snap.forEach(d => {
+              deleteDoc(doc(db, 'users', d.id)).catch(() => {});
+            });
+          })
+          .catch(() => {});
+      }
 
       return true;
     } finally {
@@ -1414,14 +1642,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
     try {
       const now = new Date().toISOString();
-      let targetEmail = '';
+      const targetUser = users.find(u => u.id === userId || u.uid === userId);
+      const targetEmail = (targetUser?.email || '').toLowerCase().trim();
 
       setUsers(prev => {
         const next = prev.map(u => {
           if (u.id === userId || u.uid === userId) {
-            targetEmail = u.email.toLowerCase().trim();
-            const updated = { ...u, role: newRole, ...({ updatedAt: now } as any) };
-            setDoc(doc(db, 'users', u.id), updated).catch(() => {});
+            const updated = cleanFirestoreUser({ ...u, role: newRole, ...({ updatedAt: now } as any) });
+            setDoc(doc(db, 'users', u.id), updated, { merge: true }).catch(() => {});
             return updated;
           }
           return u;
