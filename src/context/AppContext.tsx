@@ -216,6 +216,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         location: "San Francisco HQ",
         compensation: { basic: 50000, allowances: 15000 },
         avatar: "https://ui-avatars.com/api/?name=Debrupa+Ghosh&background=0284c7&color=fff"
+      },
+      {
+        id: resolveEmpId("jit@modelatech.com", "MOD115") || "MOD115",
+        firstName: "Satyajit",
+        lastName: "Mazumder",
+        email: "jit@modelatech.com",
+        joiningDate: "2026-10-15",
+        designation: "Staff Member",
+        phone: "",
+        department: "Engineering",
+        status: "ACTIVE",
+        location: "San Francisco HQ",
+        compensation: { basic: 50000, allowances: 15000 },
+        avatar: "https://ui-avatars.com/api/?name=Satyajit+Mazumder&background=0284c7&color=fff"
       }
     ];
 
@@ -819,8 +833,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         const remoteDocs: { docId: string; data: Employee }[] = [];
         snapshot.forEach(docSnap => {
-          const data = docSnap.data() as Employee;
-          if (!data || !data.id) return;
+          const rawData = docSnap.data() as any;
+          if (!rawData) return;
+          const rawId = String(rawData.id || docSnap.id || '').trim();
+          if (!rawId) return;
+          const nameParts = String(rawData.name || '').trim().split(/\s+/);
+          const firstName = rawData.firstName || nameParts[0] || 'Staff';
+          const lastName = rawData.lastName !== undefined ? rawData.lastName : nameParts.slice(1).join(' ');
+          const data: Employee = {
+            ...rawData,
+            id: rawId,
+            firstName,
+            lastName,
+            email: rawData.email || '',
+            joiningDate: rawData.joiningDate || '2026-10-15',
+            designation: rawData.designation || 'Staff Member',
+            department: rawData.department || 'Engineering',
+            phone: rawData.phone || '',
+            status: rawData.status || 'ACTIVE',
+            location: rawData.location || 'San Francisco HQ',
+            compensation: rawData.compensation && typeof rawData.compensation.basic === 'number'
+              ? rawData.compensation
+              : { basic: 50000, allowances: 15000 },
+            avatar: rawData.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(`${firstName} ${lastName}`.trim())}&background=0284c7&color=fff`
+          };
           const fullName = `${data.firstName || ''} ${data.lastName || ''}`.trim().toLowerCase();
           const lowerEmail = (data.email || '').trim().toLowerCase();
           const upperId = (data.id || '').trim().toUpperCase();
@@ -1050,7 +1086,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               const existing = personMap.get(key) || Array.from(personMap.values()).find(item => item.id.toUpperCase() === upperId);
               const srvUpdatedAt = String((srvEmp as any).updatedAt || '');
               const exUpdatedAt = existing ? String((existing as any).updatedAt || '') : '';
-              if (existing && srvUpdatedAt && (!exUpdatedAt || srvUpdatedAt >= exUpdatedAt)) {
+              if (!existing) {
+                personMap.set(key, srvEmp);
+              } else if (srvUpdatedAt && (!exUpdatedAt || srvUpdatedAt >= exUpdatedAt)) {
                 const mapKey = existing.email ? existing.email.toLowerCase().trim() : existing.id.toUpperCase().trim();
                 personMap.set(mapKey, { ...existing, ...srvEmp });
               }

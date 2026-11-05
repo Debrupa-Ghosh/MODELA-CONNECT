@@ -39,6 +39,12 @@ export const Sidebar: React.FC = () => {
   const navigate = useNavigate();
 
   const isSuperAdminRole = Boolean(isSuperAdmin || currentUser?.role === 'SUPER_ADMIN');
+  const isHRRole = Boolean(
+    isHR ||
+      currentUser?.role === 'HR' ||
+      currentUser?.role === 'HR_MANAGER' ||
+      String(currentUser?.role || '').toUpperCase().includes('HR')
+  );
   const isPolicyRouteActive = location.pathname.startsWith('/policy');
   const [isPolicyMenuOpen, setIsPolicyMenuOpen] = useState<boolean>(() => location.pathname.startsWith('/policy'));
 
@@ -191,8 +197,8 @@ export const Sidebar: React.FC = () => {
         {navItems.map(item => {
           const Icon = item.icon;
 
-          // For Super Admin Role: Policy item expands into two sub-pages (Add Policy & View Policy) in the format shown in the image
-          if (item.to === '/policy' && isSuperAdminRole) {
+          // For Super Admin & HR Roles: Policy item expands into two sub-pages (Add Policy & View Policy) in the format shown in the image
+          if (item.to === '/policy' && (isSuperAdminRole || isHRRole)) {
             return (
               <div key={item.to} className="space-y-1.5">
                 <button

@@ -241,15 +241,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch {}
 
+    const baselineUsers = INITIAL_USERS.filter(
+      u =>
+        !isDeletedSeedSignupRequest(u) &&
+        !isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolveEmpId(u.email, u.employeeId))
+    ).map(u => ({
+      ...u,
+      employeeId: resolveEmpId(u.email, u.employeeId)
+    }));
+
     if (list.length === 0) {
-      list = INITIAL_USERS.filter(
-        u =>
-          !isDeletedSeedSignupRequest(u) &&
-          !isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolveEmpId(u.email, u.employeeId))
-      ).map(u => ({
-        ...u,
-        employeeId: resolveEmpId(u.email, u.employeeId)
-      }));
+      list = baselineUsers;
+    } else {
+      baselineUsers.forEach(baseU => {
+        const emailKey = baseU.email.toLowerCase().trim();
+        if (!list.some(u => u.email?.toLowerCase().trim() === emailKey)) {
+          list.push(baseU);
+        }
+      });
     }
 
     // Merge any locally submitted live sign-up requests that have not been rejected or deleted
@@ -839,6 +848,75 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     );
 
+    const unsubEmployees = onSnapshot(
+      collection(db, 'employees'),
+      empSnapshot => {
+        if (!isSubscribed || empSnapshot.empty) return;
+        const empRecords: Array<{ id: string; email: string; name: string; designation?: string; department?: string; avatar?: string }> = [];
+        empSnapshot.forEach(docSnap => {
+          const data = docSnap.data();
+          if (!data) return;
+          const empId = String(data.id || docSnap.id || '').trim().toUpperCase();
+          const email = String(data.email || '').trim().toLowerCase();
+          if (!empId || !email) return;
+          if (isRecordDeleted(docSnap.id, empId, email, resolveEmpId(email, empId))) return;
+          const fullName = `${data.firstName || ''} ${data.lastName || ''}`.trim() || String(data.name || email.split('@')[0]);
+          empRecords.push({
+            id: resolveEmpId(email, empId) || empId,
+            email,
+            name: fullName,
+            designation: data.designation,
+            department: data.department,
+            avatar: data.avatar
+          });
+        });
+
+        if (empRecords.length === 0) return;
+
+        setUsers(prev => {
+          let changed = false;
+          const next = [...prev];
+          empRecords.forEach(emp => {
+            const existingIdx = next.findIndex(u => u.email?.toLowerCase().trim() === emp.email);
+            if (existingIdx === -1) {
+              const newUser: User = {
+                id: `USR-${emp.id}`,
+                uid: `USR-${emp.id}`,
+                name: emp.name,
+                email: emp.email,
+                avatar_url: emp.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.name)}&background=0284c7&color=fff`,
+                status: 'APPROVED',
+                role: 'EMPLOYEE',
+                employeeId: emp.id,
+                designation: emp.designation || 'Staff Member',
+                department: emp.department || 'Engineering',
+                requestedAt: '2026-10-15T09:00:00.000Z',
+                reviewedAt: '2026-10-15T09:30:00.000Z',
+                reviewedBy: 'System Root'
+              };
+              next.push(newUser);
+              changed = true;
+              if (!seededFirestoreUserDocIds.has(newUser.id)) {
+                seededFirestoreUserDocIds.add(newUser.id);
+                setDoc(doc(db, 'users', newUser.id), cleanFirestoreUser(newUser), { merge: true }).catch(() => {});
+              }
+            } else if (next[existingIdx].status === 'APPROVED' && !next[existingIdx].employeeId && emp.id) {
+              next[existingIdx] = { ...next[existingIdx], employeeId: emp.id };
+              changed = true;
+            }
+          });
+          if (changed) {
+            try {
+              localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(next));
+            } catch {}
+            return next;
+          }
+          return prev;
+        });
+      },
+      () => {}
+    );
+
     const fetchFromBackend = () => {
       if (!isSubscribed) return;
       fetch('/api/users')
@@ -862,6 +940,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       isSubscribed = false;
       unsub();
+      unsubEmployees();
       clearInterval(pollInterval);
     };
   }, [mergeServerUsers]);
@@ -910,24 +989,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
       }
 
-      const empEmailToId = new Map<string, { id: string; updatedAt: string }>();
+      const empEmailToId = new Map<string, { id: string; updatedAt: string; name?: string; designation?: string; department?: string; avatar?: string }>();
       if (empSnap) {
         empSnap.forEach(docSnap => {
           const eData = docSnap.data();
-          if (!eData || !eData.id) return;
-          if (isRecordDeleted(docSnap.id, eData.id, eData.email, resolveEmpId(eData.email, eData.id))) {
+          if (!eData) return;
+          const rawId = eData.id || docSnap.id;
+          if (!rawId) return;
+          if (isRecordDeleted(docSnap.id, rawId, eData.email, resolveEmpId(eData.email, rawId))) {
             return;
           }
           if (eData.email) {
             const emailKey = String(eData.email).toLowerCase().trim();
             const cur = empEmailToId.get(emailKey);
             const eUpdatedAt = String(eData.updatedAt || '');
-            const cleanId = String(eData.id).trim().toUpperCase();
+            const cleanId = String(rawId).trim().toUpperCase();
+            const fullName = `${eData.firstName || ''} ${eData.lastName || ''}`.trim() || String(eData.name || emailKey.split('@')[0]);
             if (eUpdatedAt) {
               recordCustomEmpId(emailKey, undefined, cleanId);
             }
             if (!cur || eUpdatedAt >= cur.updatedAt) {
-              empEmailToId.set(emailKey, { id: cleanId, updatedAt: eUpdatedAt });
+              empEmailToId.set(emailKey, {
+                id: cleanId,
+                updatedAt: eUpdatedAt,
+                name: fullName,
+                designation: eData.designation,
+                department: eData.department,
+                avatar: eData.avatar
+              });
             }
           }
         });
@@ -1019,6 +1108,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       // Reconcile with Firestore employees collection and custom EMP ID registry
+      empEmailToId.forEach((empInfo, emailKey) => {
+        if (!map.has(emailKey)) {
+          const resolvedId = resolveEmpId(emailKey, empInfo.id) || empInfo.id;
+          map.set(emailKey, {
+            id: `USR-${resolvedId}`,
+            uid: `USR-${resolvedId}`,
+            name: empInfo.name || emailKey.split('@')[0],
+            email: emailKey,
+            avatar_url: empInfo.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(empInfo.name || emailKey)}&background=0284c7&color=fff`,
+            status: 'APPROVED',
+            role: 'EMPLOYEE',
+            employeeId: resolvedId,
+            designation: empInfo.designation || 'Staff Member',
+            department: empInfo.department || 'Engineering',
+            requestedAt: '2026-10-15T09:00:00.000Z',
+            reviewedAt: '2026-10-15T09:30:00.000Z',
+            reviewedBy: 'System Root'
+          });
+        }
+      });
+
       map.forEach((u, emailKey) => {
         const empEntry = empEmailToId.get(emailKey);
         const resolved = resolveEmpId(emailKey, empEntry?.id || u.employeeId);

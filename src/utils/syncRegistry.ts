@@ -90,7 +90,11 @@ const SYSTEM_PROTECTED_KEYS = new Set([
   'usr-aditi-008',
   'mod008',
   'aditi chakrabarty',
-  'aditi chakraborty'
+  'aditi chakraborty',
+  'jit@modelatech.com',
+  'usr-satyajit-115',
+  'mod115',
+  'satyajit mazumder'
 ]);
 
 let cachedUnblocked: Set<string> | null = null;
@@ -106,7 +110,11 @@ export const getUnblockedRegistry = (): Set<string> => {
     'usr-aditi-008',
     'mod008',
     'aditi chakrabarty',
-    'aditi chakraborty'
+    'aditi chakraborty',
+    'jit@modelatech.com',
+    'usr-satyajit-115',
+    'mod115',
+    'satyajit mazumder'
   ]);
   try {
     const raw = localStorage.getItem(STORAGE_KEY_UNBLOCKED);

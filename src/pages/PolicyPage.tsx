@@ -72,17 +72,6 @@ const unmarkPolicyDeletedLocally = (...ids: (string | undefined)[]) => {
   } catch {}
 };
 
-const persistPoliciesToLocalStorage = (list: PolicyRecord[]) => {
-  try {
-    const compact = list.map(item => ({
-      ...item,
-      fileData: (item.fileData?.length || 0) > 200000 ? undefined : item.fileData,
-      pdfData: (item.pdfData?.length || 0) > 200000 ? undefined : item.pdfData
-    }));
-    localStorage.setItem(LOCAL_POLICIES_KEY, JSON.stringify(compact));
-  } catch {}
-};
-
 const sanitizeDocId = (rawId: string): string => {
   return String(rawId || '')
     .trim()
@@ -135,7 +124,7 @@ export const PolicyPage: React.FC = () => {
       String(currentUser?.role || '').toUpperCase().includes('DIRECTOR')
   );
   const activeSubPage: 'ADD_POLICY' | 'VIEW_POLICY' =
-    !isSuperAdminRole || location.pathname.startsWith('/policy/view')
+    !(isSuperAdminRole || isHRRole) || location.pathname.startsWith('/policy/view')
       ? 'VIEW_POLICY'
       : 'ADD_POLICY';
   const [policyName, setPolicyName] = useState('');
@@ -149,20 +138,7 @@ export const PolicyPage: React.FC = () => {
 
   const [policies, setPolicies] = useState<PolicyRecord[]>(() => {
     try {
-      const deletedSet = getDeletedPolicyIds();
-      const cached = localStorage.getItem(LOCAL_POLICIES_KEY);
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed)) {
-          return parsed.filter(
-            (p: PolicyRecord) =>
-              p &&
-              p.policyId &&
-              !deletedSet.has(String(p.policyId).trim().toLowerCase()) &&
-              !deletedSet.has(String(p.id || '').trim().toLowerCase())
-          );
-        }
-      }
+      localStorage.removeItem(LOCAL_POLICIES_KEY);
     } catch {}
     return [];
   });
@@ -172,53 +148,43 @@ export const PolicyPage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const formContainerRef = useRef<HTMLDivElement | null>(null);
   const previewContainerRef = useRef<HTMLDivElement | null>(null);
+  const fileContentCacheRef = useRef<Map<string, { fileName: string; fileData?: string; pdfData?: string; docxHtml?: string }>>(new Map());
 
-  const mergePolicies = useCallback((incoming: PolicyRecord[], removeId?: string) => {
-    setPolicies(prev => {
-      const deletedSet = getDeletedPolicyIds();
-      const map = new Map<string, PolicyRecord>();
-      prev.forEach(item => {
-        if (item && item.policyId) {
-          const key = item.policyId.trim().toLowerCase();
-          const docKey = String(item.id || '').trim().toLowerCase();
-          if (!deletedSet.has(key) && (!docKey || !deletedSet.has(docKey))) {
-            map.set(key, item);
-          }
-        }
-      });
-      incoming.forEach(item => {
-        if (item && item.policyId) {
-          const key = item.policyId.trim().toLowerCase();
-          const docKey = String(item.id || '').trim().toLowerCase();
-          if (deletedSet.has(key) || (docKey && deletedSet.has(docKey))) {
-            return;
-          }
-          const existing = map.get(key);
-          const isSameFile = !existing || existing.fileName === item.fileName;
-          map.set(key, {
-            ...(existing || {}),
-            ...item,
-            fileData: item.fileData || (isSameFile ? existing?.fileData : undefined),
-            pdfData: item.pdfData || (isSameFile ? existing?.pdfData : ''),
-            docxHtml: item.docxHtml || (isSameFile ? existing?.docxHtml : '')
-          });
-        }
-      });
-      if (removeId) {
-        const cleanRemove = removeId.trim().toLowerCase();
-        for (const [k, v] of map.entries()) {
-          if (
-            k === cleanRemove ||
-            String(v.id || '').trim().toLowerCase() === cleanRemove ||
-            String(v.policyName || '').trim().toLowerCase() === cleanRemove
-          ) {
-            map.delete(k);
-          }
-        }
+  const applyDatabasePolicies = useCallback((dbDocs: PolicyRecord[]) => {
+    const deletedSet = getDeletedPolicyIds();
+    const map = new Map<string, PolicyRecord>();
+
+    dbDocs.forEach(item => {
+      if (!item || !item.policyId || !item.policyName) return;
+      const key = item.policyId.trim().toLowerCase();
+      const docKey = String(item.id || '').trim().toLowerCase();
+      if (deletedSet.has(key) || (docKey && deletedSet.has(docKey))) {
+        return;
       }
-      const next = Array.from(map.values()).sort((a, b) =>
-        String(b.createdAt || '').localeCompare(String(a.createdAt || ''))
-      );
+      const cachedBinary = fileContentCacheRef.current.get(key);
+      const isSameFile = !cachedBinary || !cachedBinary.fileName || cachedBinary.fileName === item.fileName;
+      const mergedItem: PolicyRecord = {
+        ...item,
+        fileData: item.fileData || (isSameFile ? cachedBinary?.fileData : undefined),
+        pdfData: item.pdfData || (isSameFile ? cachedBinary?.pdfData : ''),
+        docxHtml: item.docxHtml || (isSameFile ? cachedBinary?.docxHtml : '')
+      };
+      if (mergedItem.fileData || mergedItem.docxHtml || mergedItem.pdfData) {
+        fileContentCacheRef.current.set(key, {
+          fileName: mergedItem.fileName,
+          fileData: mergedItem.fileData,
+          pdfData: mergedItem.pdfData,
+          docxHtml: mergedItem.docxHtml
+        });
+      }
+      map.set(key, mergedItem);
+    });
+
+    const next = Array.from(map.values()).sort((a, b) =>
+      String(b.createdAt || '').localeCompare(String(a.createdAt || ''))
+    );
+
+    setPolicies(prev => {
       if (
         prev.length === next.length &&
         prev.every(
@@ -233,74 +199,63 @@ export const PolicyPage: React.FC = () => {
       ) {
         return prev;
       }
-      persistPoliciesToLocalStorage(next);
       return next;
     });
   }, []);
 
-  const fetchServerPolicies = useCallback(async () => {
-    try {
-      const res = await fetch('/api/policies');
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data.policies) && data.policies.length > 0) {
-          mergePolicies(data.policies);
-        }
-      }
-    } catch {}
-  }, [mergePolicies]);
-
   useEffect(() => {
     let isMounted = true;
-    const syncedPolicyKeys = new Set<string>();
-    fetchServerPolicies();
+    try {
+      localStorage.removeItem(LOCAL_POLICIES_KEY);
+    } catch {}
 
-    const syncSnapshotDocs = (docs: { id: string; data: () => unknown }[]) => {
-      if (!isMounted) return;
-      const fsPolicies: PolicyRecord[] = [];
-      docs.forEach(d => {
-        const data = d.data() as PolicyRecord;
-        if (data && data.policyId && data.policyName) {
-          const rec: PolicyRecord = {
-            ...data,
-            id: data.id || d.id
-          };
-          fsPolicies.push(rec);
-          const syncKey = `${rec.policyId}:${rec.createdAt || ''}`;
-          if (!syncedPolicyKeys.has(syncKey)) {
-            syncedPolicyKeys.add(syncKey);
-            fetch('/api/policies', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(rec)
-            }).catch(() => {});
+    // Load binary file cache from backend only to enrich policies that exist in Firestore
+    fetch('/api/policies')
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => {
+        if (!isMounted || !data || !Array.isArray(data.policies)) return;
+        data.policies.forEach((p: PolicyRecord) => {
+          if (p && p.policyId && (p.fileData || p.docxHtml || p.pdfData)) {
+            fileContentCacheRef.current.set(p.policyId.trim().toLowerCase(), {
+              fileName: p.fileName,
+              fileData: p.fileData,
+              pdfData: p.pdfData,
+              docxHtml: p.docxHtml
+            });
           }
-        }
-      });
-      if (fsPolicies.length > 0) {
-        mergePolicies(fsPolicies);
-      }
-    };
+        });
+        setPolicies(prev => {
+          if (prev.length === 0) return prev;
+          return prev.map(item => {
+            const cached = fileContentCacheRef.current.get(item.policyId.trim().toLowerCase());
+            if (!cached || (cached.fileName && cached.fileName !== item.fileName)) return item;
+            return {
+              ...item,
+              fileData: item.fileData || cached.fileData,
+              pdfData: item.pdfData || cached.pdfData || '',
+              docxHtml: item.docxHtml || cached.docxHtml || ''
+            };
+          });
+        });
+      })
+      .catch(() => {});
 
     const unsub = onSnapshot(
       collection(db, 'policies'),
       snapshot => {
         if (!isMounted) return;
-        const removedIds = new Set<string>();
-        snapshot.docChanges().forEach(change => {
-          if (change.type === 'removed') {
-            const rData = change.doc.data() as PolicyRecord;
-            removedIds.add(change.doc.id.toLowerCase());
-            if (rData?.policyId) removedIds.add(rData.policyId.toLowerCase());
+        const fsPolicies: PolicyRecord[] = [];
+        snapshot.docs.forEach(d => {
+          const data = d.data() as PolicyRecord;
+          if (data && data.policyId && data.policyName) {
+            unmarkPolicyDeletedLocally(data.policyId, data.id || d.id);
+            fsPolicies.push({
+              ...data,
+              id: data.id || d.id
+            });
           }
         });
-        if (removedIds.size > 0) {
-          removedIds.forEach(remId => {
-            markPolicyDeletedLocally(remId);
-            mergePolicies([], remId);
-          });
-        }
-        syncSnapshotDocs(snapshot.docs);
+        applyDatabasePolicies(fsPolicies);
       },
       () => {
         // Ignore snapshot permission/network fallback errors
@@ -310,7 +265,7 @@ export const PolicyPage: React.FC = () => {
       isMounted = false;
       unsub();
     };
-  }, [fetchServerPolicies, mergePolicies]);
+  }, [applyDatabasePolicies]);
 
   // Keep viewingPolicy synchronized with enriched policy data (e.g. fileData/docxHtml) when policies update
   useEffect(() => {
@@ -513,17 +468,18 @@ export const PolicyPage: React.FC = () => {
   };
 
   const buildFirestorePolicyPayload = (record: PolicyRecord): Record<string, string> => {
+    const safeDocxHtml = record.docxHtml && record.docxHtml.length < 300000 ? record.docxHtml : '';
     const payload: Record<string, string> = {
       id: record.id,
       policyId: record.policyId,
       policyName: record.policyName,
       fileName: record.fileName,
       fileType: record.fileType,
-      pdfData: record.pdfData || '',
-      docxHtml: record.docxHtml || '',
+      pdfData: record.pdfData && record.pdfData.length < 300000 ? record.pdfData : '',
+      docxHtml: safeDocxHtml,
       createdAt: record.createdAt
     };
-    if (record.fileData && record.fileData.length < 850000) {
+    if (record.fileData && (safeDocxHtml.length + record.fileData.length) < 650000) {
       payload.fileData = record.fileData;
     }
     return payload;
@@ -602,15 +558,14 @@ export const PolicyPage: React.FC = () => {
         createdAt: new Date().toISOString()
       };
 
-      // 1. Update local state & localStorage immediately
       unmarkPolicyDeletedLocally(lockedPolicyId, docId);
-      mergePolicies([record]);
-      setLastActivePolicyId(lockedPolicyId);
-      if (viewingPolicy && viewingPolicy.policyId.toLowerCase() === lockedPolicyId.toLowerCase()) {
-        setViewingPolicy(record);
-      }
+      fileContentCacheRef.current.set(lockedPolicyId.toLowerCase(), {
+        fileName: record.fileName,
+        fileData: record.fileData,
+        pdfData: record.pdfData,
+        docxHtml: record.docxHtml
+      });
 
-      // 2. Save updated record to backend server state (/api/policies) and Firestore with bounded timeout
       const firestorePayload = buildFirestorePolicyPayload(record);
 
       await Promise.all([
@@ -620,15 +575,20 @@ export const PolicyPage: React.FC = () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(record)
           }),
-          1500
+          6000
         ),
         runWithTimeout(
           Promise.resolve().then(() =>
             setDoc(doc(db, 'policies', docId), firestorePayload, { merge: true })
           ),
-          1500
+          6000
         )
       ]);
+
+      setLastActivePolicyId(lockedPolicyId);
+      if (viewingPolicy && viewingPolicy.policyId.toLowerCase() === lockedPolicyId.toLowerCase()) {
+        setViewingPolicy(record);
+      }
 
       setEditingPolicy(null);
       setPolicyName('');
@@ -699,12 +659,14 @@ export const PolicyPage: React.FC = () => {
         createdAt: new Date().toISOString()
       };
 
-      // 1. Update local state & localStorage immediately
       unmarkPolicyDeletedLocally(trimmedId, docId);
-      mergePolicies([record]);
-      setLastActivePolicyId(trimmedId);
+      fileContentCacheRef.current.set(trimmedId.toLowerCase(), {
+        fileName: record.fileName,
+        fileData: record.fileData,
+        pdfData: record.pdfData,
+        docxHtml: record.docxHtml
+      });
 
-      // 2. Save to backend server state (/api/policies) and Firestore with bounded timeout
       const firestorePayload = buildFirestorePolicyPayload(record);
 
       await Promise.all([
@@ -714,15 +676,17 @@ export const PolicyPage: React.FC = () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(record)
           }),
-          1500
+          6000
         ),
         runWithTimeout(
           Promise.resolve().then(() =>
             setDoc(doc(db, 'policies', docId), firestorePayload, { merge: true })
           ),
-          1500
+          6000
         )
       ]);
+
+      setLastActivePolicyId(trimmedId);
 
       setEditingPolicy(null);
       setPolicyName('');
@@ -769,29 +733,26 @@ export const PolicyPage: React.FC = () => {
     try {
       if (effectivePolicyId) {
         markPolicyDeletedLocally(effectivePolicyId, effectiveDocId);
-        // 1. Remove from local state & localStorage
-        setPolicies(prev => {
-          const next = prev.filter(
+        fileContentCacheRef.current.delete(effectivePolicyId.toLowerCase());
+        setPolicies(prev =>
+          prev.filter(
             p =>
               p.policyId.toLowerCase() !== effectivePolicyId.toLowerCase() &&
               p.id.toLowerCase() !== effectiveDocId.toLowerCase()
-          );
-          persistPoliciesToLocalStorage(next);
-          return next;
-        });
+          )
+        );
 
-        // 2. Delete from backend server (/api/policies/:id) and Firestore with bounded timeout
         await Promise.all([
           runWithTimeout(
             fetch(`/api/policies/${encodeURIComponent(effectivePolicyId)}`, {
               method: 'DELETE'
             }),
-            1500
+            5000
           ),
           effectiveDocId
             ? runWithTimeout(
                 Promise.resolve().then(() => deleteDoc(doc(db, 'policies', effectiveDocId))),
-                1500
+                5000
               )
             : Promise.resolve(undefined)
         ]);

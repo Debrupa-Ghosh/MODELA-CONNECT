@@ -80,6 +80,21 @@ const DEFAULT_SERVER_USERS: ServerUser[] = [
     requestedAt: "2026-10-22T08:00:00.000Z",
     reviewedAt: "2026-10-22T08:05:00.000Z",
     reviewedBy: "System Root"
+  },
+  {
+    id: "USR-SATYAJIT-115",
+    uid: "USR-SATYAJIT-115",
+    name: "Satyajit Mazumder",
+    email: "jit@modelatech.com",
+    avatar_url: "https://ui-avatars.com/api/?name=Satyajit+Mazumder&background=0284c7&color=fff",
+    status: "APPROVED",
+    role: "EMPLOYEE",
+    employeeId: "MOD115",
+    designation: "Staff Candidate",
+    department: "General Staff",
+    requestedAt: "2026-11-02T08:00:00.000Z",
+    reviewedAt: "2026-11-02T08:05:00.000Z",
+    reviewedBy: "System Root"
   }
 ];
 
@@ -96,7 +111,10 @@ const PROTECTED_ACTIVE_KEYS = new Set([
   'aditichakraborty2005@gmail.com',
   'aditichakrabarty2005@gmail.com',
   'usr-aditi-008',
-  'mod008'
+  'mod008',
+  'jit@modelatech.com',
+  'usr-satyajit-115',
+  'mod115'
 ]);
 
 let users: ServerUser[] = [...DEFAULT_SERVER_USERS];
@@ -168,9 +186,6 @@ try {
     if (Array.isArray(parsed.staffRequests)) {
       persistedRequests = parsed.staffRequests.filter((r: any) => !isExcludedServerStaffRequest(r));
     }
-    if (Array.isArray(parsed.policies)) {
-      persistedPolicies = parsed.policies;
-    }
   }
 } catch {}
 
@@ -207,6 +222,19 @@ let employees = [
     lastName: "Ghosh",
     email: "surupa008@gmail.com",
     joiningDate: "2026-10-22",
+    designation: "Staff Candidate",
+    phone: "",
+    department: "General Staff",
+    status: "ACTIVE",
+    location: "San Francisco HQ",
+    compensation: { basic: 50000, allowances: 15000 }
+  },
+  {
+    id: "MOD115",
+    firstName: "Satyajit",
+    lastName: "Mazumder",
+    email: "jit@modelatech.com",
+    joiningDate: "2026-11-02",
     designation: "Staff Candidate",
     phone: "",
     department: "General Staff",
@@ -642,17 +670,32 @@ app.delete('/api/requests/:id', (req: Request, res: Response) => {
   res.json({ success: true, message: `Request ${id} deleted` });
 });
 
+// Helper to get Firestore instance on server
+async function getServerFirestore() {
+  const configPath = path.resolve(__dirname, 'firebase-applet-config.json');
+  if (!fs.existsSync(configPath)) return null;
+  const firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+  const { initializeApp, getApps } = await import('firebase/app');
+  const { getFirestore, doc, setDoc, deleteDoc } = await import('firebase/firestore');
+  const fbApp = getApps().length > 0 ? getApps()[0] : initializeApp(firebaseConfig);
+  const db = getFirestore(fbApp, firebaseConfig.firestoreDatabaseId);
+  return { db, doc, setDoc, deleteDoc };
+}
+
 // Policy endpoints
 app.get('/api/policies', (_req: Request, res: Response) => {
   res.json({ success: true, policies: policyRecords });
 });
 
-app.post('/api/policies', (req: Request, res: Response) => {
+app.post('/api/policies', async (req: Request, res: Response) => {
   const policy = req.body;
   if (!policy || !policy.policyId || !policy.policyName || !policy.fileName) {
     return res.status(400).json({ success: false, message: 'Invalid policy payload' });
   }
-  const cleanId = String(policy.id || policy.policyId).trim();
+  const cleanId = String(policy.id || policy.policyId)
+    .trim()
+    .replace(/[\/\\.#$\[\]]/g, '_')
+    .slice(0, 100);
   const record = {
     ...policy,
     id: cleanId,
@@ -672,12 +715,39 @@ app.post('/api/policies', (req: Request, res: Response) => {
     policyRecords.unshift(record);
   }
   saveServerState();
+
+  try {
+    const fb = await getServerFirestore();
+    if (fb) {
+      const safeDocxHtml = record.docxHtml && String(record.docxHtml).length < 300000 ? String(record.docxHtml) : '';
+      const fsPayload: Record<string, string> = {
+        id: cleanId,
+        policyId: record.policyId,
+        policyName: record.policyName,
+        fileName: record.fileName,
+        fileType: String(record.fileType || 'application/pdf'),
+        pdfData: record.pdfData && String(record.pdfData).length < 300000 ? String(record.pdfData) : '',
+        docxHtml: safeDocxHtml,
+        createdAt: record.createdAt
+      };
+      if (record.fileData && (safeDocxHtml.length + String(record.fileData).length) < 650000) {
+        fsPayload.fileData = String(record.fileData);
+      }
+      await Promise.race([
+        fb.setDoc(fb.doc(fb.db, 'policies', cleanId), fsPayload, { merge: true }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
+      ]);
+    }
+  } catch {}
+
   res.json({ success: true, policy: record });
 });
 
-app.delete('/api/policies/:id', (req: Request, res: Response) => {
+app.delete('/api/policies/:id', async (req: Request, res: Response) => {
   const { id } = req.params;
-  const cleanId = decodeURIComponent(id).trim().toLowerCase();
+  const rawDecoded = decodeURIComponent(id).trim();
+  const cleanId = rawDecoded.toLowerCase();
+  const docId = rawDecoded.replace(/[\/\\.#$\[\]]/g, '_').slice(0, 100);
   policyRecords = policyRecords.filter(
     p =>
       String(p.id || '').trim().toLowerCase() !== cleanId &&
@@ -685,6 +755,17 @@ app.delete('/api/policies/:id', (req: Request, res: Response) => {
       String(p.policyName || '').trim().toLowerCase() !== cleanId
   );
   saveServerState();
+
+  try {
+    const fb = await getServerFirestore();
+    if (fb && docId) {
+      await Promise.race([
+        fb.deleteDoc(fb.doc(fb.db, 'policies', docId)),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
+      ]);
+    }
+  } catch {}
+
   res.json({ success: true, message: `Policy ${id} deleted` });
 });
 
@@ -808,39 +889,30 @@ async function reconcileFirestoreDatabase() {
       }
     }
 
-    // 6. Sync policies collection between Firestore and server state so /api/policies is always populated
+    // 6. Sync policies collection strictly from Firestore so only policies present in database exist in server state
     try {
       const policiesSnap = await getDocs(collection(db, 'policies'));
-      let policiesChanged = false;
+      const firestorePolicies: any[] = [];
       for (const pDoc of policiesSnap.docs) {
         const pData = pDoc.data();
         if (pData && pData.policyId && pData.policyName && pData.fileName) {
           const cleanId = String(pData.id || pDoc.id).trim();
-          const idx = policyRecords.findIndex(
+          const existing = policyRecords.find(
             p =>
               String(p.id || '').toLowerCase() === cleanId.toLowerCase() ||
               String(p.policyId || '').toLowerCase() === String(pData.policyId).toLowerCase()
           );
-          if (idx >= 0) {
-            policyRecords[idx] = {
-              ...pData,
-              ...policyRecords[idx],
-              id: cleanId,
-              fileData: policyRecords[idx].fileData || pData.fileData || '',
-              docxHtml: policyRecords[idx].docxHtml || pData.docxHtml || ''
-            };
-          } else {
-            policyRecords.push({
-              ...pData,
-              id: cleanId
-            });
-            policiesChanged = true;
-          }
+          firestorePolicies.push({
+            ...(existing || {}),
+            ...pData,
+            id: cleanId,
+            fileData: pData.fileData || existing?.fileData || '',
+            docxHtml: pData.docxHtml || existing?.docxHtml || ''
+          });
         }
       }
-      if (policiesChanged) {
-        saveServerState();
-      }
+      policyRecords = firestorePolicies;
+      saveServerState();
     } catch {
       needsRetry = true;
     }

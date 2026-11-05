@@ -45,6 +45,21 @@ export const INITIAL_USERS: User[] = [
     requestedAt: "2026-10-22T08:00:00.000Z",
     reviewedAt: "2026-10-22T08:05:00.000Z",
     reviewedBy: "System Root"
+  },
+  {
+    id: "USR-SATYAJIT-115",
+    uid: "USR-SATYAJIT-115",
+    name: "Satyajit Mazumder",
+    email: "jit@modelatech.com",
+    avatar_url: "https://ui-avatars.com/api/?name=Satyajit+Mazumder&background=0284c7&color=fff",
+    status: "APPROVED",
+    role: "EMPLOYEE",
+    employeeId: "MOD115",
+    designation: "Staff Candidate",
+    department: "General Staff",
+    requestedAt: "2026-11-02T08:00:00.000Z",
+    reviewedAt: "2026-11-02T08:05:00.000Z",
+    reviewedBy: "System Root"
   }
 ];
 
@@ -92,6 +107,20 @@ export const INITIAL_EMPLOYEES: Employee[] = [
     location: "San Francisco HQ",
     compensation: { basic: 50000, allowances: 15000 },
     avatar: "https://ui-avatars.com/api/?name=Debrupa+Ghosh&background=0284c7&color=fff"
+  },
+  {
+    id: "MOD115",
+    firstName: "Satyajit",
+    lastName: "Mazumder",
+    email: "jit@modelatech.com",
+    joiningDate: "2026-11-02",
+    designation: "Staff Candidate",
+    phone: "",
+    department: "General Staff",
+    status: "ACTIVE",
+    location: "San Francisco HQ",
+    compensation: { basic: 50000, allowances: 15000 },
+    avatar: "https://ui-avatars.com/api/?name=Satyajit+Mazumder&background=0284c7&color=fff"
   }
 ];
 
