@@ -10,7 +10,7 @@ export const INITIAL_USERS: User[] = [
     status: "APPROVED",
     role: "SUPER_ADMIN",
     employeeId: "MOD001",
-    designation: "Executive Director & Super Admin",
+    designation: "Staff Candidate",
     department: "Executive Office",
     requestedAt: "2026-09-20T08:44:15.481Z",
     reviewedAt: "2026-09-20T08:44:35.660Z",

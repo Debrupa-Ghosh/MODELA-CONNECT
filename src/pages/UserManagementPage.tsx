@@ -397,7 +397,7 @@ export const UserManagementPage: React.FC = () => {
                       {u.email}
                     </td>
                     <td className="py-4 px-6 text-slate-300 text-xs">
-                      {u.designation || 'Enterprise Staff'}
+                      {u.email?.toLowerCase().trim() === 'sushovand@modelatech.com' ? 'Staff Candidate' : (u.designation || 'Enterprise Staff')}
                     </td>
                     <td className="py-4 px-6">
                       {isDirector ? (

@@ -45,7 +45,7 @@ const DEFAULT_SERVER_USERS: ServerUser[] = [
     status: "APPROVED",
     role: "SUPER_ADMIN",
     employeeId: "MOD001",
-    designation: "Executive Director & Super Admin",
+    designation: "Staff Candidate",
     department: "Executive Office",
     requestedAt: "2026-09-20T08:44:15.481Z",
     reviewedAt: "2026-09-20T08:44:35.660Z",
@@ -157,12 +157,18 @@ try {
     const raw = fs.readFileSync(STATE_FILE_PATH, 'utf-8');
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed.users) && parsed.users.length > 0) {
-      users = parsed.users.filter(
-        (u: ServerUser) =>
-          u &&
-          !PERMANENTLY_DELETED_REQUEST_KEYS.has(String(u.email || '').toLowerCase().trim()) &&
-          !PERMANENTLY_DELETED_REQUEST_KEYS.has(String(u.id || '').toLowerCase().trim())
-      );
+      users = parsed.users
+        .filter(
+          (u: ServerUser) =>
+            u &&
+            !PERMANENTLY_DELETED_REQUEST_KEYS.has(String(u.email || '').toLowerCase().trim()) &&
+            !PERMANENTLY_DELETED_REQUEST_KEYS.has(String(u.id || '').toLowerCase().trim())
+        )
+        .map((u: ServerUser) =>
+          String(u.email || '').toLowerCase().trim() === 'sushovand@modelatech.com'
+            ? { ...u, designation: 'Staff Candidate' }
+            : u
+        );
       DEFAULT_SERVER_USERS.forEach(defU => {
         if (!users.some(u => u.email.toLowerCase().trim() === defU.email.toLowerCase().trim())) {
           users.push(defU);
