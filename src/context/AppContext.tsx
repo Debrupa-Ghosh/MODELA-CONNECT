@@ -98,7 +98,7 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
-  EMPLOYEES: 'modela_employees_v2',
+  EMPLOYEES: 'modela_employees_v3',
   REQUESTS: 'modela_requests_v3_clean',
   ATTENDANCE: 'modela_attendance_v2',
   PAYROLL: 'modela_payroll_v2',
@@ -134,9 +134,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }));
     }
 
-    // Ensure Sushoovan Das (Super Admin MOD001), Modela Tech, and Marcus Vance are always in the Employees page
+    // Ensure Sushoovan Das (Super Admin MTK006) and all 18 active database employees are always in the Employees page
     const sushoovanEmployee: Employee = {
-      id: resolveEmpId("sushovand@modelatech.com", "MOD001") || "MOD001",
+      id: resolveEmpId("sushovand@modelatech.com", "MTK006") || "MTK006",
       firstName: "Sushoovan",
       lastName: "Das",
       email: "sushovand@modelatech.com",
@@ -173,9 +173,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         em === 'modelatech2026@gmail.com' ||
         em === 'sushoovandas@gmail.com' ||
         em === 'ghoshdebrupa005@gmail.com' ||
+        em === 'tiasha@modelatechnologies.com' ||
         (em.includes('tony') && em.includes('stark')) ||
         i.includes('tonystark') ||
         i === 'mod000' ||
+        i === 'mod001' ||
+        i === 'mod008' ||
+        i === 'mod011' ||
         i === 'mod101' ||
         i === 'mod003' ||
         i === 'mod005' ||
@@ -189,48 +193,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const requiredEmployees: Employee[] = [
       sushoovanEmployee,
-      {
-        id: resolveEmpId("aditichakraborty2005@gmail.com", "MOD008") || "MOD008",
-        firstName: "Aditi",
-        lastName: "Chakrabarty",
-        email: "aditichakraborty2005@gmail.com",
-        joiningDate: "2026-10-29",
-        designation: "Staff Candidate",
-        phone: "",
-        department: "General Staff",
-        status: "ACTIVE",
-        location: "San Francisco HQ",
-        compensation: { basic: 50000, allowances: 15000 },
-        avatar: "https://ui-avatars.com/api/?name=Aditi+Chakrabarty&background=0284c7&color=fff"
-      },
-      {
-        id: resolveEmpId("surupa008@gmail.com", "MOD011") || "MOD011",
-        firstName: "Debrupa",
-        lastName: "Ghosh",
-        email: "surupa008@gmail.com",
-        joiningDate: "2026-10-22",
-        designation: "Staff Candidate",
-        phone: "",
-        department: "General Staff",
-        status: "ACTIVE",
-        location: "San Francisco HQ",
-        compensation: { basic: 50000, allowances: 15000 },
-        avatar: "https://ui-avatars.com/api/?name=Debrupa+Ghosh&background=0284c7&color=fff"
-      },
-      {
-        id: resolveEmpId("jit@modelatech.com", "MOD115") || "MOD115",
-        firstName: "Satyajit",
-        lastName: "Mazumder",
-        email: "jit@modelatech.com",
-        joiningDate: "2026-10-15",
-        designation: "Staff Member",
-        phone: "",
-        department: "Engineering",
-        status: "ACTIVE",
-        location: "San Francisco HQ",
-        compensation: { basic: 50000, allowances: 15000 },
-        avatar: "https://ui-avatars.com/api/?name=Satyajit+Mazumder&background=0284c7&color=fff"
-      }
+      ...INITIAL_EMPLOYEES.filter(e => e.email?.toLowerCase() !== 'sushovand@modelatech.com').map(e => ({
+        ...e,
+        id: resolveEmpId(e.email, e.id) || e.id
+      }))
     ];
 
     const nonApprovedUserEmails = new Set(
@@ -258,7 +224,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Merge in any approved users from localStorage or initial dataset so they appear immediately
     try {
-      const savedUsers = localStorage.getItem('modela_users_v2');
+      const savedUsers = localStorage.getItem('modela_users_v3') || localStorage.getItem('modela_users_v2');
       const usersArray = savedUsers ? JSON.parse(savedUsers) : INITIAL_USERS;
       if (Array.isArray(usersArray)) {
         usersArray
@@ -611,6 +577,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       empName.includes('pooja sharma') ||
       (empName.includes('pooja') && empName.includes('sharma')) ||
       empId === 'MOD000' ||
+      empId === 'MOD008' ||
       empId === 'MOD101' ||
       empId === 'MOD102' ||
       empId === 'MOD106' ||
@@ -622,6 +589,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       docId === 'PAY-2026-09-04' ||
       docId === 'PAY-2026-10-04' ||
       docId.includes('MOD000') ||
+      docId.includes('MOD008') ||
       docId.includes('MOD101') ||
       docId.includes('MOD102') ||
       docId.includes('MOD106') ||
@@ -810,6 +778,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const cleanedEmpIds = new Set<string>();
     const seededEmpIds = new Set<string>();
 
+    // Immediately delete legacy duplicate MOD008 from Firestore employees and backend
+    deleteDoc(doc(db, 'employees', 'MOD008')).catch(() => {});
+    fetch('/api/employees/MOD008', { method: 'DELETE' }).catch(() => {});
+
     const unsub = onSnapshot(
       collection(db, 'employees'),
       async snapshot => {
@@ -837,28 +809,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (!rawData) return;
           const rawId = String(rawData.id || docSnap.id || '').trim();
           if (!rawId) return;
+          const lowerEmail = String(rawData.email || '').trim().toLowerCase();
+          const isPoulamiManna = lowerEmail === 'poulamim@modelatech.com' || rawId.toUpperCase() === 'MTK017';
           const nameParts = String(rawData.name || '').trim().split(/\s+/);
-          const firstName = rawData.firstName || nameParts[0] || 'Staff';
-          const lastName = rawData.lastName !== undefined ? rawData.lastName : nameParts.slice(1).join(' ');
+          const firstName = isPoulamiManna ? 'Poulami' : (rawData.firstName || nameParts[0] || 'Staff');
+          const lastName = isPoulamiManna ? 'Manna' : (rawData.lastName !== undefined ? rawData.lastName : nameParts.slice(1).join(' '));
           const data: Employee = {
             ...rawData,
-            id: rawId,
+            id: isPoulamiManna ? 'MTK017' : rawId,
             firstName,
             lastName,
             email: rawData.email || '',
             joiningDate: rawData.joiningDate || '2026-10-15',
-            designation: rawData.designation || 'Staff Member',
-            department: rawData.department || 'Engineering',
+            designation: rawData.designation || 'Staff Candidate',
+            department: rawData.department || 'General Staff',
             phone: rawData.phone || '',
             status: rawData.status || 'ACTIVE',
             location: rawData.location || 'San Francisco HQ',
             compensation: rawData.compensation && typeof rawData.compensation.basic === 'number'
               ? rawData.compensation
               : { basic: 50000, allowances: 15000 },
-            avatar: rawData.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(`${firstName} ${lastName}`.trim())}&background=0284c7&color=fff`
+            avatar: isPoulamiManna
+              ? 'https://ui-avatars.com/api/?name=Poulami+Manna&background=0284c7&color=fff'
+              : (rawData.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(`${firstName} ${lastName}`.trim())}&background=0284c7&color=fff`)
           };
           const fullName = `${data.firstName || ''} ${data.lastName || ''}`.trim().toLowerCase();
-          const lowerEmail = (data.email || '').trim().toLowerCase();
           const upperId = (data.id || '').trim().toUpperCase();
           const isRemovedEmployee =
             fullName.includes('marcus vance') ||
@@ -873,7 +848,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             lowerEmail === 'modelatech2026@gmail.com' ||
             lowerEmail === 'sushoovandas@gmail.com' ||
             lowerEmail === 'ghoshdebrupa005@gmail.com' ||
-            upperId === 'MOD000' ||
+            lowerEmail === 'tiasha@modelatechnologies.com' ||
+            docSnap.id.toUpperCase() === 'MOD008' ||
+            docSnap.id.toUpperCase() === 'MOD001' ||
+            docSnap.id.toUpperCase() === 'MOD011' ||
+            upperId === 'MOD008' ||
+            upperId === 'MOD001' ||
+            upperId === 'MOD011' ||
             upperId === 'MOD101' ||
             upperId === 'MOD003' ||
             upperId === 'MOD005' ||
@@ -993,7 +974,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // 3. Approved users from AuthContext / User Management
         let savedUsersList: User[] = [];
         try {
-          const rawU = localStorage.getItem('modela_users_v2');
+          const rawU = localStorage.getItem('modela_users_v3') || localStorage.getItem('modela_users_v2');
           if (rawU) {
             const parsed = JSON.parse(rawU);
             if (Array.isArray(parsed)) savedUsersList = parsed;
@@ -1036,6 +1017,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             if (targetEmp.id !== resolvedId) {
               targetEmp.id = resolvedId;
             }
+            // If this employee is not yet saved under resolvedId in Firestore employees collection, persist it
+            const existsInRemote = remoteDocs.some(
+              d => d.docId.toUpperCase() === targetEmp.id.toUpperCase()
+            );
+            if (!existsInRemote && !seededEmpIds.has(targetEmp.id)) {
+              seededEmpIds.add(targetEmp.id);
+              setDoc(doc(db, 'employees', targetEmp.id), cleanFirestoreData(targetEmp), { merge: true }).catch(() => {});
+            }
             // Also notify AuthContext if targetEmp.id in Firestore is newer than u.employeeId
             if (u.employeeId !== targetEmp.id) {
               window.dispatchEvent(
@@ -1046,7 +1035,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }
           } else {
             // New approved user not yet in directory
-            const parts = (u.name || '').trim().split(/\s+/);
+            const isPoulami = cleanEmail === 'poulamim@modelatech.com';
+            const parts = (isPoulami ? 'Poulami Manna' : (u.name || '')).trim().split(/\s+/);
             const empId = (resolveEmpId(cleanEmail, u.employeeId || u.id) || u.employeeId || u.id).toUpperCase().trim();
             if (isRecordDeleted(empId, cleanEmail, u.id, u.uid)) return;
             const newEmp: Employee = {
@@ -1061,7 +1051,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               status: 'ACTIVE',
               location: 'San Francisco HQ',
               compensation: u.role === 'SUPER_ADMIN' ? { basic: 95000, allowances: 30000 } : { basic: 50000, allowances: 15000 },
-              avatar: u.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || u.email)}&background=0284c7&color=fff`
+              avatar: isPoulami
+                ? 'https://ui-avatars.com/api/?name=Poulami+Manna&background=0284c7&color=fff'
+                : (u.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || u.email)}&background=0284c7&color=fff`)
             };
             personMap.set(cleanEmail, newEmp);
             if (!seededEmpIds.has(empId)) {
@@ -1842,19 +1834,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateEmployee = async (id: string, updates: Partial<Employee>): Promise<boolean> => {
-    let existingEmp = employees.find(
-      e => e.id.toUpperCase() === id.toUpperCase() ||
-           (updates.email && e.email?.toLowerCase() === updates.email.toLowerCase())
-    );
+    const cleanInputEmail = updates.email ? updates.email.toLowerCase().trim() : '';
 
-    if (!existingEmp && updates.email) {
-      const matchedUser = users.find(u => u.email.toLowerCase() === updates.email!.toLowerCase());
+    // When email is provided, match strictly by email first so we never grab another employee who shared the same fallback ID (e.g. MOD000)
+    let existingEmp = cleanInputEmail
+      ? employees.find(e => e.email && e.email.toLowerCase().trim() === cleanInputEmail)
+      : employees.find(e => e.id.toUpperCase() === id.toUpperCase());
+
+    if (!existingEmp && cleanInputEmail) {
+      const matchedUser = users.find(u => u.email.toLowerCase().trim() === cleanInputEmail);
       const nameParts = (matchedUser?.name || '').trim().split(/\s+/);
       existingEmp = {
         id: id.trim().toUpperCase(),
         firstName: updates.firstName || nameParts[0] || 'Staff',
-        lastName: updates.lastName || nameParts.slice(1).join(' ') || '',
-        email: updates.email,
+        lastName: updates.lastName !== undefined ? updates.lastName : (nameParts.slice(1).join(' ') || ''),
+        email: updates.email!,
         joiningDate: new Date().toISOString().split('T')[0],
         phone: '',
         designation: updates.designation || matchedUser?.designation || 'Enterprise Staff',
@@ -1862,7 +1856,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         status: 'ACTIVE',
         location: 'San Francisco HQ',
         compensation: { basic: 50000, allowances: 15000 },
-        avatar: matchedUser?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(updates.email)}&background=0284c7&color=fff`
+        avatar: matchedUser?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(updates.email!)}&background=0284c7&color=fff`
       };
     }
 
@@ -1870,14 +1864,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const rawNewId = updates.id ? updates.id.trim().toUpperCase() : existingEmp.id.toUpperCase();
     const isIdChanging = Boolean(rawNewId && rawNewId !== existingEmp.id.toUpperCase());
+    const targetEmail = (existingEmp.email || updates.email || '').trim();
+    const cleanTargetEmail = targetEmail.toLowerCase();
 
-    if (isIdChanging) {
+    if (isIdChanging && rawNewId !== 'MOD000') {
       // Validate uniqueness: check if another person (different email) already has rawNewId
-      const conflict = employees.some(
-        e => e.id.toUpperCase() === rawNewId &&
-             (!existingEmp.email || !e.email || e.email.toLowerCase() !== existingEmp.email.toLowerCase())
+      const conflictInEmployees = employees.some(
+        e =>
+          e.id.toUpperCase() === rawNewId &&
+          (!cleanTargetEmail || !e.email || e.email.toLowerCase().trim() !== cleanTargetEmail)
       );
-      if (conflict) {
+      const conflictInUsers = users.some(
+        u =>
+          u.status === 'APPROVED' &&
+          u.employeeId?.toUpperCase() === rawNewId &&
+          (!cleanTargetEmail || !u.email || u.email.toLowerCase().trim() !== cleanTargetEmail)
+      );
+      if (conflictInEmployees || conflictInUsers) {
         showToast('ID Conflict', `Employee ID ${rawNewId} is already assigned to another employee.`, 'error');
         return false;
       }
@@ -1885,13 +1888,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const finalId = rawNewId;
     const oldEmpId = existingEmp.id;
-    const targetEmail = (existingEmp.email || updates.email || '').trim();
     const updatedFirstName = updates.firstName !== undefined ? updates.firstName : existingEmp.firstName || '';
     const updatedLastName = updates.lastName !== undefined ? updates.lastName : existingEmp.lastName || '';
     const fullName = `${updatedFirstName} ${updatedLastName}`.trim();
     const now = new Date().toISOString();
 
-    // Ensure the new ID is never blocked in deleted registry and is recorded in custom EMP ID registry
+    // Ensure the new ID is never blocked in deleted registry and is recorded in custom EMP ID registry for this specific email
     removeDeletedRecord(finalId, targetEmail);
     recordCustomEmpId(targetEmail, oldEmpId, finalId);
 
@@ -1899,16 +1901,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       ...existingEmp,
       ...updates,
       id: finalId,
-      ...( { updatedAt: now } as any )
+      firstName: updatedFirstName,
+      lastName: updatedLastName,
+      ...({ updatedAt: now } as any)
     };
 
-    // 1. Immediately update in-memory and localStorage employees state without duplicates
+    // 1. Immediately update in-memory and localStorage employees state without touching other employees who shared oldEmpId
     setEmployees(prev => {
-      const filtered = prev.filter(
-        e => e.id.toUpperCase() !== oldEmpId.toUpperCase() &&
-             e.id.toUpperCase() !== finalId.toUpperCase() &&
-             (!targetEmail || !e.email || e.email.toLowerCase() !== targetEmail.toLowerCase())
-      );
+      const filtered = prev.filter(e => {
+        if (cleanTargetEmail && e.email) {
+          return e.email.toLowerCase().trim() !== cleanTargetEmail;
+        }
+        return e.id.toUpperCase() !== oldEmpId.toUpperCase() && e.id.toUpperCase() !== finalId.toUpperCase();
+      });
       const next = [mergedEmp, ...filtered];
       try {
         localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(next));
@@ -1916,7 +1921,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return next;
     });
 
-    // 2. Immediately notify AuthContext & update user state
+    // 2. Immediately notify AuthContext & update user state for this specific email
     window.dispatchEvent(
       new CustomEvent('modela_employee_id_changed', {
         detail: { oldId: oldEmpId, newId: finalId, email: targetEmail }
@@ -1931,7 +1936,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     }
 
-    // 3. Persist to backend API immediately & Firestore employees collection non-blockingly so UI never freezes
+    // 3. Persist to backend API immediately & Firestore employees collection non-blockingly
     fetch('/api/employees', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1943,7 +1948,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.warn('Firestore employee update error:', err);
     });
 
-    if (isIdChanging) {
+    // Only delete oldEmpId doc in Firestore if no other employee with a different email still uses oldEmpId
+    const otherEmpStillUsesOldId = employees.some(
+      e =>
+        e.id.toUpperCase() === oldEmpId.toUpperCase() &&
+        cleanTargetEmail &&
+        e.email &&
+        e.email.toLowerCase().trim() !== cleanTargetEmail
+    );
+
+    if (isIdChanging && !otherEmpStillUsesOldId) {
       if (oldEmpId !== finalId) {
         deleteDoc(doc(db, 'employees', oldEmpId)).catch(() => {});
       }
@@ -1952,30 +1966,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     }
 
-    getDocs(collection(db, 'employees'))
-      .then(allEmpDocs => {
-        for (const eDoc of allEmpDocs.docs) {
-          if (eDoc.id === finalId) continue;
-          const eData = eDoc.data();
-          const sameEmail = targetEmail && eData.email && String(eData.email).toLowerCase().trim() === targetEmail.toLowerCase();
-          const sameOldId = isIdChanging && (eDoc.id.toUpperCase() === oldEmpId.toUpperCase() || String(eData.id || '').toUpperCase() === oldEmpId.toUpperCase());
-          if (sameEmail || sameOldId) {
-            deleteDoc(doc(db, 'employees', eDoc.id)).catch(() => {});
+    if (cleanTargetEmail) {
+      getDocs(collection(db, 'employees'))
+        .then(allEmpDocs => {
+          for (const eDoc of allEmpDocs.docs) {
+            if (eDoc.id === finalId) continue;
+            const eData = eDoc.data();
+            const sameEmail =
+              eData.email && String(eData.email).toLowerCase().trim() === cleanTargetEmail;
+            if (sameEmail) {
+              deleteDoc(doc(db, 'employees', eDoc.id)).catch(() => {});
+            }
           }
-        }
-      })
-      .catch(() => {});
+        })
+        .catch(() => {});
+    }
 
-    // 4. Cascade ID change across all database collections & context states in real time (non-blocking)
+    // 4. Cascade ID change in Firestore users collection strictly for this user's email
     getDocs(collection(db, 'users'))
       .then(userDocs => {
         let updatedUserInFirestore = false;
         for (const uDoc of userDocs.docs) {
+          if (uDoc.id === SYNC_REGISTRY_DOC_ID) continue;
           const uData = uDoc.data();
-          const matches =
-            (oldEmpId && uData.employeeId?.toUpperCase() === oldEmpId.toUpperCase()) ||
-            (targetEmail && uData.email?.toLowerCase() === targetEmail.toLowerCase()) ||
-            (oldEmpId && uDoc.id.toUpperCase() === oldEmpId.toUpperCase());
+          const matches = cleanTargetEmail
+            ? uData.email?.toLowerCase().trim() === cleanTargetEmail
+            : Boolean(oldEmpId && uData.employeeId?.toUpperCase() === oldEmpId.toUpperCase());
           if (matches) {
             updatedUserInFirestore = true;
             setDoc(
@@ -1986,10 +2002,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
         }
 
-        if (!updatedUserInFirestore && targetEmail) {
+        if (!updatedUserInFirestore && cleanTargetEmail) {
           const matchedU =
-            users.find(u => u.email.toLowerCase() === targetEmail.toLowerCase()) ||
-            INITIAL_USERS.find(u => u.email.toLowerCase() === targetEmail.toLowerCase());
+            users.find(u => u.email.toLowerCase().trim() === cleanTargetEmail) ||
+            INITIAL_USERS.find(u => u.email.toLowerCase().trim() === cleanTargetEmail);
           if (matchedU) {
             setDoc(
               doc(db, 'users', matchedU.id),
@@ -2002,34 +2018,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .catch(() => {});
 
     if (isIdChanging) {
-      // B. Cascade update payroll records
+      // B. Cascade update payroll records for this specific employee
       setPayroll(prev => {
-        const updated = prev.map(p =>
-          (p.employeeId?.toUpperCase() === oldEmpId.toUpperCase() || (targetEmail && p.employeeId === targetEmail))
-            ? { ...p, employeeId: finalId }
-            : p
-        );
+        const updated = prev.map(p => {
+          const sameOldId = p.employeeId?.toUpperCase() === oldEmpId.toUpperCase();
+          const sameName = !fullName || !p.employeeName || p.employeeName.toLowerCase().trim() === fullName.toLowerCase();
+          if ((sameOldId && sameName) || (targetEmail && p.employeeId === targetEmail)) {
+            return { ...p, employeeId: finalId };
+          }
+          return p;
+        });
         try {
           localStorage.setItem(STORAGE_KEYS.PAYROLL, JSON.stringify(updated));
         } catch {}
         return updated;
       });
-
-      getDocs(collection(db, 'payroll'))
-        .then(payrollDocs => {
-          for (const pDoc of payrollDocs.docs) {
-            const pData = pDoc.data();
-            if (pData.employeeId?.toUpperCase() === oldEmpId.toUpperCase()) {
-              const isCanonical = /^PAY-\d{4}-\d{2}-\d{2}$/.test(pDoc.id);
-              if (isCanonical) {
-                updateDoc(doc(db, 'payroll', pDoc.id), { employeeId: finalId }).catch(() => {});
-              } else if (pDoc.id.toUpperCase() !== `PAY-${pData.year}-${String(pData.month || 'OCT').substring(0, 3).toUpperCase()}-${finalId}`) {
-                deleteDoc(doc(db, 'payroll', pDoc.id)).catch(() => {});
-              }
-            }
-          }
-        })
-        .catch(() => {});
 
       // C. Cascade update attendance records
       setAttendance(prev => {
@@ -2042,11 +2045,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return updated;
       });
 
-      // D. Cascade update staff workflow requests
+      // D. Cascade update staff workflow requests for this specific employee
       setStaffRequests(prev => {
-        const updated = prev.map(r =>
-          r.employeeId?.toUpperCase() === oldEmpId.toUpperCase() ? { ...r, employeeId: finalId } : r
-        );
+        const updated = prev.map(r => {
+          const matchesReq = cleanTargetEmail
+            ? r.employeeEmail?.toLowerCase().trim() === cleanTargetEmail
+            : r.employeeId?.toUpperCase() === oldEmpId.toUpperCase();
+          return matchesReq ? { ...r, employeeId: finalId } : r;
+        });
         try {
           localStorage.setItem(STORAGE_KEYS.REQUESTS, JSON.stringify(updated));
         } catch {}
@@ -2057,7 +2063,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .then(reqDocs => {
           for (const rDoc of reqDocs.docs) {
             const rData = rDoc.data();
-            if (rData.employeeId?.toUpperCase() === oldEmpId.toUpperCase()) {
+            const matchesReq = cleanTargetEmail
+              ? rData.employeeEmail?.toLowerCase().trim() === cleanTargetEmail
+              : rData.employeeId?.toUpperCase() === oldEmpId.toUpperCase();
+            if (matchesReq) {
               updateDoc(doc(db, 'requests', rDoc.id), { employeeId: finalId }).catch(() => {});
             }
           }

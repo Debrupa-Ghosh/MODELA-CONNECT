@@ -96,14 +96,21 @@ export const UserManagementPage: React.FC = () => {
     }
     setIsSavingEmpId(true);
     try {
-      await updateEmployee(u.employeeId || u.id, {
+      const nameParts = (u.name || '').trim().split(/\s+/);
+      const firstName = nameParts[0] || 'Staff';
+      const lastName = nameParts.slice(1).join(' ');
+      const updatedOk = await updateEmployee(u.employeeId || u.id, {
         id: cleanNew,
         email: u.email,
-        firstName: (u.name || '').trim().split(/\s+/)[0] || 'Staff',
+        firstName,
+        lastName,
         designation: u.designation,
         department: u.department
       });
-      await updateUserEmployeeId(u.id, cleanNew);
+      if (!updatedOk) {
+        return;
+      }
+      await updateUserEmployeeId(u.email || u.id, cleanNew);
       setEditingEmpIdUserId(null);
       showToast('ID Updated', `Employee ID updated to ${cleanNew} for ${u.name || u.email}.`);
     } finally {
@@ -391,7 +398,9 @@ export const UserManagementPage: React.FC = () => {
                 {filteredApproved.map(u => (
                   <tr key={u.id} className="hover:bg-[#0E1B33]/60 transition-colors">
                     <td className="py-4 px-6 font-bold text-white text-xs">
-                      {u.name?.trim() || <span className="text-amber-400/90 italic">[Name Pending]</span>}
+                      {(u.email?.toLowerCase().trim() === 'poulamim@modelatech.com' || u.employeeId?.toUpperCase().trim() === 'MTK017')
+                        ? 'Poulami Manna'
+                        : (u.name?.trim() || <span className="text-amber-400/90 italic">[Name Pending]</span>)}
                     </td>
                     <td className="py-4 px-6 text-slate-300 font-mono text-xs">
                       {u.email}

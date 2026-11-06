@@ -57,7 +57,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const STORAGE_KEY_USERS = 'modela_users_v2';
+const STORAGE_KEY_USERS = 'modela_users_v3';
 const STORAGE_KEY_ACTIVE_USER = 'modela_active_user_email_v2';
 const STORAGE_KEY_LIVE_REQUESTS = 'modela_live_signup_requests_v2';
 
@@ -193,8 +193,7 @@ const isLegacyExcludedUser = (u: Partial<User>, docId?: string): boolean => {
       lowerEmail === 'sushoovandas@gmail.com' ||
       lowerEmail === 'ghoshdebrupa005@gmail.com') &&
       isRecordDeleted(lowerEmail)) ||
-    ((upperEmpId === 'MOD000' ||
-      upperEmpId === 'MOD101' ||
+    ((upperEmpId === 'MOD101' ||
       upperEmpId === 'MOD003' ||
       upperEmpId === 'MOD005' ||
       upperEmpId === 'MOD006' ||
@@ -202,6 +201,61 @@ const isLegacyExcludedUser = (u: Partial<User>, docId?: string): boolean => {
       upperEmpId === 'MOD102') &&
       isRecordDeleted(upperEmpId))
   );
+};
+
+const normalizeCanonicalUser = (u: User): User => {
+  if (!u) return u;
+  const emailLower = (u.email || '').toLowerCase().trim();
+  const empIdUpper = (u.employeeId || '').toUpperCase().trim();
+  let next = u;
+  if (emailLower === 'sushovand@modelatech.com') {
+    const cleanId = (!empIdUpper || empIdUpper === 'MOD001' || empIdUpper === 'MOD000') ? 'MTK006' : empIdUpper;
+    next = {
+      ...next,
+      name: 'Sushoovan Das',
+      employeeId: cleanId,
+      designation: 'Staff Candidate'
+    };
+  }
+  if (emailLower === 'aditichakraborty2005@gmail.com' || emailLower === 'aditichakrabarty2005@gmail.com') {
+    const cleanId = (!empIdUpper || empIdUpper === 'MOD008') ? 'MTK020' : empIdUpper;
+    next = {
+      ...next,
+      name: 'Aditi Chakrabarty',
+      employeeId: cleanId,
+      designation: 'Staff Candidate'
+    };
+  }
+  if (emailLower === 'surupa008@gmail.com') {
+    const cleanId = (!empIdUpper || empIdUpper === 'MOD011') ? 'MTK023' : empIdUpper;
+    next = {
+      ...next,
+      name: 'Debrupa Ghosh',
+      employeeId: cleanId,
+      designation: 'Staff Candidate'
+    };
+  }
+  if (emailLower === 'poulamim@modelatech.com' || empIdUpper === 'MTK017') {
+    const cleanId = (!empIdUpper || empIdUpper === 'MOD000') ? 'MTK017' : empIdUpper;
+    next = {
+      ...next,
+      name: 'Poulami Manna',
+      employeeId: cleanId,
+      designation: 'Staff Candidate',
+      avatar_url: 'https://ui-avatars.com/api/?name=Poulami+Manna&background=0284c7&color=fff'
+    };
+  }
+  if (emailLower === 'smandal@modelatechnologies.com' || empIdUpper === 'MOD116') {
+    const cleanId = (!empIdUpper || empIdUpper === 'MOD000' || empIdUpper === 'MOD001') ? 'MOD116' : empIdUpper;
+    next = {
+      ...next,
+      name: 'Subhasri Mandal',
+      employeeId: cleanId,
+      designation: 'Staff Candidate',
+      avatar_url: 'https://ui-avatars.com/api/?name=Subhasri+Mandal&background=0284c7&color=fff'
+    };
+  }
+  return next;
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -233,7 +287,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 !isRecordDeleted(u.id, u.uid, emailKey, reqDocId, u.employeeId, resolveEmpId(emailKey, u.employeeId))
               );
             })
-            .map(u => ({
+            .map(u => normalizeCanonicalUser({
               ...u,
               employeeId: resolveEmpId(u.email, u.employeeId)
             }));
@@ -298,7 +352,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       avatar_url: "https://ui-avatars.com/api/?name=Sushoovan+Das&background=3b82f6&color=fff",
       status: "APPROVED",
       role: "SUPER_ADMIN",
-      employeeId: resolveEmpId("sushovand@modelatech.com", "MOD001") || "MOD001",
+      employeeId: resolveEmpId("sushovand@modelatech.com", "MTK006") || "MTK006",
       designation: "Staff Candidate",
       department: "Executive Office",
       requestedAt: "2026-09-20T08:44:15.481Z",
@@ -306,7 +360,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       reviewedBy: "System Root"
     };
 
-    if (!isRecordDeleted('USR-Q94BIIQ5', 'sushovand@modelatech.com', 'MOD001', sushoovanUser.employeeId)) {
+    if (!isRecordDeleted('USR-Q94BIIQ5', 'sushovand@modelatech.com', 'MTK006', sushoovanUser.employeeId)) {
       const idx = list.findIndex(u => u.email?.toLowerCase() === 'sushovand@modelatech.com' || u.id === 'USR-Q94BIIQ5');
       if (idx >= 0) {
         const curStatus = list[idx].status;
@@ -316,7 +370,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           designation: "Staff Candidate",
           status: curStatus || 'APPROVED',
           role: curStatus === 'PENDING' ? (list[idx].role ?? null) : (list[idx].role || 'SUPER_ADMIN'),
-          employeeId: curStatus === 'PENDING' ? list[idx].employeeId : (resolveEmpId('sushovand@modelatech.com', list[idx].employeeId || 'MOD001') || 'MOD001')
+          employeeId: curStatus === 'PENDING' ? list[idx].employeeId : (resolveEmpId('sushovand@modelatech.com', list[idx].employeeId || 'MTK006') || 'MTK006')
         };
       } else {
         list.unshift(sushoovanUser);
@@ -372,13 +426,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { oldId, newId, email } = customEvent.detail || {};
       if (newId) {
         const cleanNew = newId.trim().toUpperCase();
-        recordCustomEmpId(email, oldId, cleanNew);
+        const cleanEmail = email ? email.trim().toLowerCase() : '';
+        recordCustomEmpId(cleanEmail || undefined, oldId, cleanNew);
         const now = new Date().toISOString();
         setUsers(prev => {
           const next = prev.map(u => {
-            const isMatch =
-              (oldId && u.employeeId?.toUpperCase() === oldId.toUpperCase()) ||
-              (email && u.email?.toLowerCase() === email.toLowerCase());
+            // If email is known, match strictly by email so other users who had oldId are never modified
+            const isMatch = cleanEmail
+              ? u.email?.toLowerCase().trim() === cleanEmail
+              : Boolean(oldId && u.employeeId?.toUpperCase() === oldId.toUpperCase());
             if (isMatch) {
               recordCustomEmpId(u.email, u.employeeId, cleanNew);
               const updated = cleanFirestoreUser({ ...u, employeeId: cleanNew, updatedAt: now } as any);
@@ -594,11 +650,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             !isRecordDeleted(u.id, u.uid, emailKey, reqDocId, u.employeeId, resolveEmpId(emailKey, u.employeeId))
           );
         })
-        .map(u =>
-          u.email.toLowerCase().trim() === 'sushovand@modelatech.com'
-            ? { ...u, designation: 'Staff Candidate' }
-            : u
-        );
+        .map(u => normalizeCanonicalUser(u));
       if (JSON.stringify(prev) === JSON.stringify(next)) {
         return prev;
       }
@@ -800,7 +852,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
 
         // Ensure Sushoovan Das is present in users map if not deleted (preserving PENDING status if re-applying)
-        if (!isRecordDeleted('USR-Q94BIIQ5', 'sushovand@modelatech.com', 'MOD001', resolveEmpId('sushovand@modelatech.com', 'MOD001'))) {
+        if (!isRecordDeleted('USR-Q94BIIQ5', 'sushovand@modelatech.com', 'MTK006', resolveEmpId('sushovand@modelatech.com', 'MTK006'))) {
           const sushoovanUser: User = {
             id: "USR-Q94BIIQ5",
             uid: "USR-Q94BIIQ5",
@@ -809,7 +861,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             avatar_url: "https://ui-avatars.com/api/?name=Sushoovan+Das&background=3b82f6&color=fff",
             status: "APPROVED",
             role: "SUPER_ADMIN",
-            employeeId: "MOD001",
+            employeeId: "MTK006",
             designation: "Staff Candidate",
             department: "Executive Office",
             requestedAt: "2026-09-20T08:44:15.481Z",
@@ -823,27 +875,94 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             ...(curSushoovan || {}),
             status: curStatus || 'APPROVED',
             role: curStatus === 'PENDING' ? (curSushoovan?.role ?? null) : (curSushoovan?.role || 'SUPER_ADMIN'),
-            employeeId: curStatus === 'PENDING' ? curSushoovan?.employeeId : (resolveEmpId('sushovand@modelatech.com', curSushoovan?.employeeId || 'MOD001') || 'MOD001'),
+            employeeId: curStatus === 'PENDING' ? curSushoovan?.employeeId : (resolveEmpId('sushovand@modelatech.com', curSushoovan?.employeeId || 'MTK006') || 'MTK006'),
             name: curSushoovan?.name || 'Sushoovan Das',
             designation: 'Staff Candidate'
           };
           map.set('sushovand@modelatech.com', updatedSushoovan);
-          if (curSushoovan && curSushoovan.designation !== 'Staff Candidate') {
-            setDoc(doc(db, 'users', updatedSushoovan.id || 'USR-Q94BIIQ5'), { designation: 'Staff Candidate' }, { merge: true }).catch(() => {});
+          if (curSushoovan && (curSushoovan.designation !== 'Staff Candidate' || curSushoovan.employeeId !== 'MTK006')) {
+            setDoc(doc(db, 'users', updatedSushoovan.id || 'USR-Q94BIIQ5'), { designation: 'Staff Candidate', employeeId: 'MTK006' }, { merge: true }).catch(() => {});
           }
         }
 
-        const updatedUsers = Array.from(map.values()).filter(u => {
-          if (!u || u.id === SYNC_REGISTRY_DOC_ID || u.email === 'sync@system.internal') return false;
-          if (u.status === 'REJECTED') return false;
-          const emailKey = u.email.toLowerCase().trim();
-          const reqDocId = `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
-          return (
-            !isDeletedSeedSignupRequest(u) &&
-            !isLegacyExcludedUser(u) &&
-            !isRecordDeleted(u.id, u.uid, emailKey, reqDocId, u.employeeId, resolveEmpId(emailKey, u.employeeId))
-          );
+        const surupaEntry = map.get('surupa008@gmail.com');
+        if (surupaEntry && surupaEntry.employeeId !== 'MTK023') {
+          const fixedSurupa = normalizeCanonicalUser({ ...surupaEntry, employeeId: 'MTK023' });
+          map.set('surupa008@gmail.com', fixedSurupa);
+          if (fixedSurupa.id && !seededFirestoreUserDocIds.has(`fix-surupa-${fixedSurupa.id}`)) {
+            seededFirestoreUserDocIds.add(`fix-surupa-${fixedSurupa.id}`);
+            setDoc(doc(db, 'users', fixedSurupa.id), { employeeId: 'MTK023' }, { merge: true }).catch(() => {});
+          }
+        }
+
+        const smandalEntry = map.get('smandal@modelatechnologies.com');
+        if (smandalEntry) {
+          const fixedSmandal = normalizeCanonicalUser(smandalEntry);
+          map.set('smandal@modelatechnologies.com', fixedSmandal);
+          if (
+            fixedSmandal.id &&
+            (smandalEntry.name !== 'Subhasri Mandal' || smandalEntry.employeeId !== 'MOD116') &&
+            !seededFirestoreUserDocIds.has(`fix-smandal-${fixedSmandal.id}`)
+          ) {
+            seededFirestoreUserDocIds.add(`fix-smandal-${fixedSmandal.id}`);
+            setDoc(doc(db, 'users', fixedSmandal.id), cleanFirestoreUser(fixedSmandal), { merge: true }).catch(() => {});
+          }
+        }
+
+        const aditiEntry = map.get('aditichakraborty2005@gmail.com');
+        if (aditiEntry && aditiEntry.employeeId !== 'MTK020') {
+          const fixedAditi = normalizeCanonicalUser({ ...aditiEntry, employeeId: 'MTK020' });
+          map.set('aditichakraborty2005@gmail.com', fixedAditi);
+          if (fixedAditi.id && !seededFirestoreUserDocIds.has(`fix-aditi-${fixedAditi.id}`)) {
+            seededFirestoreUserDocIds.add(`fix-aditi-${fixedAditi.id}`);
+            setDoc(doc(db, 'users', fixedAditi.id), { employeeId: 'MTK020' }, { merge: true }).catch(() => {});
+          }
+        }
+        // Clean up any duplicate user doc in Firestore for aditichakraborty2005@gmail.com that still had MOD008
+        remoteList.forEach(ru => {
+          const em = (ru.email || '').toLowerCase().trim();
+          if (
+            (em === 'aditichakraborty2005@gmail.com' || em === 'aditichakrabarty2005@gmail.com') &&
+            String(ru.employeeId || '').toUpperCase() === 'MOD008'
+          ) {
+            const keptId = map.get('aditichakraborty2005@gmail.com')?.id;
+            if (ru.id && keptId && ru.id !== keptId && !cleanedFirestoreUserDocIds.has(ru.id)) {
+              cleanedFirestoreUserDocIds.add(ru.id);
+              deleteDoc(doc(db, 'users', ru.id)).catch(() => {});
+            } else if (ru.id && !seededFirestoreUserDocIds.has(`upd-aditi-${ru.id}`)) {
+              seededFirestoreUserDocIds.add(`upd-aditi-${ru.id}`);
+              setDoc(doc(db, 'users', ru.id), { employeeId: 'MTK020' }, { merge: true }).catch(() => {});
+            }
+          }
         });
+
+        const poulamiEntry = map.get('poulamim@modelatech.com');
+        if (poulamiEntry) {
+          const fixedPoulami = normalizeCanonicalUser(poulamiEntry);
+          map.set('poulamim@modelatech.com', fixedPoulami);
+          if (
+            fixedPoulami.id &&
+            (poulamiEntry.name !== 'Poulami Manna' || poulamiEntry.employeeId !== 'MTK017' || !remoteList.some(r => r.email?.toLowerCase().trim() === 'poulamim@modelatech.com')) &&
+            !seededFirestoreUserDocIds.has(`fix-poulami-${fixedPoulami.id}`)
+          ) {
+            seededFirestoreUserDocIds.add(`fix-poulami-${fixedPoulami.id}`);
+            setDoc(doc(db, 'users', fixedPoulami.id), cleanFirestoreUser(fixedPoulami), { merge: true }).catch(() => {});
+          }
+        }
+
+        const updatedUsers = Array.from(map.values())
+          .filter(u => {
+            if (!u || u.id === SYNC_REGISTRY_DOC_ID || u.email === 'sync@system.internal') return false;
+            if (u.status === 'REJECTED') return false;
+            const emailKey = u.email.toLowerCase().trim();
+            const reqDocId = `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
+            return (
+              !isDeletedSeedSignupRequest(u) &&
+              !isLegacyExcludedUser(u) &&
+              !isRecordDeleted(u.id, u.uid, emailKey, reqDocId, u.employeeId, resolveEmpId(emailKey, u.employeeId))
+            );
+          })
+          .map(u => normalizeCanonicalUser(u));
         setUsers(prev => {
           if (JSON.stringify(prev) === JSON.stringify(updatedUsers)) {
             return prev;
@@ -869,6 +988,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (!data) return;
           const empId = String(data.id || docSnap.id || '').trim().toUpperCase();
           const email = String(data.email || '').trim().toLowerCase();
+          if (docSnap.id.toUpperCase() === 'MOD008' || empId === 'MOD008') {
+            if (!cleanedFirestoreUserDocIds.has(`emp-${docSnap.id}`)) {
+              cleanedFirestoreUserDocIds.add(`emp-${docSnap.id}`);
+              deleteDoc(doc(db, 'employees', docSnap.id)).catch(() => {});
+            }
+            return;
+          }
           if (!empId || !email) return;
           if (isRecordDeleted(docSnap.id, empId, email, resolveEmpId(email, empId))) return;
           const fullName = `${data.firstName || ''} ${data.lastName || ''}`.trim() || String(data.name || email.split('@')[0]);
@@ -890,7 +1016,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           empRecords.forEach(emp => {
             const existingIdx = next.findIndex(u => u.email?.toLowerCase().trim() === emp.email);
             if (existingIdx === -1) {
-              const newUser: User = {
+              const newUser: User = normalizeCanonicalUser({
                 id: `USR-${emp.id}`,
                 uid: `USR-${emp.id}`,
                 name: emp.name,
@@ -899,21 +1025,62 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 status: 'APPROVED',
                 role: 'EMPLOYEE',
                 employeeId: emp.id,
-                designation: emp.designation || 'Staff Member',
-                department: emp.department || 'Engineering',
+                designation: emp.designation || 'Staff Candidate',
+                department: emp.department || 'General Staff',
                 requestedAt: '2026-10-15T09:00:00.000Z',
                 reviewedAt: '2026-10-15T09:30:00.000Z',
                 reviewedBy: 'System Root'
-              };
+              });
               next.push(newUser);
               changed = true;
               if (!seededFirestoreUserDocIds.has(newUser.id)) {
                 seededFirestoreUserDocIds.add(newUser.id);
                 setDoc(doc(db, 'users', newUser.id), cleanFirestoreUser(newUser), { merge: true }).catch(() => {});
               }
-            } else if (next[existingIdx].status === 'APPROVED' && !next[existingIdx].employeeId && emp.id) {
-              next[existingIdx] = { ...next[existingIdx], employeeId: emp.id };
-              changed = true;
+            } else if (next[existingIdx].status === 'APPROVED') {
+              const curU = next[existingIdx];
+              const nextEmpId =
+                emp.id && emp.id !== 'MOD000' && emp.id !== 'MOD008' && emp.id !== 'MOD001' && emp.id !== 'MOD011'
+                  ? emp.id
+                  : (resolveEmpId(emp.email, curU.employeeId || emp.id) || curU.employeeId || emp.id);
+              const nextName =
+                emp.email === 'poulamim@modelatech.com' || emp.id === 'MTK017'
+                  ? 'Poulami Manna'
+                  : (emp.name && emp.name !== emp.email.split('@')[0] ? emp.name : curU.name);
+              const nextDesig = curU.email?.toLowerCase().trim() === 'sushovand@modelatech.com'
+                ? 'Staff Candidate'
+                : (curU.designation || emp.designation || 'Staff Candidate');
+              const nextDept = curU.department || emp.department || 'General Staff';
+              if (
+                curU.employeeId !== nextEmpId ||
+                curU.name !== nextName ||
+                curU.designation !== nextDesig ||
+                curU.department !== nextDept
+              ) {
+                const updatedU = normalizeCanonicalUser({
+                  ...curU,
+                  employeeId: nextEmpId,
+                  name: nextName,
+                  designation: nextDesig,
+                  department: nextDept
+                });
+                next[existingIdx] = updatedU;
+                changed = true;
+                if (updatedU.id && !seededFirestoreUserDocIds.has(`emp-sync-${updatedU.id}-${nextEmpId}-${nextName}`)) {
+                  seededFirestoreUserDocIds.add(`emp-sync-${updatedU.id}-${nextEmpId}-${nextName}`);
+                  setDoc(
+                    doc(db, 'users', updatedU.id),
+                    {
+                      employeeId: updatedU.employeeId,
+                      name: updatedU.name,
+                      designation: updatedU.designation,
+                      department: updatedU.department,
+                      avatar_url: updatedU.avatar_url
+                    },
+                    { merge: true }
+                  ).catch(() => {});
+                }
+              }
             }
           });
           if (changed) {
@@ -1007,6 +1174,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (!eData) return;
           const rawId = eData.id || docSnap.id;
           if (!rawId) return;
+          const cleanId = String(rawId).trim().toUpperCase();
+          if (docSnap.id.toUpperCase() === 'MOD008' || cleanId === 'MOD008') {
+            deleteDoc(doc(db, 'employees', docSnap.id)).catch(() => {});
+            return;
+          }
           if (isRecordDeleted(docSnap.id, rawId, eData.email, resolveEmpId(eData.email, rawId))) {
             return;
           }
@@ -1014,7 +1186,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const emailKey = String(eData.email).toLowerCase().trim();
             const cur = empEmailToId.get(emailKey);
             const eUpdatedAt = String(eData.updatedAt || '');
-            const cleanId = String(rawId).trim().toUpperCase();
             const fullName = `${eData.firstName || ''} ${eData.lastName || ''}`.trim() || String(eData.name || emailKey.split('@')[0]);
             if (eUpdatedAt) {
               recordCustomEmpId(emailKey, undefined, cleanId);
@@ -1143,8 +1314,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       map.forEach((u, emailKey) => {
         const empEntry = empEmailToId.get(emailKey);
         const resolved = resolveEmpId(emailKey, empEntry?.id || u.employeeId);
-        if (resolved && u.employeeId !== resolved) {
-          map.set(emailKey, { ...u, employeeId: resolved });
+        const targetName =
+          emailKey === 'poulamim@modelatech.com' || resolved === 'MTK017'
+            ? 'Poulami Manna'
+            : (empEntry?.name && empEntry.name !== emailKey.split('@')[0] ? empEntry.name : u.name);
+        if ((resolved && u.employeeId !== resolved) || u.name !== targetName) {
+          map.set(emailKey, normalizeCanonicalUser({ ...u, employeeId: resolved || u.employeeId, name: targetName }));
         }
       });
 
@@ -1160,11 +1335,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             !isRecordDeleted(u.id, u.uid, emailKey, reqDocId, u.employeeId, resolveEmpId(emailKey, u.employeeId))
           );
         })
-        .map(u =>
-          u.email.toLowerCase().trim() === 'sushovand@modelatech.com'
-            ? { ...u, designation: 'Staff Candidate' }
-            : u
-        );
+        .map(u => normalizeCanonicalUser(u));
       setUsers(nextList);
       try {
         localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(nextList));
@@ -1550,15 +1721,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateUserFromEmployee = (empId: string, email?: string, updates?: { name?: string; department?: string; designation?: string }) => {
     const cleanId = empId.trim().toUpperCase();
-    if (email) {
-      recordCustomEmpId(email, undefined, cleanId);
+    const cleanEmail = email ? email.trim().toLowerCase() : '';
+    if (cleanEmail) {
+      recordCustomEmpId(cleanEmail, undefined, cleanId);
     }
     const now = new Date().toISOString();
     setUsers(prev => {
       const next = prev.map(u => {
-        const isMatch =
-          (u.employeeId && u.employeeId.toUpperCase() === cleanId) ||
-          (email && u.email?.toLowerCase() === email.toLowerCase());
+        // Strictly match by email when email is provided so other users sharing the same employeeId are untouched
+        const isMatch = cleanEmail
+          ? u.email?.toLowerCase().trim() === cleanEmail
+          : Boolean(u.employeeId && u.employeeId.toUpperCase() === cleanId);
         if (isMatch) {
           recordCustomEmpId(u.email, u.employeeId, cleanId);
           const updated = cleanFirestoreUser({
@@ -1583,23 +1756,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateUserEmployeeId = async (userIdOrEmail: string, newId: string): Promise<boolean> => {
     const cleanNew = newId.trim().toUpperCase();
-    if (!cleanNew) return false;
+    const cleanTarget = String(userIdOrEmail || '').trim();
+    if (!cleanNew || !cleanTarget) return false;
 
-    let targetEmail = '';
-    let oldEmpId = '';
+    const existingTarget = users.find(
+      u =>
+        u.id === cleanTarget ||
+        u.uid === cleanTarget ||
+        (u.email && u.email.toLowerCase().trim() === cleanTarget.toLowerCase())
+    );
+    const targetEmail = (existingTarget?.email || (cleanTarget.includes('@') ? cleanTarget : '')).trim().toLowerCase();
+    const oldEmpId = existingTarget?.employeeId || '';
     const now = new Date().toISOString();
+
+    if (targetEmail) {
+      recordCustomEmpId(targetEmail, oldEmpId, cleanNew);
+    }
 
     setUsers(prev => {
       const next = prev.map(u => {
+        // Match strictly by user ID, UID, or email (never by shared employeeId!)
         const isMatch =
-          u.id === userIdOrEmail ||
-          u.uid === userIdOrEmail ||
-          (u.email && u.email.toLowerCase() === userIdOrEmail.toLowerCase()) ||
-          (u.employeeId && u.employeeId.toUpperCase() === userIdOrEmail.toUpperCase());
+          u.id === cleanTarget ||
+          u.uid === cleanTarget ||
+          (targetEmail && u.email && u.email.toLowerCase().trim() === targetEmail);
         if (isMatch) {
-          targetEmail = u.email;
-          oldEmpId = u.employeeId || '';
-          recordCustomEmpId(u.email, oldEmpId, cleanNew);
+          recordCustomEmpId(u.email, u.employeeId, cleanNew);
           const updated = cleanFirestoreUser({ ...u, employeeId: cleanNew, updatedAt: now } as any);
           setDoc(doc(db, 'users', u.id), updated, { merge: true }).catch(() => {});
           return updated;
@@ -1614,16 +1796,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (targetEmail) {
       const liveMap = getLiveRequestsMap();
-      const ex = liveMap.get(targetEmail.toLowerCase().trim());
+      const ex = liveMap.get(targetEmail);
       if (ex) {
-        liveMap.set(targetEmail.toLowerCase().trim(), { ...ex, employeeId: cleanNew, ...({ updatedAt: now } as any) });
+        liveMap.set(targetEmail, { ...ex, employeeId: cleanNew, ...({ updatedAt: now } as any) });
         saveLiveRequestsMap(liveMap);
       }
     }
 
     window.dispatchEvent(
       new CustomEvent('modela_employee_id_changed', {
-        detail: { oldId: oldEmpId || userIdOrEmail, newId: cleanNew, email: targetEmail }
+        detail: { oldId: oldEmpId, newId: cleanNew, email: targetEmail }
       })
     );
 

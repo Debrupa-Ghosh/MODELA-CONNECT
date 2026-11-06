@@ -34,7 +34,7 @@ app.use(express.json({ limit: '50mb' }));
 
 const STATE_FILE_PATH = path.resolve(__dirname, '.server-users-state.json');
 
-// Default baseline users
+// Default baseline users (all 18 active database employees)
 const DEFAULT_SERVER_USERS: ServerUser[] = [
   {
     id: "USR-Q94BIIQ5",
@@ -44,7 +44,7 @@ const DEFAULT_SERVER_USERS: ServerUser[] = [
     avatar_url: "https://ui-avatars.com/api/?name=Sushoovan+Das&background=3b82f6&color=fff",
     status: "APPROVED",
     role: "SUPER_ADMIN",
-    employeeId: "MOD001",
+    employeeId: "MTK006",
     designation: "Staff Candidate",
     department: "Executive Office",
     requestedAt: "2026-09-20T08:44:15.481Z",
@@ -59,7 +59,7 @@ const DEFAULT_SERVER_USERS: ServerUser[] = [
     avatar_url: "https://ui-avatars.com/api/?name=Aditi+Chakrabarty&background=0284c7&color=fff",
     status: "APPROVED",
     role: "EMPLOYEE",
-    employeeId: "MOD008",
+    employeeId: "MTK020",
     designation: "Staff Candidate",
     department: "General Staff",
     requestedAt: "2026-10-29T05:00:00.000Z",
@@ -74,7 +74,7 @@ const DEFAULT_SERVER_USERS: ServerUser[] = [
     avatar_url: "https://ui-avatars.com/api/?name=Debrupa+Ghosh&background=0284c7&color=fff",
     status: "APPROVED",
     role: "EMPLOYEE",
-    employeeId: "MOD011",
+    employeeId: "MTK023",
     designation: "Staff Candidate",
     department: "General Staff",
     requestedAt: "2026-10-22T08:00:00.000Z",
@@ -95,6 +95,216 @@ const DEFAULT_SERVER_USERS: ServerUser[] = [
     requestedAt: "2026-11-02T08:00:00.000Z",
     reviewedAt: "2026-11-02T08:05:00.000Z",
     reviewedBy: "System Root"
+  },
+  {
+    id: "USR-MTK018",
+    uid: "USR-MTK018",
+    name: "Abhinandan Baitalik",
+    email: "abhinandanb@modelatech.com",
+    avatar_url: "https://ui-avatars.com/api/?name=Abhinandan+Baitalik&background=0284c7&color=fff",
+    status: "APPROVED",
+    role: "EMPLOYEE",
+    employeeId: "MTK018",
+    designation: "Staff Candidate",
+    department: "General Staff",
+    requestedAt: "2026-11-04T08:00:00.000Z",
+    reviewedAt: "2026-11-04T08:05:00.000Z",
+    reviewedBy: "System Root"
+  },
+  {
+    id: "USR-MTK019",
+    uid: "USR-MTK019",
+    name: "Batas chandra mahato",
+    email: "batasm@modelatech.com",
+    avatar_url: "https://ui-avatars.com/api/?name=Batas+chandra+mahato&background=0284c7&color=fff",
+    status: "APPROVED",
+    role: "EMPLOYEE",
+    employeeId: "MTK019",
+    designation: "Staff Candidate",
+    department: "General Staff",
+    requestedAt: "2026-11-04T08:00:00.000Z",
+    reviewedAt: "2026-11-04T08:05:00.000Z",
+    reviewedBy: "System Root"
+  },
+  {
+    id: "USR-MTK016",
+    uid: "USR-MTK016",
+    name: "Damayanti Chanda",
+    email: "damayantic@modelatech.com",
+    avatar_url: "https://ui-avatars.com/api/?name=Damayanti+Chanda&background=0284c7&color=fff",
+    status: "APPROVED",
+    role: "HR",
+    employeeId: "MTK016",
+    designation: "Staff Candidate",
+    department: "General Staff",
+    requestedAt: "2026-11-04T08:00:00.000Z",
+    reviewedAt: "2026-11-04T08:05:00.000Z",
+    reviewedBy: "System Root"
+  },
+  {
+    id: "USR-MOD106",
+    uid: "USR-MOD106",
+    name: "Modela Tech",
+    email: "modelatech4@gmail.com",
+    avatar_url: "https://ui-avatars.com/api/?name=Modela+Tech&background=3b82f6&color=fff",
+    status: "APPROVED",
+    role: "SUPER_ADMIN",
+    employeeId: "MOD106",
+    designation: "Staff Candidate",
+    department: "General Staff",
+    requestedAt: "2026-11-04T08:00:00.000Z",
+    reviewedAt: "2026-11-04T08:05:00.000Z",
+    reviewedBy: "System Root"
+  },
+  {
+    id: "USR-MTK012",
+    uid: "USR-MTK012",
+    name: "Mosarof Hosen",
+    email: "mosarafh@modelatech.com",
+    avatar_url: "https://ui-avatars.com/api/?name=Mosarof+Hosen&background=0284c7&color=fff",
+    status: "APPROVED",
+    role: "EMPLOYEE",
+    employeeId: "MTK012",
+    designation: "Staff Candidate",
+    department: "General Staff",
+    requestedAt: "2026-11-04T08:00:00.000Z",
+    reviewedAt: "2026-11-04T08:05:00.000Z",
+    reviewedBy: "System Root"
+  },
+  {
+    id: "USR-MTK003",
+    uid: "USR-MTK003",
+    name: "Pritam Saha",
+    email: "pat@modelatech.com",
+    avatar_url: "https://ui-avatars.com/api/?name=Pritam+Saha&background=0284c7&color=fff",
+    status: "APPROVED",
+    role: "DIRECTOR",
+    employeeId: "MTK003",
+    designation: "Staff Candidate",
+    department: "General Staff",
+    requestedAt: "2026-11-04T08:00:00.000Z",
+    reviewedAt: "2026-11-04T08:05:00.000Z",
+    reviewedBy: "System Root"
+  },
+  {
+    id: "USR-MTK021",
+    uid: "USR-MTK021",
+    name: "Poulami Das",
+    email: "poulamid@modelatech.com",
+    avatar_url: "https://ui-avatars.com/api/?name=Poulami+Das&background=0284c7&color=fff",
+    status: "APPROVED",
+    role: "EMPLOYEE",
+    employeeId: "MTK021",
+    designation: "Staff Candidate",
+    department: "General Staff",
+    requestedAt: "2026-11-04T08:00:00.000Z",
+    reviewedAt: "2026-11-04T08:05:00.000Z",
+    reviewedBy: "System Root"
+  },
+  {
+    id: "USR-MTK017",
+    uid: "USR-MTK017",
+    name: "Poulami Manna",
+    email: "poulamim@modelatech.com",
+    avatar_url: "https://ui-avatars.com/api/?name=Poulami+Manna&background=0284c7&color=fff",
+    status: "APPROVED",
+    role: "EMPLOYEE",
+    employeeId: "MTK017",
+    designation: "Staff Candidate",
+    department: "General Staff",
+    requestedAt: "2026-11-05T08:00:00.000Z",
+    reviewedAt: "2026-11-05T08:05:00.000Z",
+    reviewedBy: "System Root"
+  },
+  {
+    id: "USR-MTK004",
+    uid: "USR-MTK004",
+    name: "Sandeepan Choudhury",
+    email: "sandeepanc04@gmail.com",
+    avatar_url: "https://ui-avatars.com/api/?name=Sandeepan+Choudhury&background=0284c7&color=fff",
+    status: "APPROVED",
+    role: "DIRECTOR",
+    employeeId: "MTK004",
+    designation: "Staff Candidate",
+    department: "General Staff",
+    requestedAt: "2026-11-04T08:00:00.000Z",
+    reviewedAt: "2026-11-04T08:05:00.000Z",
+    reviewedBy: "System Root"
+  },
+  {
+    id: "USR-MTK007",
+    uid: "USR-MTK007",
+    name: "Shibotosh Karmakar",
+    email: "shibotoshk@modelatech.com",
+    avatar_url: "https://ui-avatars.com/api/?name=Shibotosh+Karmakar&background=0284c7&color=fff",
+    status: "APPROVED",
+    role: "EMPLOYEE",
+    employeeId: "MTK007",
+    designation: "Staff Candidate",
+    department: "General Staff",
+    requestedAt: "2026-11-04T08:00:00.000Z",
+    reviewedAt: "2026-11-04T08:05:00.000Z",
+    reviewedBy: "System Root"
+  },
+  {
+    id: "USR-MTK009",
+    uid: "USR-MTK009",
+    name: "Shuvam Mandal",
+    email: "shuvamm@modelatech.com",
+    avatar_url: "https://ui-avatars.com/api/?name=Shuvam+Mandal&background=0284c7&color=fff",
+    status: "APPROVED",
+    role: "EMPLOYEE",
+    employeeId: "MTK009",
+    designation: "Staff Candidate",
+    department: "General Staff",
+    requestedAt: "2026-11-04T08:00:00.000Z",
+    reviewedAt: "2026-11-04T08:05:00.000Z",
+    reviewedBy: "System Root"
+  },
+  {
+    id: "USR-MOD116",
+    uid: "USR-MOD116",
+    name: "Subhasri Mandal",
+    email: "smandal@modelatechnologies.com",
+    avatar_url: "https://ui-avatars.com/api/?name=Subhasri+Mandal&background=0284c7&color=fff",
+    status: "APPROVED",
+    role: "EMPLOYEE",
+    employeeId: "MOD116",
+    designation: "Staff Candidate",
+    department: "General Staff",
+    requestedAt: "2026-11-04T08:00:00.000Z",
+    reviewedAt: "2026-11-04T08:05:00.000Z",
+    reviewedBy: "System Root"
+  },
+  {
+    id: "USR-MTK022",
+    uid: "USR-MTK022",
+    name: "Subhabrata Saha",
+    email: "subhabratas@modelatech.com",
+    avatar_url: "https://ui-avatars.com/api/?name=Subhabrata+Saha&background=0284c7&color=fff",
+    status: "APPROVED",
+    role: "EMPLOYEE",
+    employeeId: "MTK022",
+    designation: "Staff Candidate",
+    department: "General Staff",
+    requestedAt: "2026-11-04T08:00:00.000Z",
+    reviewedAt: "2026-11-04T08:05:00.000Z",
+    reviewedBy: "System Root"
+  },
+  {
+    id: "USR-MTK024",
+    uid: "USR-MTK024",
+    name: "Swagata Chattopadhyay",
+    email: "swagatac@modelatech.com",
+    avatar_url: "https://ui-avatars.com/api/?name=Swagata+Chattopadhyay&background=0284c7&color=fff",
+    status: "APPROVED",
+    role: "EMPLOYEE",
+    employeeId: "MTK024",
+    designation: "Staff Candidate",
+    department: "General Staff",
+    requestedAt: "2026-11-04T08:00:00.000Z",
+    reviewedAt: "2026-11-04T08:05:00.000Z",
+    reviewedBy: "System Root"
   }
 ];
 
@@ -104,17 +314,66 @@ const PERMANENTLY_DELETED_REQUEST_KEYS = new Set([
   'deb@gmail.com',
   'usr-qyg6aplc',
   'vikram.sengupta@gmail.com',
-  'usr-pending-03'
+  'usr-pending-03',
+  'tiasha@modelatechnologies.com'
 ]);
 
 const PROTECTED_ACTIVE_KEYS = new Set([
+  'sushovand@modelatech.com',
+  'usr-q94biiq5',
+  'mtk006',
   'aditichakraborty2005@gmail.com',
   'aditichakrabarty2005@gmail.com',
   'usr-aditi-008',
-  'mod008',
+  'mtk020',
+  'surupa008@gmail.com',
+  'usr-surupa-011',
+  'mtk023',
   'jit@modelatech.com',
   'usr-satyajit-115',
-  'mod115'
+  'mod115',
+  'abhinandanb@modelatech.com',
+  'usr-mtk018',
+  'mtk018',
+  'batasm@modelatech.com',
+  'usr-mtk019',
+  'mtk019',
+  'damayantic@modelatech.com',
+  'usr-mtk016',
+  'mtk016',
+  'modelatech4@gmail.com',
+  'usr-mod106',
+  'mod106',
+  'mosarafh@modelatech.com',
+  'usr-mtk012',
+  'mtk012',
+  'pat@modelatech.com',
+  'usr-mtk003',
+  'mtk003',
+  'poulamid@modelatech.com',
+  'usr-mtk021',
+  'mtk021',
+  'poulamim@modelatech.com',
+  'usr-mtk017',
+  'mtk017',
+  'sandeepanc04@gmail.com',
+  'usr-mtk004',
+  'mtk004',
+  'shibotoshk@modelatech.com',
+  'usr-mtk007',
+  'mtk007',
+  'shuvamm@modelatech.com',
+  'usr-mtk009',
+  'mtk009',
+  'smandal@modelatechnologies.com',
+  'usr-mod116',
+  'mod116',
+  'subhabratas@modelatech.com',
+  'usr-mtk022',
+  'mtk022',
+  'swagatac@modelatech.com',
+  'usr-mtk024',
+  'mtk024'
 ]);
 
 let users: ServerUser[] = [...DEFAULT_SERVER_USERS];
@@ -164,11 +423,40 @@ try {
             !PERMANENTLY_DELETED_REQUEST_KEYS.has(String(u.email || '').toLowerCase().trim()) &&
             !PERMANENTLY_DELETED_REQUEST_KEYS.has(String(u.id || '').toLowerCase().trim())
         )
-        .map((u: ServerUser) =>
-          String(u.email || '').toLowerCase().trim() === 'sushovand@modelatech.com'
-            ? { ...u, designation: 'Staff Candidate' }
-            : u
-        );
+        .map((u: ServerUser) => {
+          const emailLower = String(u.email || '').toLowerCase().trim();
+          const empIdUpper = String(u.employeeId || '').toUpperCase().trim();
+          if (emailLower === 'sushovand@modelatech.com') {
+            return {
+              ...u,
+              designation: 'Staff Candidate',
+              employeeId: (!empIdUpper || empIdUpper === 'MOD001' || empIdUpper === 'MOD000') ? 'MTK006' : empIdUpper
+            };
+          }
+          if (emailLower === 'aditichakraborty2005@gmail.com' || emailLower === 'aditichakrabarty2005@gmail.com') {
+            return { ...u, employeeId: (!empIdUpper || empIdUpper === 'MOD008') ? 'MTK020' : empIdUpper };
+          }
+          if (emailLower === 'surupa008@gmail.com') {
+            return { ...u, employeeId: (!empIdUpper || empIdUpper === 'MOD011') ? 'MTK023' : empIdUpper };
+          }
+          if (emailLower === 'smandal@modelatechnologies.com' || empIdUpper === 'MOD116') {
+            return {
+              ...u,
+              name: 'Subhasri Mandal',
+              employeeId: (!empIdUpper || empIdUpper === 'MOD000' || empIdUpper === 'MOD001') ? 'MOD116' : empIdUpper,
+              avatar_url: 'https://ui-avatars.com/api/?name=Subhasri+Mandal&background=0284c7&color=fff'
+            };
+          }
+          if (emailLower === 'poulamim@modelatech.com' || empIdUpper === 'MTK017') {
+            return {
+              ...u,
+              name: 'Poulami Manna',
+              employeeId: (!empIdUpper || empIdUpper === 'MOD000') ? 'MTK017' : empIdUpper,
+              avatar_url: 'https://ui-avatars.com/api/?name=Poulami+Manna&background=0284c7&color=fff'
+            };
+          }
+          return u;
+        });
       DEFAULT_SERVER_USERS.forEach(defU => {
         if (!users.some(u => u.email.toLowerCase().trim() === defU.email.toLowerCase().trim())) {
           users.push(defU);
@@ -184,7 +472,11 @@ try {
       });
     }
     if (Array.isArray(parsed.employees)) {
-      persistedEmployees = parsed.employees;
+      persistedEmployees = parsed.employees.filter((pe: any) => {
+        const idUp = String(pe?.id || '').toUpperCase().trim();
+        const emLo = String(pe?.email || '').toLowerCase().trim();
+        return idUp !== 'MOD008' && idUp !== 'MOD001' && idUp !== 'MOD011' && emLo !== 'tiasha@modelatechnologies.com';
+      });
     }
     if (Array.isArray(parsed.payroll)) {
       persistedPayroll = parsed.payroll;
@@ -197,7 +489,7 @@ try {
 
 let employees = [
   {
-    id: "MOD001",
+    id: "MTK006",
     firstName: "Sushoovan",
     lastName: "Das",
     email: "sushovand@modelatech.com",
@@ -207,33 +499,36 @@ let employees = [
     department: "Executive Office",
     status: "ACTIVE",
     location: "San Francisco HQ",
-    compensation: { basic: 85000, allowances: 25000 }
+    compensation: { basic: 85000, allowances: 25000 },
+    avatar: "https://ui-avatars.com/api/?name=Sushoovan+Das&background=3b82f6&color=fff"
   },
   {
-    id: "MOD008",
+    id: "MTK020",
     firstName: "Aditi",
     lastName: "Chakrabarty",
     email: "aditichakraborty2005@gmail.com",
-    joiningDate: "2026-10-29",
-    designation: "Staff Candidate",
-    phone: "",
+    joiningDate: "2026-09-09",
+    designation: "Intern",
+    phone: "6291 115 600",
     department: "General Staff",
     status: "ACTIVE",
     location: "San Francisco HQ",
-    compensation: { basic: 50000, allowances: 15000 }
+    compensation: { basic: 50000, allowances: 15000 },
+    avatar: "https://ui-avatars.com/api/?name=Aditi+Chakrabarty&background=0284c7&color=fff"
   },
   {
-    id: "MOD011",
+    id: "MTK023",
     firstName: "Debrupa",
     lastName: "Ghosh",
     email: "surupa008@gmail.com",
-    joiningDate: "2026-10-22",
-    designation: "Staff Candidate",
-    phone: "",
+    joiningDate: "2026-10-01",
+    designation: "Intern",
+    phone: "9007930757",
     department: "General Staff",
     status: "ACTIVE",
     location: "San Francisco HQ",
-    compensation: { basic: 50000, allowances: 15000 }
+    compensation: { basic: 50000, allowances: 15000 },
+    avatar: "https://ui-avatars.com/api/?name=Debrupa+Ghosh&background=0284c7&color=fff"
   },
   {
     id: "MOD115",
@@ -246,7 +541,204 @@ let employees = [
     department: "General Staff",
     status: "ACTIVE",
     location: "San Francisco HQ",
-    compensation: { basic: 50000, allowances: 15000 }
+    compensation: { basic: 50000, allowances: 15000 },
+    avatar: "https://ui-avatars.com/api/?name=Satyajit+Mazumder&background=0284c7&color=fff"
+  },
+  {
+    id: "MTK018",
+    firstName: "Abhinandan",
+    lastName: "Baitalik",
+    email: "abhinandanb@modelatech.com",
+    joiningDate: "2026-11-04",
+    designation: "Staff Candidate",
+    phone: "",
+    department: "General Staff",
+    status: "ACTIVE",
+    location: "San Francisco HQ",
+    compensation: { basic: 50000, allowances: 15000 },
+    avatar: "https://ui-avatars.com/api/?name=Abhinandan+Baitalik&background=0284c7&color=fff"
+  },
+  {
+    id: "MTK019",
+    firstName: "Batas",
+    lastName: "chandra mahato",
+    email: "batasm@modelatech.com",
+    joiningDate: "2026-11-04",
+    designation: "Staff Candidate",
+    phone: "",
+    department: "General Staff",
+    status: "ACTIVE",
+    location: "San Francisco HQ",
+    compensation: { basic: 50000, allowances: 15000 },
+    avatar: "https://ui-avatars.com/api/?name=Batas+chandra+mahato&background=0284c7&color=fff"
+  },
+  {
+    id: "MTK016",
+    firstName: "Damayanti",
+    lastName: "Chanda",
+    email: "damayantic@modelatech.com",
+    joiningDate: "2026-11-04",
+    designation: "Staff Candidate",
+    phone: "",
+    department: "General Staff",
+    status: "ACTIVE",
+    location: "San Francisco HQ",
+    compensation: { basic: 50000, allowances: 15000 },
+    avatar: "https://ui-avatars.com/api/?name=Damayanti+Chanda&background=0284c7&color=fff"
+  },
+  {
+    id: "MOD106",
+    firstName: "Modela",
+    lastName: "Tech",
+    email: "modelatech4@gmail.com",
+    joiningDate: "2026-11-04",
+    designation: "Staff Candidate",
+    phone: "",
+    department: "General Staff",
+    status: "ACTIVE",
+    location: "San Francisco HQ",
+    compensation: { basic: 95000, allowances: 30000 },
+    avatar: "https://ui-avatars.com/api/?name=Modela+Tech&background=3b82f6&color=fff"
+  },
+  {
+    id: "MTK012",
+    firstName: "Mosarof",
+    lastName: "Hosen",
+    email: "mosarafh@modelatech.com",
+    joiningDate: "2026-11-04",
+    designation: "Staff Candidate",
+    phone: "",
+    department: "General Staff",
+    status: "ACTIVE",
+    location: "San Francisco HQ",
+    compensation: { basic: 50000, allowances: 15000 },
+    avatar: "https://ui-avatars.com/api/?name=Mosarof+Hosen&background=0284c7&color=fff"
+  },
+  {
+    id: "MTK003",
+    firstName: "Pritam",
+    lastName: "Saha",
+    email: "pat@modelatech.com",
+    joiningDate: "2026-11-04",
+    designation: "Staff Candidate",
+    phone: "",
+    department: "General Staff",
+    status: "ACTIVE",
+    location: "San Francisco HQ",
+    compensation: { basic: 50000, allowances: 15000 },
+    avatar: "https://ui-avatars.com/api/?name=Pritam+Saha&background=0284c7&color=fff"
+  },
+  {
+    id: "MTK021",
+    firstName: "Poulami",
+    lastName: "Das",
+    email: "poulamid@modelatech.com",
+    joiningDate: "2026-11-04",
+    designation: "Staff Candidate",
+    phone: "",
+    department: "General Staff",
+    status: "ACTIVE",
+    location: "San Francisco HQ",
+    compensation: { basic: 50000, allowances: 15000 },
+    avatar: "https://ui-avatars.com/api/?name=Poulami+Das&background=0284c7&color=fff"
+  },
+  {
+    id: "MTK017",
+    firstName: "Poulami",
+    lastName: "Manna",
+    email: "poulamim@modelatech.com",
+    joiningDate: "2026-11-05",
+    designation: "Staff Candidate",
+    phone: "",
+    department: "General Staff",
+    status: "ACTIVE",
+    location: "San Francisco HQ",
+    compensation: { basic: 50000, allowances: 15000 },
+    avatar: "https://ui-avatars.com/api/?name=Poulami+Manna&background=0284c7&color=fff"
+  },
+  {
+    id: "MTK004",
+    firstName: "Sandeepan",
+    lastName: "Choudhury",
+    email: "sandeepanc04@gmail.com",
+    joiningDate: "2026-11-04",
+    designation: "Staff Candidate",
+    phone: "",
+    department: "General Staff",
+    status: "ACTIVE",
+    location: "San Francisco HQ",
+    compensation: { basic: 50000, allowances: 15000 },
+    avatar: "https://ui-avatars.com/api/?name=Sandeepan+Choudhury&background=0284c7&color=fff"
+  },
+  {
+    id: "MTK007",
+    firstName: "Shibotosh",
+    lastName: "Karmakar",
+    email: "shibotoshk@modelatech.com",
+    joiningDate: "2026-11-04",
+    designation: "Staff Candidate",
+    phone: "",
+    department: "General Staff",
+    status: "ACTIVE",
+    location: "San Francisco HQ",
+    compensation: { basic: 50000, allowances: 15000 },
+    avatar: "https://ui-avatars.com/api/?name=Shibotosh+Karmakar&background=0284c7&color=fff"
+  },
+  {
+    id: "MTK009",
+    firstName: "Shuvam",
+    lastName: "Mandal",
+    email: "shuvamm@modelatech.com",
+    joiningDate: "2026-11-04",
+    designation: "Staff Candidate",
+    phone: "",
+    department: "General Staff",
+    status: "ACTIVE",
+    location: "San Francisco HQ",
+    compensation: { basic: 50000, allowances: 15000 },
+    avatar: "https://ui-avatars.com/api/?name=Shuvam+Mandal&background=0284c7&color=fff"
+  },
+  {
+    id: "MOD116",
+    firstName: "Subhasri",
+    lastName: "Mandal",
+    email: "smandal@modelatechnologies.com",
+    joiningDate: "2026-11-04",
+    designation: "Staff Candidate",
+    phone: "",
+    department: "General Staff",
+    status: "ACTIVE",
+    location: "San Francisco HQ",
+    compensation: { basic: 50000, allowances: 15000 },
+    avatar: "https://ui-avatars.com/api/?name=Subhasri+Mandal&background=0284c7&color=fff"
+  },
+  {
+    id: "MTK022",
+    firstName: "Subhabrata",
+    lastName: "Saha",
+    email: "subhabratas@modelatech.com",
+    joiningDate: "2026-11-04",
+    designation: "Staff Candidate",
+    phone: "",
+    department: "General Staff",
+    status: "ACTIVE",
+    location: "San Francisco HQ",
+    compensation: { basic: 50000, allowances: 15000 },
+    avatar: "https://ui-avatars.com/api/?name=Subhabrata+Saha&background=0284c7&color=fff"
+  },
+  {
+    id: "MTK024",
+    firstName: "Swagata",
+    lastName: "Chattopadhyay",
+    email: "swagatac@modelatech.com",
+    joiningDate: "2026-11-04",
+    designation: "Staff Candidate",
+    phone: "",
+    department: "General Staff",
+    status: "ACTIVE",
+    location: "San Francisco HQ",
+    compensation: { basic: 50000, allowances: 15000 },
+    avatar: "https://ui-avatars.com/api/?name=Swagata+Chattopadhyay&background=0284c7&color=fff"
   }
 ];
 
@@ -300,7 +792,7 @@ let policyRecords: any[] = [...persistedPolicies];
 
 if (persistedEmployees.length > 0) {
   persistedEmployees.forEach(pe => {
-    if (!pe || !pe.id) return;
+    if (!pe || !pe.id || String(pe.id).toUpperCase().trim() === 'MOD008') return;
     const idx = employees.findIndex(
       e => e.id.toUpperCase() === String(pe.id).toUpperCase() || (pe.email && e.email?.toLowerCase() === String(pe.email).toLowerCase())
     );
@@ -566,10 +1058,11 @@ app.post('/api/employees', (req: Request, res: Response) => {
   if (!newEmp || !newEmp.id) {
     return res.status(400).json({ success: false, message: 'Invalid employee payload' });
   }
-  const idx = employees.findIndex(
-    e =>
-      e.id.toUpperCase() === String(newEmp.id).toUpperCase() ||
-      (newEmp.email && e.email?.toLowerCase() === String(newEmp.email).toLowerCase())
+  const cleanEmail = newEmp.email ? String(newEmp.email).toLowerCase().trim() : '';
+  const idx = employees.findIndex(e =>
+    cleanEmail
+      ? e.email?.toLowerCase().trim() === cleanEmail
+      : e.id.toUpperCase() === String(newEmp.id).toUpperCase()
   );
   if (idx >= 0) {
     employees[idx] = { ...employees[idx], ...newEmp };
@@ -586,16 +1079,18 @@ app.post('/api/employees/update-id', (req: Request, res: Response) => {
     return res.status(400).json({ success: false, message: 'Invalid payload' });
   }
   const cleanEmail = email ? email.toLowerCase().trim() : (employee?.email ? employee.email.toLowerCase().trim() : '');
-  employees = employees.map(e =>
-    (e.id === oldId || (cleanEmail && e.email?.toLowerCase() === cleanEmail))
-      ? { ...(employee || e), id: newId }
-      : e
-  );
-  users = users.map(u =>
-    (u.employeeId === oldId || (cleanEmail && u.email?.toLowerCase() === cleanEmail))
-      ? { ...u, employeeId: newId }
-      : u
-  );
+  employees = employees.map(e => {
+    const isMatch = cleanEmail
+      ? e.email?.toLowerCase().trim() === cleanEmail
+      : e.id === oldId;
+    return isMatch ? { ...(employee || e), id: newId } : e;
+  });
+  users = users.map(u => {
+    const isMatch = cleanEmail
+      ? u.email?.toLowerCase().trim() === cleanEmail
+      : u.employeeId === oldId;
+    return isMatch ? { ...u, employeeId: newId } : u;
+  });
   saveServerState();
   res.json({ success: true });
 });
@@ -682,7 +1177,8 @@ async function getServerFirestore() {
   if (!fs.existsSync(configPath)) return null;
   const firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
   const { initializeApp, getApps } = await import('firebase/app');
-  const { getFirestore, doc, setDoc, deleteDoc } = await import('firebase/firestore');
+  const { getFirestore, doc, setDoc, deleteDoc, setLogLevel } = await import('firebase/firestore');
+  setLogLevel('silent');
   const fbApp = getApps().length > 0 ? getApps()[0] : initializeApp(firebaseConfig);
   const db = getFirestore(fbApp, firebaseConfig.firestoreDatabaseId);
   return { db, doc, setDoc, deleteDoc };
@@ -783,159 +1279,8 @@ app.get('/api/users/stream', (_req: Request, res: Response) => {
   res.end();
 });
 
-// Server-side Firestore reconciliation to guarantee database state
-async function reconcileFirestoreDatabase() {
-  try {
-    const configPath = path.resolve(__dirname, 'firebase-applet-config.json');
-    if (!fs.existsSync(configPath)) return;
-    const firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-    const { initializeApp, getApps } = await import('firebase/app');
-    const { getFirestore, doc, setDoc, deleteDoc, collection, getDocs, getDoc } = await import('firebase/firestore');
-
-    const fbApp = getApps().length > 0 ? getApps()[0] : initializeApp(firebaseConfig);
-    const db = getFirestore(fbApp, firebaseConfig.firestoreDatabaseId);
-
-    const withWriteTimeout = <T>(p: Promise<T>, ms = 6000): Promise<T> =>
-      Promise.race([
-        p,
-        new Promise<T>((_, reject) => setTimeout(() => reject(new Error('Write timeout (quota backoff)')), ms))
-      ]);
-
-    let needsRetry = false;
-
-    // 1. Ensure MOD008 (aditichakraborty2005@gmail.com) is present in Firestore employees collection
-    const mod008Ref = doc(db, 'employees', 'MOD008');
-    const mod008Snap = await getDoc(mod008Ref);
-    if (!mod008Snap.exists()) {
-      try {
-        await withWriteTimeout(
-          setDoc(
-            mod008Ref,
-            {
-              id: 'MOD008',
-              firstName: 'Aditi',
-              lastName: 'Chakraborty',
-              email: 'aditichakraborty2005@gmail.com',
-              joiningDate: '2026-10-29',
-              designation: 'Staff Candidate',
-              phone: '',
-              department: 'General Staff',
-              status: 'ACTIVE',
-              location: 'San Francisco HQ',
-              compensation: { basic: 50000, allowances: 15000 },
-              avatar: 'https://ui-avatars.com/api/?name=Aditi%20Chakraborty&background=0284c7&color=fff'
-            },
-            { merge: true }
-          )
-        );
-      } catch {
-        needsRetry = true;
-      }
-    }
-
-    // 2. Delete all Modela Tech, MOD106 records from Firestore payroll collection ONLY
-    const payrollSnap = await getDocs(collection(db, 'payroll'));
-    for (const d of payrollSnap.docs) {
-      const data = d.data();
-      const docIdUpper = d.id.toUpperCase();
-      const empIdUpper = String(data.employeeId || '').trim().toUpperCase();
-      const empNameLower = String(data.employeeName || '').trim().toLowerCase();
-      if (
-        docIdUpper.includes('MOD106') ||
-        empIdUpper === 'MOD106' ||
-        empNameLower === 'modela tech' ||
-        empNameLower.includes('modela tech')
-      ) {
-        try {
-          await withWriteTimeout(deleteDoc(doc(db, 'payroll', d.id)));
-        } catch {
-          needsRetry = true;
-          break;
-        }
-      }
-    }
-
-    // 3. Delete REQ-1572, REQ-3779, REQ-9074, REQ-2709, and REQ-6425 from Firestore requests collection
-    try {
-      await withWriteTimeout(deleteDoc(doc(db, 'requests', 'REQ-1572')));
-      await withWriteTimeout(deleteDoc(doc(db, 'requests', 'REQ-3779')));
-      await withWriteTimeout(deleteDoc(doc(db, 'requests', 'REQ-9074')));
-      await withWriteTimeout(deleteDoc(doc(db, 'requests', 'REQ-2709')));
-      await withWriteTimeout(deleteDoc(doc(db, 'requests', 'REQ-6425')));
-      const reqSnap = await getDocs(collection(db, 'requests'));
-      for (const rDoc of reqSnap.docs) {
-        const rData = rDoc.data();
-        if (isExcludedServerStaffRequest({ ...rData, id: rData.id || rDoc.id })) {
-          await withWriteTimeout(deleteDoc(doc(db, 'requests', rDoc.id)));
-        }
-      }
-    } catch {
-      needsRetry = true;
-    }
-
-    // 4. Sync any updated payroll records (such as OT amounts) to Firestore payroll collection
-    for (const pRec of payrollRecords) {
-      if (!pRec || !pRec.id) continue;
-      try {
-        await withWriteTimeout(setDoc(doc(db, 'payroll', pRec.id), pRec, { merge: true }));
-      } catch {
-        needsRetry = true;
-        break;
-      }
-    }
-
-    // 5. Sync any updated employee records (such as Sick/Privilege/Maternity/Paternity Leave) to Firestore employees collection
-    for (const empRec of employees) {
-      if (!empRec || !empRec.id || !(empRec as any).updatedAt) continue;
-      try {
-        await withWriteTimeout(setDoc(doc(db, 'employees', empRec.id), empRec, { merge: true }));
-      } catch {
-        needsRetry = true;
-        break;
-      }
-    }
-
-    // 6. Sync policies collection strictly from Firestore so only policies present in database exist in server state
-    try {
-      const policiesSnap = await getDocs(collection(db, 'policies'));
-      const firestorePolicies: any[] = [];
-      for (const pDoc of policiesSnap.docs) {
-        const pData = pDoc.data();
-        if (pData && pData.policyId && pData.policyName && pData.fileName) {
-          const cleanId = String(pData.id || pDoc.id).trim();
-          const existing = policyRecords.find(
-            p =>
-              String(p.id || '').toLowerCase() === cleanId.toLowerCase() ||
-              String(p.policyId || '').toLowerCase() === String(pData.policyId).toLowerCase()
-          );
-          firestorePolicies.push({
-            ...(existing || {}),
-            ...pData,
-            id: cleanId,
-            fileData: pData.fileData || existing?.fileData || '',
-            docxHtml: pData.docxHtml || existing?.docxHtml || ''
-          });
-        }
-      }
-      policyRecords = firestorePolicies;
-      saveServerState();
-    } catch {
-      needsRetry = true;
-    }
-
-    if (needsRetry) {
-      setTimeout(reconcileFirestoreDatabase, 5 * 60 * 1000);
-    } else {
-      console.log('Firestore reconciliation complete.');
-    }
-  } catch (err) {
-    setTimeout(reconcileFirestoreDatabase, 5 * 60 * 1000);
-  }
-}
-
 // Vite Middleware Integration
 async function startServer() {
-  reconcileFirestoreDatabase();
   const distPath = path.resolve(__dirname, 'dist');
   const distIndexPath = path.resolve(distPath, 'index.html');
 

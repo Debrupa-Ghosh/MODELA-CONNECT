@@ -3,15 +3,14 @@
 import { doc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 
-const STORAGE_KEY_DELETED = 'modela_deleted_registry_v4';
-const STORAGE_KEY_UNBLOCKED = 'modela_unblocked_registry_v1';
-const STORAGE_KEY_EMP_ID_MAP = 'modela_emp_id_overrides_v1';
+const STORAGE_KEY_DELETED = 'modela_deleted_registry_v5';
+const STORAGE_KEY_UNBLOCKED = 'modela_unblocked_registry_v2';
+const STORAGE_KEY_EMP_ID_MAP = 'modela_emp_id_overrides_v2';
 export const SYNC_REGISTRY_DOC_ID = 'SYNC-REGISTRY-GLOBAL';
 
 const PERMANENTLY_EXCLUDED_KEYS = new Set([
   'modelatech2026@gmail.com',
   'usr-superadmin-01',
-  'mod000',
   'mod101',
   'sushoovandas@gmail.com',
   'usr-sushoovan-gmail',
@@ -28,6 +27,7 @@ const PERMANENTLY_EXCLUDED_KEYS = new Set([
   'vikram.sengupta@gmail.com',
   'usr-pending-03',
   'req-vikram_sengupta_gmail_com',
+  'tiasha@modelatechnologies.com',
   'req-1572',
   'req-2709',
   'req-6425',
@@ -39,6 +39,7 @@ const DEFAULT_DELETED_IDS = [
   'alex.morgan@modela.io',
   'elena.rostova@modela.io',
   'rani123@gmail.com',
+  'tiasha@modelatechnologies.com',
   'req-1572',
   'req-2709',
   'req-6425',
@@ -82,20 +83,130 @@ const DEFAULT_DELETED_IDS = [
   ...Array.from(PERMANENTLY_EXCLUDED_KEYS)
 ];
 
-const SYSTEM_PROTECTED_KEYS = new Set([
+const ACTIVE_DB_PROTECTED_KEYS = [
   'sync-registry-global',
   'sync@system.internal',
+  // 1. Sushoovan Das (MTK006)
+  'sushovand@modelatech.com',
+  'usr-q94biiq5',
+  'mtk006',
+  'sushoovan das',
+  // 2. Aditi Chakrabarty (MTK020)
   'aditichakraborty2005@gmail.com',
   'aditichakrabarty2005@gmail.com',
   'usr-aditi-008',
-  'mod008',
+  'usr-mtk020',
+  'mtk020',
   'aditi chakrabarty',
   'aditi chakraborty',
+  // 3. Debrupa Ghosh (MTK023)
+  'surupa008@gmail.com',
+  'usr-surupa-011',
+  'usr-mtk023',
+  'mtk023',
+  'debrupa ghosh',
+  // 4. Satyajit Mazumder (MOD115)
   'jit@modelatech.com',
   'usr-satyajit-115',
   'mod115',
-  'satyajit mazumder'
-]);
+  'satyajit mazumder',
+  // 5. Abhinandan Baitalik (MTK018)
+  'abhinandanb@modelatech.com',
+  'usr-mtk018',
+  'mtk018',
+  'abhinandan baitalik',
+  // 6. Batas chandra mahato (MTK019)
+  'batasm@modelatech.com',
+  'usr-mtk019',
+  'mtk019',
+  'batas chandra mahato',
+  // 7. Damayanti Chanda (MTK016)
+  'damayantic@modelatech.com',
+  'usr-mtk016',
+  'mtk016',
+  'damayanti chanda',
+  // 8. Modela Tech (MOD106)
+  'modelatech4@gmail.com',
+  'usr-mod106',
+  'mod106',
+  'modela tech',
+  // 9. Mosarof Hosen (MTK012)
+  'mosarafh@modelatech.com',
+  'usr-mtk012',
+  'mtk012',
+  'mosarof hosen',
+  // 10. Pritam Saha (MTK003)
+  'pat@modelatech.com',
+  'usr-mtk003',
+  'mtk003',
+  'pritam saha',
+  // 11. Poulami Das (MTK021)
+  'poulamid@modelatech.com',
+  'usr-mtk021',
+  'mtk021',
+  'poulami das',
+  // 12. Poulami Manna (MTK017)
+  'poulamim@modelatech.com',
+  'usr-mtk017',
+  'mtk017',
+  'poulami manna',
+  // 13. Sandeepan Choudhury (MTK004)
+  'sandeepanc04@gmail.com',
+  'usr-mtk004',
+  'mtk004',
+  'sandeepan choudhury',
+  // 14. Shibotosh Karmakar (MTK007)
+  'shibotoshk@modelatech.com',
+  'usr-mtk007',
+  'mtk007',
+  'shibotosh karmakar',
+  // 15. Shuvam Mandal (MTK009)
+  'shuvamm@modelatech.com',
+  'usr-mtk009',
+  'mtk009',
+  'shuvam mandal',
+  // 16. Subhasri Mandal (MOD116)
+  'smandal@modelatechnologies.com',
+  'usr-mod116',
+  'mod116',
+  'subhasri mandal',
+  // 17. Subhabrata Saha (MTK022)
+  'subhabratas@modelatech.com',
+  'usr-mtk022',
+  'mtk022',
+  'subhabrata saha',
+  // 18. Swagata Chattopadhyay (MTK024)
+  'swagatac@modelatech.com',
+  'usr-mtk024',
+  'mtk024',
+  'swagata chattopadhyay'
+];
+
+const SYSTEM_PROTECTED_KEYS = new Set(ACTIVE_DB_PROTECTED_KEYS);
+
+const DEFAULT_EMP_ID_BY_EMAIL: Record<string, string> = {
+  'sushovand@modelatech.com': 'MTK006',
+  'aditichakraborty2005@gmail.com': 'MTK020',
+  'aditichakrabarty2005@gmail.com': 'MTK020',
+  'surupa008@gmail.com': 'MTK023',
+  'jit@modelatech.com': 'MOD115',
+  'abhinandanb@modelatech.com': 'MTK018',
+  'batasm@modelatech.com': 'MTK019',
+  'damayantic@modelatech.com': 'MTK016',
+  'modelatech4@gmail.com': 'MOD106',
+  'mosarafh@modelatech.com': 'MTK012',
+  'pat@modelatech.com': 'MTK003',
+  'poulamid@modelatech.com': 'MTK021',
+  'poulamim@modelatech.com': 'MTK017',
+  'sandeepanc04@gmail.com': 'MTK004',
+  'shibotoshk@modelatech.com': 'MTK007',
+  'shuvamm@modelatech.com': 'MTK009',
+  'smandal@modelatechnologies.com': 'MOD116',
+  'subhabratas@modelatech.com': 'MTK022',
+  'swagatac@modelatech.com': 'MTK024'
+};
+
+const OBSOLETE_FALLBACK_IDS = new Set(['MOD000', 'MOD001', 'MOD008', 'MOD011']);
 
 let cachedUnblocked: Set<string> | null = null;
 let cachedDeleted: Set<string> | null = null;
@@ -104,18 +215,7 @@ let persistTimer: ReturnType<typeof setTimeout> | null = null;
 
 export const getUnblockedRegistry = (): Set<string> => {
   if (cachedUnblocked) return cachedUnblocked;
-  const result = new Set<string>([
-    'aditichakraborty2005@gmail.com',
-    'aditichakrabarty2005@gmail.com',
-    'usr-aditi-008',
-    'mod008',
-    'aditi chakrabarty',
-    'aditi chakraborty',
-    'jit@modelatech.com',
-    'usr-satyajit-115',
-    'mod115',
-    'satyajit mazumder'
-  ]);
+  const result = new Set<string>(ACTIVE_DB_PROTECTED_KEYS);
   try {
     const raw = localStorage.getItem(STORAGE_KEY_UNBLOCKED);
     if (raw) {
@@ -123,7 +223,9 @@ export const getUnblockedRegistry = (): Set<string> => {
       if (Array.isArray(arr)) {
         arr.forEach(s => {
           const clean = String(s || '').toLowerCase().trim();
-          if (clean) result.add(clean);
+          if (clean && clean !== 'mod008' && clean !== 'mod011' && clean !== 'mod001') {
+            result.add(clean);
+          }
         });
       }
     }
@@ -156,20 +258,37 @@ export const getDeletedRegistry = (): Set<string> => {
 
 export const getCustomEmpIdMap = (): Record<string, string> => {
   if (cachedEmpIdMap) return cachedEmpIdMap;
+  const emailOnlyMap: Record<string, string> = { ...DEFAULT_EMP_ID_BY_EMAIL };
   try {
     const raw = localStorage.getItem(STORAGE_KEY_EMP_ID_MAP);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object') {
-        const validMap = parsed as Record<string, string>;
-        cachedEmpIdMap = validMap;
-        return validMap;
+        let cleaned = false;
+        Object.entries(parsed).forEach(([k, v]) => {
+          const cleanKey = String(k || '').trim().toLowerCase();
+          if (cleanKey.includes('@') && typeof v === 'string' && v.trim()) {
+            const cleanVal = v.trim().toUpperCase();
+            if (OBSOLETE_FALLBACK_IDS.has(cleanVal) && DEFAULT_EMP_ID_BY_EMAIL[cleanKey]) {
+              emailOnlyMap[cleanKey] = DEFAULT_EMP_ID_BY_EMAIL[cleanKey];
+              cleaned = true;
+            } else {
+              emailOnlyMap[cleanKey] = cleanVal;
+            }
+          } else {
+            cleaned = true;
+          }
+        });
+        if (cleaned) {
+          localStorage.setItem(STORAGE_KEY_EMP_ID_MAP, JSON.stringify(emailOnlyMap));
+        }
+        cachedEmpIdMap = emailOnlyMap;
+        return emailOnlyMap;
       }
     }
   } catch {}
-  const emptyMap: Record<string, string> = {};
-  cachedEmpIdMap = emptyMap;
-  return emptyMap;
+  cachedEmpIdMap = emailOnlyMap;
+  return emailOnlyMap;
 };
 
 export const persistSyncRegistryToFirestore = async (): Promise<void> => {
@@ -248,10 +367,15 @@ export const applyRemoteSyncRegistry = (data: any): boolean => {
       const currentMap = getCustomEmpIdMap();
       let mapChanged = false;
       Object.entries(data.empIdMap).forEach(([k, v]) => {
-        if (k && typeof v === 'string' && v.trim()) {
+        const cleanKey = String(k || '').trim().toLowerCase();
+        // Only apply email-keyed overrides and never overwrite database IDs with obsolete fallback IDs (MOD000, MOD001, MOD008, MOD011)
+        if (cleanKey.includes('@') && typeof v === 'string' && v.trim()) {
           const cleanVal = v.trim().toUpperCase();
-          if (currentMap[k] !== cleanVal) {
-            currentMap[k] = cleanVal;
+          if (OBSOLETE_FALLBACK_IDS.has(cleanVal) && DEFAULT_EMP_ID_BY_EMAIL[cleanKey]) {
+            return;
+          }
+          if (currentMap[cleanKey] !== cleanVal) {
+            currentMap[cleanKey] = cleanVal;
             changed = true;
             mapChanged = true;
           }
@@ -333,7 +457,7 @@ export const isRecordDeleted = (...identifiers: (string | undefined | null)[]): 
     if (!id) return false;
     const clean = id.toLowerCase().trim();
     if (!clean) return false;
-    if (unblocked.has(clean)) return false;
+    if (unblocked.has(clean) || SYSTEM_PROTECTED_KEYS.has(clean)) return false;
     if (
       PERMANENTLY_EXCLUDED_KEYS.has(clean) ||
       clean.includes('tony stark') ||
@@ -368,29 +492,19 @@ export const recordCustomEmpId = (email?: string | null, oldId?: string | null, 
     return;
   }
   const cleanNew = newId.trim().toUpperCase();
+  if (OBSOLETE_FALLBACK_IDS.has(cleanNew) && cleanEmail && DEFAULT_EMP_ID_BY_EMAIL[cleanEmail]) {
+    return;
+  }
   removeDeletedRecord(cleanNew, oldId, email);
   try {
     const map = getCustomEmpIdMap();
     let changed = false;
-    if (email && email.trim()) {
-      const emailKey = email.trim().toLowerCase();
-      if (map[emailKey] !== cleanNew) {
-        map[emailKey] = cleanNew;
+    // Strictly map by email only so editing one user's employee ID never changes another user who shared oldId
+    if (cleanEmail && cleanEmail.includes('@')) {
+      if (map[cleanEmail] !== cleanNew) {
+        map[cleanEmail] = cleanNew;
         changed = true;
       }
-    }
-    if (oldId && oldId.trim()) {
-      const cleanOld = oldId.trim().toUpperCase();
-      if (map[cleanOld] !== cleanNew) {
-        map[cleanOld] = cleanNew;
-        changed = true;
-      }
-      Object.keys(map).forEach(k => {
-        if (map[k] === cleanOld) {
-          map[k] = cleanNew;
-          changed = true;
-        }
-      });
     }
     if (changed) {
       localStorage.setItem(STORAGE_KEY_EMP_ID_MAP, JSON.stringify(map));
@@ -404,16 +518,27 @@ export const recordCustomEmpId = (email?: string | null, oldId?: string | null, 
 export const resolveEmpId = (email?: string | null, fallbackId?: string | null): string => {
   const map = getCustomEmpIdMap();
   if (email && email.trim()) {
-    const byEmail = map[email.trim().toLowerCase()];
-    if (byEmail) return byEmail;
+    const emailKey = email.trim().toLowerCase();
+    const byEmail = map[emailKey];
+    if (byEmail) {
+      if (OBSOLETE_FALLBACK_IDS.has(byEmail) && DEFAULT_EMP_ID_BY_EMAIL[emailKey]) {
+        return DEFAULT_EMP_ID_BY_EMAIL[emailKey];
+      }
+      return byEmail;
+    }
+    if (DEFAULT_EMP_ID_BY_EMAIL[emailKey]) {
+      return DEFAULT_EMP_ID_BY_EMAIL[emailKey];
+    }
   }
   if (fallbackId && fallbackId.trim()) {
     const cleanFallback = fallbackId.trim().toUpperCase();
-    const byId = map[cleanFallback];
-    if (byId) return byId;
+    if (cleanFallback === 'MOD008') return 'MTK020';
+    if (cleanFallback === 'MOD011') return 'MTK023';
+    if (cleanFallback === 'MOD001') return 'MTK006';
     return cleanFallback;
   }
   return '';
 };
+
 
 
