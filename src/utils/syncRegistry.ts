@@ -334,18 +334,29 @@ export const applyRemoteSyncRegistry = (data: any): boolean => {
     let unblockedChanged = false;
     let deletedChanged = false;
 
-    const remoteUnblockedSet = Array.isArray(data.unblockedIds)
-      ? new Set(data.unblockedIds.map((x: any) => String(x || '').toLowerCase().trim()).filter(Boolean))
+    const remoteUnblockedSet: Set<string> | null = Array.isArray(data.unblockedIds)
+      ? new Set<string>(data.unblockedIds.map((x: any) => String(x || '').toLowerCase().trim()).filter(Boolean))
       : null;
+
+    if (remoteUnblockedSet) {
+      remoteUnblockedSet.forEach(clean => {
+        if (clean && clean !== 'mod008' && clean !== 'mod011' && clean !== 'mod001' && clean !== 'mod000') {
+          if (!unblocked.has(clean)) {
+            unblocked.add(clean);
+            unblockedChanged = true;
+          }
+          if (currentDeleted.has(clean)) {
+            currentDeleted.delete(clean);
+            deletedChanged = true;
+          }
+        }
+      });
+    }
 
     if (Array.isArray(data.deletedIds)) {
       data.deletedIds.forEach((item: any) => {
         const clean = String(item || '').toLowerCase().trim();
         if (clean && !SYSTEM_PROTECTED_KEYS.has(clean)) {
-          if (remoteUnblockedSet && !remoteUnblockedSet.has(clean) && unblocked.has(clean)) {
-            unblocked.delete(clean);
-            unblockedChanged = true;
-          }
           if (!unblocked.has(clean) && !currentDeleted.has(clean)) {
             currentDeleted.add(clean);
             deletedChanged = true;

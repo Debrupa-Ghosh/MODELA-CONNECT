@@ -78,6 +78,7 @@ const DELETED_SEED_REQUEST_IDS = new Set([
 
 const isDeletedSeedSignupRequest = (u?: Partial<User> | null, docId?: string): boolean => {
   if (!u) return false;
+  if ((u as any)?.isLiveRequest) return false;
   const lowerId = String(u.id || '').trim().toLowerCase();
   const lowerUid = String(u.uid || '').trim().toLowerCase();
   const lowerDocId = String(docId || '').trim().toLowerCase();
@@ -281,15 +282,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               if (u.status === 'REJECTED') return false;
               const emailKey = String(u.email || '').toLowerCase().trim();
               const reqDocId = emailKey ? `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}` : undefined;
+              const isPending = u.status === 'PENDING';
               return (
                 !isDeletedSeedSignupRequest(u) &&
                 !isLegacyExcludedUser(u) &&
-                !isRecordDeleted(u.id, u.uid, emailKey, reqDocId, u.employeeId, resolveEmpId(emailKey, u.employeeId))
+                !isRecordDeleted(u.id, u.uid, emailKey, reqDocId, isPending ? undefined : u.employeeId, isPending ? undefined : resolveEmpId(emailKey, u.employeeId))
               );
             })
             .map(u => normalizeCanonicalUser({
               ...u,
-              employeeId: resolveEmpId(u.email, u.employeeId)
+              employeeId: u.status === 'PENDING' ? undefined : resolveEmpId(u.email, u.employeeId)
             }));
         }
       }
@@ -475,15 +477,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (u.status === 'REJECTED') return false;
             const emailKey = String(u.email || '').toLowerCase().trim();
             const reqDocId = emailKey ? `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}` : undefined;
+            const isPending = u.status === 'PENDING';
             return (
               !isDeletedSeedSignupRequest(u) &&
               !isLegacyExcludedUser(u) &&
-              !isRecordDeleted(u.id, u.uid, emailKey, reqDocId, u.employeeId, resolveEmpId(emailKey, u.employeeId))
+              !isRecordDeleted(u.id, u.uid, emailKey, reqDocId, isPending ? undefined : u.employeeId, isPending ? undefined : resolveEmpId(emailKey, u.employeeId))
             );
           })
           .map(u => ({
             ...u,
-            employeeId: resolveEmpId(u.email, u.employeeId)
+            employeeId: u.status === 'PENDING' ? undefined : resolveEmpId(u.email, u.employeeId)
           }));
         try {
           localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(next));
@@ -510,10 +513,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (u.status === 'REJECTED') return false;
         const emailKey = String(u.email || '').toLowerCase().trim();
         const reqDocId = emailKey ? `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}` : undefined;
+        const isPending = u.status === 'PENDING';
         return (
           !isDeletedSeedSignupRequest(u) &&
           !isLegacyExcludedUser(u) &&
-          !isRecordDeleted(u.id, u.uid, emailKey, reqDocId, u.employeeId, resolveEmpId(emailKey, u.employeeId))
+          !isRecordDeleted(u.id, u.uid, emailKey, reqDocId, isPending ? undefined : u.employeeId, isPending ? undefined : resolveEmpId(emailKey, u.employeeId))
         );
       });
       localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(sanitized));
@@ -527,10 +531,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const liveMap = getLiveRequestsMap();
     let liveModified = false;
 
+    const serverDeletedSet = new Set<string>(
+      Array.isArray(deletedIds)
+        ? deletedIds.map(d => String(d || '').toLowerCase().trim()).filter(Boolean)
+        : []
+    );
+
+    const activeLiveRequestKeys = new Set<string>();
+    incomingUsers.forEach((rawU: any) => {
+      if (!rawU || !rawU.email || !rawU.id) return;
+      const emailKey = String(rawU.email).toLowerCase().trim();
+      if (
+        rawU.isLiveRequest &&
+        (rawU.status === 'PENDING' || rawU.status === 'APPROVED') &&
+        !serverDeletedSet.has(emailKey) &&
+        !serverDeletedSet.has(String(rawU.id || '').toLowerCase().trim())
+      ) {
+        const reqDocId = `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        activeLiveRequestKeys.add(emailKey);
+        activeLiveRequestKeys.add(String(rawU.id || '').toLowerCase().trim());
+        if (rawU.uid) activeLiveRequestKeys.add(String(rawU.uid).toLowerCase().trim());
+        activeLiveRequestKeys.add(reqDocId.toLowerCase());
+        removeDeletedRecord(rawU.id, rawU.uid, emailKey, reqDocId, rawU.employeeId);
+      }
+    });
+
     if (Array.isArray(deletedIds) && deletedIds.length > 0) {
       deletedIds.forEach(dId => {
         const clean = String(dId || '').toLowerCase().trim();
-        if (clean) {
+        if (clean && !activeLiveRequestKeys.has(clean)) {
           if (liveMap.delete(clean)) liveModified = true;
           liveMap.forEach((val, key) => {
             if (
@@ -555,10 +584,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (isDeletedSeedSignupRequest(rawU)) return;
 
       const reqDocId = `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      const isPending = rawU.status === 'PENDING';
+      const empIdToCheck = isPending ? undefined : resolveEmpId(emailKey, rawU.employeeId);
+
       if (
         rawU.status === 'REJECTED' ||
         isLegacyExcludedUser(rawU) ||
-        isRecordDeleted(rawU.id, rawU.uid, emailKey, reqDocId, rawU.employeeId, resolveEmpId(emailKey, rawU.employeeId))
+        isRecordDeleted(rawU.id, rawU.uid, emailKey, reqDocId, isPending ? undefined : rawU.employeeId, empIdToCheck)
       ) {
         if (rawU.status === 'REJECTED') {
           recordDeletedRecord(rawU.id, rawU.uid, emailKey, reqDocId);
@@ -567,12 +599,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      if (rawU.isLiveRequest && rawU.status === 'PENDING') {
-        liveMap.set(emailKey, rawU);
+      const normalizedServerUser: User = isPending
+        ? { ...rawU, employeeId: undefined }
+        : (rawU as User);
+
+      if (rawU.isLiveRequest && isPending) {
+        liveMap.set(emailKey, normalizedServerUser);
         liveModified = true;
       }
 
-      validServerUsers.push(rawU as User);
+      validServerUsers.push(normalizedServerUser);
     });
 
     if (liveModified) {
@@ -586,10 +622,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (!u || !u.email || u.status === 'REJECTED') return;
         const emailKey = u.email.toLowerCase().trim();
         const reqDocId = `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        const isPending = u.status === 'PENDING';
         if (
           !isDeletedSeedSignupRequest(u) &&
           !isLegacyExcludedUser(u) &&
-          !isRecordDeleted(u.id, u.uid, emailKey, reqDocId, u.employeeId, resolveEmpId(emailKey, u.employeeId))
+          !isRecordDeleted(u.id, u.uid, emailKey, reqDocId, isPending ? undefined : u.employeeId, isPending ? undefined : resolveEmpId(emailKey, u.employeeId))
         ) {
           map.set(emailKey, u);
         }
@@ -600,7 +637,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (isDeletedSeedSignupRequest(rawU) || rawU.status === 'REJECTED') return;
         const emailKey = rawU.email.toLowerCase().trim();
         const reqDocId = `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
-        if (isRecordDeleted(rawU.id, rawU.uid, emailKey, reqDocId, rawU.employeeId, resolveEmpId(emailKey, rawU.employeeId))) {
+        const isPending = rawU.status === 'PENDING';
+        if (isRecordDeleted(rawU.id, rawU.uid, emailKey, reqDocId, isPending ? undefined : rawU.employeeId, isPending ? undefined : resolveEmpId(emailKey, rawU.employeeId))) {
           return;
         }
         const existing = map.get(emailKey);
@@ -611,7 +649,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           map.set(emailKey, {
             ...(existing || {}),
             ...rawU,
-            employeeId: resolveEmpId(emailKey, rawU.employeeId || existing?.employeeId)
+            employeeId: isPending ? undefined : resolveEmpId(emailKey, rawU.employeeId || existing?.employeeId)
           });
         }
       });
@@ -619,10 +657,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Ensure all valid local live requests are also present
       liveMap.forEach((liveU, emailKey) => {
         const reqDocId = `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
+        const isPending = liveU.status === 'PENDING';
         if (
           isDeletedSeedSignupRequest(liveU) ||
           liveU.status === 'REJECTED' ||
-          isRecordDeleted(liveU.id, liveU.uid, emailKey, reqDocId, liveU.employeeId)
+          isRecordDeleted(liveU.id, liveU.uid, emailKey, reqDocId, isPending ? undefined : liveU.employeeId)
         ) {
           return;
         }
@@ -633,7 +672,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           map.set(emailKey, {
             ...(existing || {}),
             ...liveU,
-            employeeId: resolveEmpId(emailKey, liveU.employeeId || existing?.employeeId)
+            employeeId: isPending ? undefined : resolveEmpId(emailKey, liveU.employeeId || existing?.employeeId)
           });
         }
       });
@@ -644,10 +683,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (u.status === 'REJECTED') return false;
           const emailKey = u.email.toLowerCase().trim();
           const reqDocId = `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
+          const isPending = u.status === 'PENDING';
           return (
             !isDeletedSeedSignupRequest(u) &&
             !isLegacyExcludedUser(u) &&
-            !isRecordDeleted(u.id, u.uid, emailKey, reqDocId, u.employeeId, resolveEmpId(emailKey, u.employeeId))
+            !isRecordDeleted(u.id, u.uid, emailKey, reqDocId, isPending ? undefined : u.employeeId, isPending ? undefined : resolveEmpId(emailKey, u.employeeId))
           );
         })
         .map(u => normalizeCanonicalUser(u));
@@ -724,10 +764,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
           const lowerEmail = (item.email || '').trim().toLowerCase();
           const reqDocId = `REQ-${lowerEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
+          const isPending = item.status === 'PENDING';
+          if ((item as any).isLiveRequest && (isPending || item.status === 'APPROVED')) {
+            removeDeletedRecord(docSnap.id, item.id, item.uid, lowerEmail, reqDocId, item.employeeId);
+          }
           if (
             item.status === 'REJECTED' ||
             isLegacyExcludedUser(item, docSnap.id) ||
-            isRecordDeleted(docSnap.id, item.id, item.uid, lowerEmail, reqDocId, item.employeeId, resolveEmpId(lowerEmail, item.employeeId))
+            isRecordDeleted(docSnap.id, item.id, item.uid, lowerEmail, reqDocId, isPending ? undefined : item.employeeId, isPending ? undefined : resolveEmpId(lowerEmail, item.employeeId))
           ) {
             if (liveMap.delete(lowerEmail)) {
               liveModified = true;
@@ -743,11 +787,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
             return;
           }
-          if ((item as any).isLiveRequest && item.status === 'PENDING') {
-            liveMap.set(lowerEmail, item);
+          if ((item as any).isLiveRequest && isPending) {
+            liveMap.set(lowerEmail, { ...item, employeeId: undefined });
             liveModified = true;
           }
-          remoteList.push(item);
+          remoteList.push(isPending ? { ...item, employeeId: undefined } : item);
         });
 
         if (liveModified) {
@@ -779,28 +823,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (isDeletedSeedSignupRequest(u) || u.status === 'REJECTED') return;
           const emailKey = u.email.toLowerCase().trim();
           const reqDocId = `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
-          if (isRecordDeleted(u.id, u.uid, emailKey, reqDocId, u.employeeId, resolveEmpId(emailKey, u.employeeId))) {
+          const isPending = u.status === 'PENDING';
+          if (isRecordDeleted(u.id, u.uid, emailKey, reqDocId, isPending ? undefined : u.employeeId, isPending ? undefined : resolveEmpId(emailKey, u.employeeId))) {
             return;
           }
           const existing = map.get(emailKey);
           const uUpdatedAt = (u as any).updatedAt || u.requestedAt || '';
           const exUpdatedAt = existing ? ((existing as any).updatedAt || existing.requestedAt || '') : '';
 
-          if (uUpdatedAt && u.employeeId) {
+          if (!isPending && uUpdatedAt && u.employeeId) {
             recordCustomEmpId(emailKey, undefined, u.employeeId);
           }
 
           if (!existing || uUpdatedAt >= exUpdatedAt) {
-            const resolvedId = uUpdatedAt && u.employeeId
-              ? u.employeeId.trim().toUpperCase()
-              : resolveEmpId(emailKey, u.employeeId || existing?.employeeId);
+            const resolvedId = isPending
+              ? undefined
+              : (uUpdatedAt && u.employeeId
+                ? u.employeeId.trim().toUpperCase()
+                : resolveEmpId(emailKey, u.employeeId || existing?.employeeId));
             map.set(emailKey, {
               ...(existing || {}),
               ...u,
               employeeId: resolvedId
             });
           } else {
-            const resolvedId = resolveEmpId(emailKey, existing.employeeId || u.employeeId);
+            const resolvedId = existing.status === 'PENDING' ? undefined : resolveEmpId(emailKey, existing.employeeId || u.employeeId);
             map.set(emailKey, {
               ...u,
               ...existing,
@@ -814,7 +861,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (!srvU || !srvU.email || isDeletedSeedSignupRequest(srvU) || srvU.status === 'REJECTED') return;
           const emailKey = srvU.email.toLowerCase().trim();
           const reqDocId = `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
-          if (isRecordDeleted(srvU.id, srvU.uid, emailKey, reqDocId, srvU.employeeId, resolveEmpId(emailKey, srvU.employeeId))) {
+          const isPending = srvU.status === 'PENDING';
+          if (isRecordDeleted(srvU.id, srvU.uid, emailKey, reqDocId, isPending ? undefined : srvU.employeeId, isPending ? undefined : resolveEmpId(emailKey, srvU.employeeId))) {
             return;
           }
           const existing = map.get(emailKey);
@@ -824,7 +872,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             map.set(emailKey, {
               ...(existing || {}),
               ...srvU,
-              employeeId: resolveEmpId(emailKey, srvU.employeeId || existing?.employeeId)
+              employeeId: isPending ? undefined : resolveEmpId(emailKey, srvU.employeeId || existing?.employeeId)
             });
           }
         });
@@ -832,10 +880,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Merge persistent local live sign-up requests
         liveMap.forEach((liveU, emailKey) => {
           const reqDocId = `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
+          const isPending = liveU.status === 'PENDING';
           if (
             isDeletedSeedSignupRequest(liveU) ||
             liveU.status === 'REJECTED' ||
-            isRecordDeleted(liveU.id, liveU.uid, emailKey, reqDocId, liveU.employeeId)
+            isRecordDeleted(liveU.id, liveU.uid, emailKey, reqDocId, isPending ? undefined : liveU.employeeId)
           ) {
             return;
           }
@@ -846,7 +895,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             map.set(emailKey, {
               ...(existing || {}),
               ...liveU,
-              employeeId: resolveEmpId(emailKey, liveU.employeeId || existing?.employeeId)
+              employeeId: isPending ? undefined : resolveEmpId(emailKey, liveU.employeeId || existing?.employeeId)
             });
           }
         });
@@ -956,10 +1005,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (u.status === 'REJECTED') return false;
             const emailKey = u.email.toLowerCase().trim();
             const reqDocId = `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
+            const isPending = u.status === 'PENDING';
             return (
               !isDeletedSeedSignupRequest(u) &&
               !isLegacyExcludedUser(u) &&
-              !isRecordDeleted(u.id, u.uid, emailKey, reqDocId, u.employeeId, resolveEmpId(emailKey, u.employeeId))
+              !isRecordDeleted(u.id, u.uid, emailKey, reqDocId, isPending ? undefined : u.employeeId, isPending ? undefined : resolveEmpId(emailKey, u.employeeId))
             );
           })
           .map(u => normalizeCanonicalUser(u));
@@ -1097,7 +1147,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const fetchFromBackend = () => {
       if (!isSubscribed) return;
-      fetch('/api/users')
+      fetch(`/api/users?t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' }
+      })
         .then(r => r.json())
         .then(data => {
           if (isSubscribed && data && Array.isArray(data.users)) {
@@ -1110,10 +1163,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     fetchFromBackend();
 
     const pollInterval = setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        fetchFromBackend();
-      }
-    }, 15000);
+      fetchFromBackend();
+    }, 3000);
 
     return () => {
       isSubscribed = false;
@@ -1127,7 +1178,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const refreshUsers = useCallback(async () => {
     try {
       // Step 1: Fast sync from backend API so pending requests appear immediately even if Firestore is in quota backoff
-      const apiRes = await fetch('/api/users')
+      const apiRes = await fetch(`/api/users?t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' }
+      })
         .then(r => r.json())
         .catch(() => null);
 
@@ -1221,10 +1275,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
           const emailKey = uData.email.toLowerCase().trim();
           const reqDocId = `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
+          const isPending = uData.status === 'PENDING';
+          if ((uData as any).isLiveRequest && (isPending || uData.status === 'APPROVED')) {
+            removeDeletedRecord(docSnap.id, uData.id, uData.uid, emailKey, reqDocId, uData.employeeId);
+          }
           if (
             uData.status === 'REJECTED' ||
             isLegacyExcludedUser(uData, docSnap.id) ||
-            isRecordDeleted(docSnap.id, uData.id, uData.uid, emailKey, reqDocId, uData.employeeId, resolveEmpId(emailKey, uData.employeeId))
+            isRecordDeleted(docSnap.id, uData.id, uData.uid, emailKey, reqDocId, isPending ? undefined : uData.employeeId, isPending ? undefined : resolveEmpId(emailKey, uData.employeeId))
           ) {
             if (liveMap.delete(emailKey)) liveModified = true;
             if (
@@ -1235,7 +1293,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
             return;
           }
-          remoteUsers.push(uData);
+          remoteUsers.push(isPending ? { ...uData, employeeId: undefined } : uData);
         });
       }
 
@@ -1271,20 +1329,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (isDeletedSeedSignupRequest(u) || u.status === 'REJECTED') return;
         const emailKey = u.email.toLowerCase().trim();
         const reqDocId = `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
-        if (isRecordDeleted(u.id, u.uid, emailKey, reqDocId, u.employeeId, resolveEmpId(emailKey, u.employeeId))) {
+        const isPending = u.status === 'PENDING';
+        if (isRecordDeleted(u.id, u.uid, emailKey, reqDocId, isPending ? undefined : u.employeeId, isPending ? undefined : resolveEmpId(emailKey, u.employeeId))) {
           return;
         }
         const existing = map.get(emailKey);
         const uUpdatedAt = (u as any).updatedAt || u.requestedAt || '';
         const exUpdatedAt = existing ? ((existing as any).updatedAt || existing.requestedAt || '') : '';
-        if (uUpdatedAt && u.employeeId) {
+        if (!isPending && uUpdatedAt && u.employeeId) {
           recordCustomEmpId(emailKey, undefined, u.employeeId);
         }
         if (!existing || uUpdatedAt >= exUpdatedAt) {
           map.set(emailKey, {
             ...(existing || {}),
             ...u,
-            employeeId: resolveEmpId(emailKey, u.employeeId || existing?.employeeId)
+            employeeId: isPending ? undefined : resolveEmpId(emailKey, u.employeeId || existing?.employeeId)
           });
         }
       });
@@ -1312,6 +1371,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       map.forEach((u, emailKey) => {
+        if (u.status === 'PENDING') return;
         const empEntry = empEmailToId.get(emailKey);
         const resolved = resolveEmpId(emailKey, empEntry?.id || u.employeeId);
         const targetName =
@@ -1329,10 +1389,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (u.status === 'REJECTED') return false;
           const emailKey = u.email.toLowerCase().trim();
           const reqDocId = `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
+          const isPending = u.status === 'PENDING';
           return (
             !isDeletedSeedSignupRequest(u) &&
             !isLegacyExcludedUser(u) &&
-            !isRecordDeleted(u.id, u.uid, emailKey, reqDocId, u.employeeId, resolveEmpId(emailKey, u.employeeId))
+            !isRecordDeleted(u.id, u.uid, emailKey, reqDocId, isPending ? undefined : u.employeeId, isPending ? undefined : resolveEmpId(emailKey, u.employeeId))
           );
         })
         .map(u => normalizeCanonicalUser(u));
@@ -1507,10 +1568,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return next;
     });
 
-    // Send to backend API for instant SSE broadcast to all connected devices
+    // Send to backend API for instant sync across all connected browsers and devices
     fetch('/api/users/request', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      keepalive: true,
       body: JSON.stringify(cleanedNewUser)
     }).catch(() => {});
 

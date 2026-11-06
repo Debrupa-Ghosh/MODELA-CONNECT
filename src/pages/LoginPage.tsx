@@ -4,7 +4,7 @@ import { useApp } from '../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 
 export const LoginPage: React.FC = () => {
-  const { users, loginAs, submitSignupRequest, currentUser } = useAuth();
+  const { users, loginAs, submitSignupRequest, currentUser, refreshUsers } = useAuth();
   const { showToast } = useApp();
   const navigate = useNavigate();
 
@@ -26,8 +26,18 @@ export const LoginPage: React.FC = () => {
     }
   }, [currentUser, navigate]);
 
+  // Poll backend/Firestore while waiting for Admin approval
+  React.useEffect(() => {
+    if (step !== 'STEP_3_WAITING') return;
+    refreshUsers();
+    const timer = setInterval(() => {
+      refreshUsers();
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [step, refreshUsers]);
+
   // Real-time sync across devices: while actively waiting on STEP_3_WAITING, as soon as Admin accepts the request,
-  // the live Firestore snapshot updates users, which immediately logs this session in!
+  // the live Firestore/backend sync updates users, which immediately logs this session in!
   React.useEffect(() => {
     if (step !== 'STEP_3_WAITING') return;
     const savedPending = localStorage.getItem('modela_pending_signup_email');

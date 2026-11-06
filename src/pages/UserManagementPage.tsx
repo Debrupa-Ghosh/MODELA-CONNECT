@@ -35,6 +35,9 @@ export const UserManagementPage: React.FC = () => {
   // Real-time auto-sync when viewing Identity Sign-Up Requests or returning to the tab
   React.useEffect(() => {
     refreshUsers();
+    const pollTimer = setInterval(() => {
+      refreshUsers();
+    }, 3000);
     const handleVisibilityOrFocus = () => {
       if (document.visibilityState === 'visible') {
         refreshUsers();
@@ -43,6 +46,7 @@ export const UserManagementPage: React.FC = () => {
     window.addEventListener('focus', handleVisibilityOrFocus);
     document.addEventListener('visibilitychange', handleVisibilityOrFocus);
     return () => {
+      clearInterval(pollTimer);
       window.removeEventListener('focus', handleVisibilityOrFocus);
       document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
     };
@@ -233,7 +237,10 @@ export const UserManagementPage: React.FC = () => {
       <div className="bg-[#0B1528] border border-[#1E293B] rounded-2xl p-1.5 flex items-center gap-1.5 overflow-x-auto shadow-sm text-xs">
         {!isDirectorRole && (
           <button
-            onClick={() => setActiveTab('SIGNUP_QUEUE')}
+            onClick={() => {
+              setActiveTab('SIGNUP_QUEUE');
+              refreshUsers();
+            }}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all cursor-pointer whitespace-nowrap ${
               currentTab === 'SIGNUP_QUEUE'
                 ? 'bg-[#2563EB] text-white shadow-md'

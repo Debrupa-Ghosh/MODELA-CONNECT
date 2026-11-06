@@ -420,8 +420,9 @@ try {
         .filter(
           (u: ServerUser) =>
             u &&
-            !PERMANENTLY_DELETED_REQUEST_KEYS.has(String(u.email || '').toLowerCase().trim()) &&
-            !PERMANENTLY_DELETED_REQUEST_KEYS.has(String(u.id || '').toLowerCase().trim())
+            (u.isLiveRequest ||
+              (!PERMANENTLY_DELETED_REQUEST_KEYS.has(String(u.email || '').toLowerCase().trim()) &&
+                !PERMANENTLY_DELETED_REQUEST_KEYS.has(String(u.id || '').toLowerCase().trim())))
         )
         .map((u: ServerUser) => {
           const emailLower = String(u.email || '').toLowerCase().trim();
@@ -463,10 +464,25 @@ try {
         }
       });
     }
+    const activeLiveEmailsAndIds = new Set<string>();
+    users.forEach(u => {
+      if (u && u.isLiveRequest && (u.status === 'PENDING' || u.status === 'APPROVED')) {
+        const em = String(u.email || '').toLowerCase().trim();
+        const id = String(u.id || '').toLowerCase().trim();
+        if (em) {
+          activeLiveEmailsAndIds.add(em);
+          serverDeletedIds.delete(em);
+        }
+        if (id) {
+          activeLiveEmailsAndIds.add(id);
+          serverDeletedIds.delete(id);
+        }
+      }
+    });
     if (Array.isArray(parsed.deletedIds)) {
       parsed.deletedIds.forEach((id: string) => {
         const clean = String(id).toLowerCase().trim();
-        if (!PROTECTED_ACTIVE_KEYS.has(clean)) {
+        if (!PROTECTED_ACTIVE_KEYS.has(clean) && !activeLiveEmailsAndIds.has(clean)) {
           serverDeletedIds.add(clean);
         }
       });
@@ -806,9 +822,9 @@ if (persistedEmployees.length > 0) {
 
 let saveStateTimer: ReturnType<typeof setTimeout> | null = null;
 
-const saveServerState = () => {
+const saveServerState = (immediate = false) => {
   if (saveStateTimer) clearTimeout(saveStateTimer);
-  saveStateTimer = setTimeout(() => {
+  const writeNow = () => {
     saveStateTimer = null;
     try {
       const payload = JSON.stringify({
@@ -819,9 +835,18 @@ const saveServerState = () => {
         staffRequests: staffRequests.filter(r => !isExcludedServerStaffRequest(r)),
         policies: policyRecords
       });
-      fs.promises.writeFile(STATE_FILE_PATH, payload, 'utf-8').catch(() => {});
+      if (immediate) {
+        fs.writeFileSync(STATE_FILE_PATH, payload, 'utf-8');
+      } else {
+        fs.promises.writeFile(STATE_FILE_PATH, payload, 'utf-8').catch(() => {});
+      }
     } catch {}
-  }, 200);
+  };
+  if (immediate) {
+    writeNow();
+  } else {
+    saveStateTimer = setTimeout(writeNow, 150);
+  }
 };
 
 saveServerState();
@@ -841,6 +866,7 @@ const broadcastUsers = () => {
 
 // API Endpoints
 app.get('/api/users', (req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   users = users.filter(
     u =>
       u &&
@@ -864,19 +890,23 @@ app.post('/api/users/request', (req: Request, res: Response) => {
   const emailLower = newUser.email.toLowerCase().trim();
   if (['sushovand@modelatech.com'].includes(emailLower)) {
     const sa = users.find(u => u.email.toLowerCase() === emailLower);
-    return res.json({ success: true, user: sa || newUser, message: 'Super Admin active' });
+    if (sa && sa.status === 'APPROVED') {
+      return res.json({ success: true, user: sa, message: 'Super Admin active' });
+    }
   }
   const now = new Date().toISOString();
   const existing = users.find(u => u.email.toLowerCase().trim() === emailLower);
+  const recordId = newUser.id || existing?.id || `USR-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
   const record: ServerUser = {
     ...(existing || {}),
     ...newUser,
-    id: newUser.id || existing?.id || `USR-${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
-    uid: newUser.uid || newUser.id || existing?.uid || existing?.id,
+    id: recordId,
+    uid: newUser.uid || recordId,
     email: emailLower,
     name: (newUser.name || existing?.name || emailLower).trim(),
     status: 'PENDING',
     role: null,
+    employeeId: undefined,
     requestedAt: newUser.requestedAt || now,
     updatedAt: now,
     notificationUnread: true,
@@ -887,13 +917,15 @@ app.post('/api/users/request', (req: Request, res: Response) => {
   serverDeletedIds.delete(`req-${emailLower.replace(/[^a-z0-9]/g, '_')}`);
   if (record.id) serverDeletedIds.delete(record.id.toLowerCase());
   if (record.uid) serverDeletedIds.delete(record.uid.toLowerCase());
-  if (record.employeeId) serverDeletedIds.delete(record.employeeId.toLowerCase());
+  if (existing?.id) serverDeletedIds.delete(existing.id.toLowerCase());
+  if (existing?.uid) serverDeletedIds.delete(existing.uid.toLowerCase());
+  if (existing?.employeeId) serverDeletedIds.delete(existing.employeeId.toLowerCase());
 
   users = [
     record,
     ...users.filter(u => u.email.toLowerCase().trim() !== emailLower && u.id !== record.id)
   ];
-  saveServerState();
+  saveServerState(true);
   broadcastUsers();
   res.json({ success: true, user: record });
 });
