@@ -256,6 +256,16 @@ const normalizeCanonicalUser = (u: User): User => {
       avatar_url: 'https://ui-avatars.com/api/?name=Subhasri+Mandal&background=0284c7&color=fff'
     };
   }
+  if (emailLower === 'tiasha@modelatechnologies.com' || (empIdUpper === 'MOD001' && emailLower !== 'smandal@modelatechnologies.com' && emailLower !== 'sushovand@modelatech.com')) {
+    const cleanId = (!empIdUpper || empIdUpper === 'MOD000') ? 'MOD001' : empIdUpper;
+    next = {
+      ...next,
+      name: 'Tiasha Chakraborty',
+      employeeId: cleanId,
+      designation: 'Staff Candidate',
+      avatar_url: 'https://ui-avatars.com/api/?name=Tiasha+Chakraborty&background=0284c7&color=fff'
+    };
+  }
   return next;
 };
 
@@ -1090,7 +1100,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             } else if (next[existingIdx].status === 'APPROVED') {
               const curU = next[existingIdx];
               const nextEmpId =
-                emp.id && emp.id !== 'MOD000' && emp.id !== 'MOD008' && emp.id !== 'MOD001' && emp.id !== 'MOD011'
+                emp.id && emp.id !== 'MOD000' && emp.id !== 'MOD008' && emp.id !== 'MOD011'
                   ? emp.id
                   : (resolveEmpId(emp.email, curU.employeeId || emp.id) || curU.employeeId || emp.id);
               const nextName =

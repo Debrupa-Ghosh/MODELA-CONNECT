@@ -173,11 +173,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         em === 'modelatech2026@gmail.com' ||
         em === 'sushoovandas@gmail.com' ||
         em === 'ghoshdebrupa005@gmail.com' ||
-        em === 'tiasha@modelatechnologies.com' ||
         (em.includes('tony') && em.includes('stark')) ||
         i.includes('tonystark') ||
         i === 'mod000' ||
-        i === 'mod001' ||
         i === 'mod008' ||
         i === 'mod011' ||
         i === 'mod101' ||
@@ -443,11 +441,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const isExcludedStaffRequest = (r?: Partial<StaffWorkflowRequest> | null): boolean => {
     if (!r) return true;
+    if (isRecordDeleted(r.id)) return true;
+
     const reqId = String(r.id || '').trim().toUpperCase();
     const empId = String(r.employeeId || '').trim().toUpperCase();
     const empEmail = String(r.employeeEmail || '').trim().toLowerCase();
     const empName = String(r.employeeName || '').trim().toLowerCase();
     const reqTitle = String(r.title || '').trim().toLowerCase();
+    const reqStatus = String(r.status || 'PENDING').trim().toUpperCase();
+
+    // Permanently exclude deleted pending request(s) of MTK023 (including REQ-6677 / title "ABC" or any pending request of MTK023 created on or before 2026-11-06T10:28:00.000Z)
+    if (
+      reqId === 'REQ-6677' ||
+      (empId === 'MTK023' &&
+        reqStatus === 'PENDING' &&
+        (reqTitle === 'abc' ||
+          !r.submittedAt ||
+          new Date(r.submittedAt).getTime() <= new Date('2026-11-06T10:28:00.000Z').getTime()))
+    ) {
+      return true;
+    }
+
+    // Never exclude newly submitted live requests or requests with To mentions
+    if (
+      r.isLiveStaffRequest ||
+      Boolean(r.to && String(r.to).trim()) ||
+      (Array.isArray(r.toUsers) && r.toUsers.length > 0)
+    ) {
+      return false;
+    }
 
     // Always exclude mock / seed requests and specifically deleted requests (including REQ-1572, REQ-3779, REQ-9074, REQ-2709, REQ-6425)
     if (
@@ -475,8 +497,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       empName === 'pooja sharma' ||
       empName === 'marcus vance' ||
       r.employeeName === 'Riju1234' ||
-      r.employeeName === 'Abc123' ||
-      isRecordDeleted(r.id)
+      r.employeeName === 'Abc123'
     ) {
       return true;
     }
@@ -848,12 +869,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             lowerEmail === 'modelatech2026@gmail.com' ||
             lowerEmail === 'sushoovandas@gmail.com' ||
             lowerEmail === 'ghoshdebrupa005@gmail.com' ||
-            lowerEmail === 'tiasha@modelatechnologies.com' ||
             docSnap.id.toUpperCase() === 'MOD008' ||
-            docSnap.id.toUpperCase() === 'MOD001' ||
             docSnap.id.toUpperCase() === 'MOD011' ||
             upperId === 'MOD008' ||
-            upperId === 'MOD001' ||
             upperId === 'MOD011' ||
             upperId === 'MOD101' ||
             upperId === 'MOD003' ||
@@ -1107,7 +1125,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
 
     const pollServerEmployees = async () => {
-      if (document.visibilityState !== 'visible') return;
       try {
         const res = await fetch('/api/employees');
         if (!res.ok) return;
@@ -1132,6 +1149,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }
             return e;
           });
+          serverEmps.forEach(se => {
+            if (!se || !se.id) return;
+            const cleanEmail = se.email ? se.email.toLowerCase().trim() : '';
+            const upperId = se.id.toUpperCase().trim();
+            if (isRecordDeleted(upperId, cleanEmail)) return;
+            const exists = next.some(
+              e =>
+                (e.id && e.id.toUpperCase() === upperId) ||
+                (cleanEmail && e.email && e.email.toLowerCase().trim() === cleanEmail)
+            );
+            if (!exists) {
+              next.push(se);
+              changed = true;
+            }
+          });
           if (changed) {
             try {
               localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(next));
@@ -1143,6 +1175,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } catch {}
     };
 
+    pollServerEmployees();
     const empPollTimer = setInterval(pollServerEmployees, 15000);
 
     return () => {
@@ -1208,9 +1241,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const cleanedReqIds = new Set<string>();
 
     const pollApiRequests = async () => {
-      if (document.visibilityState !== 'visible') return;
       try {
-        const res = await fetch('/api/requests');
+        const res = await fetch(`/api/requests?t=${Date.now()}`, { cache: 'no-store' });
         if (res.ok) {
           const json = await res.json();
           const apiReqs: StaffWorkflowRequest[] = Array.isArray(json?.requests) ? json.requests : [];
@@ -1219,9 +1251,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } catch {}
     };
 
-    // Immediately purge REQ-1572 and other excluded requests from Firestore and backend
+    // Immediately purge REQ-1572, REQ-6677 (pending request of MTK023), and other excluded requests from Firestore and backend
     deleteDoc(doc(db, 'requests', 'REQ-1572')).catch(() => {});
     fetch('/api/requests/REQ-1572', { method: 'DELETE' }).catch(() => {});
+    deleteDoc(doc(db, 'requests', 'REQ-6677')).catch(() => {});
+    fetch('/api/requests/REQ-6677', { method: 'DELETE' }).catch(() => {});
 
     const unsub = onSnapshot(
       collection(db, 'requests'),
@@ -1250,7 +1284,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         latestFirestoreRequests = fsReqs;
         let apiReqs: StaffWorkflowRequest[] = [];
         try {
-          const res = await fetch('/api/requests');
+          const res = await fetch(`/api/requests?t=${Date.now()}`, { cache: 'no-store' });
           if (res.ok) {
             const json = await res.json();
             if (Array.isArray(json?.requests)) apiReqs = json.requests;
@@ -1265,7 +1299,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
 
     pollApiRequests();
-    const pollTimer = setInterval(pollApiRequests, 15000);
+    const pollTimer = setInterval(pollApiRequests, 3000);
 
     return () => {
       isSubscribed = false;
@@ -2248,7 +2282,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id,
       submittedAt: new Date().toISOString(),
       status: 'PENDING',
-      isVerifiedStaff: true
+      isVerifiedStaff: true,
+      isLiveStaffRequest: true
     });
 
     setStaffRequests(prev => {
@@ -2277,8 +2312,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateStaffRequestStatus = async (id: string, status: RequestStatus, remarks?: string): Promise<boolean> => {
-    if (!canUserApproveRequest(currentUser?.role)) {
-      showToast('Permission Denied', 'Only HR, Super Admin, or Director can accept or reject requests.', 'error');
+    const targetReq = staffRequests.find(r => r.id === id) || selectedStaffRequest;
+    if (!canUserApproveRequest(currentUser?.role, targetReq?.type, targetReq, currentUser)) {
+      showToast(
+        'Permission Denied',
+        'Only the user mentioned in "To" or a Super Admin can accept or reject this request.',
+        'error'
+      );
       return false;
     }
     const reviewer = currentUser?.name || currentUser?.email || 'Executive Admin';

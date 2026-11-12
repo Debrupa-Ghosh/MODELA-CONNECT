@@ -143,6 +143,19 @@ export const RequestDetailsModal: React.FC = () => {
           </div>
         </div>
 
+        {/* To Mentioned Recipients */}
+        {req.to && (
+          <div className="p-3.5 rounded-xl bg-[#070D1D] border border-[#1E293B] space-y-1 text-xs">
+            <span className="text-sky-400 flex items-center gap-1.5 font-bold">
+              <Send className="w-3.5 h-3.5" />
+              To (Mentioned Recipients):
+            </span>
+            <p className="text-xs font-semibold text-white break-words">
+              {req.to}
+            </p>
+          </div>
+        )}
+
         {/* Detailed Fields Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
           {req.type === 'LEAVE' && (req.startDate || req.endDate) ? (
@@ -331,9 +344,9 @@ export const RequestDetailsModal: React.FC = () => {
               Close
             </button>
 
-            {req.status === 'PENDING' && (hasFullAccess || isAdmin) && (
+            {req.status === 'PENDING' && (
               <>
-                {canUserApproveRequest(currentUser?.role, req.type, req) ? (
+                {canUserApproveRequest(currentUser?.role, req.type, req, currentUser) ? (
                   <>
                     {!showRejectForm && (
                       <button
@@ -354,11 +367,11 @@ export const RequestDetailsModal: React.FC = () => {
                       {isProcessing ? 'Approving...' : 'Approve Request'}
                     </button>
                   </>
-                ) : (
+                ) : (hasFullAccess || isAdmin) ? (
                   <div className="text-xs text-amber-400 bg-amber-950/40 border border-amber-800/80 px-3 py-1.5 rounded-xl font-medium">
-                    View Only • Only HR, Super Admin, or Director can approve or reject requests
+                    View Only • Mentioned Recipient or Super Admin Approval Required
                   </div>
-                )}
+                ) : null}
               </>
             )}
           </div>

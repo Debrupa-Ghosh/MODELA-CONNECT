@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
-import { StaffWorkflowRequest, isRequestOwnedByUser, canUserApproveRequest, isBucketHolidayRequest, hasFullAccessRole } from '../types';
+import { StaffWorkflowRequest, isRequestOwnedByUser, canUserApproveRequest, isBucketHolidayRequest, hasFullAccessRole, getRequestMentionStatus, normalizeRole } from '../types';
 import { NewStaffRequestModal } from '../components/requests/NewStaffRequestModal';
 import {
   Search,
@@ -11,12 +11,17 @@ import {
   ChevronDown,
   User as UserIcon,
   CheckCircle2,
-  Clock
+  Clock,
+  AtSign
 } from 'lucide-react';
 
 export const RequestsPage: React.FC = () => {
   const { staffRequests, updateStaffRequestStatus, openRequestDetails, refreshStaffRequests, showToast } = useApp();
-  const { currentUser, isAdmin, isSuperAdmin, hasFullAccess } = useAuth();
+  const { currentUser, isAdmin, isSuperAdmin } = useAppAuth();
+
+  function useAppAuth() {
+    return useAuth();
+  }
 
   const [searchQuery, setSearchQuery] = useState('');
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -25,23 +30,23 @@ export const RequestsPage: React.FC = () => {
   // Workflow filters for staff requests
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
-  // Default to ALL for Super Admin, Director, HR, and Manager so newly submitted staff requests are immediately visible
   const [adminScope, setAdminScope] = useState<'MINE' | 'ALL'>('ALL');
 
-  // Verify privileged access for Super Admin, Director, HR, and Manager
-  const isPrivilegedAdmin = Boolean(
-    hasFullAccess ||
-    isAdmin ||
+  const normalizedRole = normalizeRole(currentUser?.role);
+  // Director role and Super Admin can see all the requests
+  const canSeeAllRequests = Boolean(
     isSuperAdmin ||
-    hasFullAccessRole(currentUser?.role)
+    normalizedRole === 'SUPER_ADMIN' ||
+    normalizedRole === 'DIRECTOR'
   );
 
-  // Staff workflow requests strictly owned by current user
-  const myRequests = staffRequests.filter(req => isRequestOwnedByUser(req, currentUser));
+  // Staff workflow requests owned by current user or where current user is mentioned in To
+  const myRequests = staffRequests.filter(
+    req => isRequestOwnedByUser(req, currentUser) || getRequestMentionStatus(req, currentUser).inTo
+  );
 
-  // Requirement: One employee can see only their own submitted staff request in the Requests page not all requests from other employees.
-  // Super Admin & Admins toggle between 'ALL' workforce queue and 'MINE', while standard employees strictly see their own requests.
-  const baseStaffRequests = isPrivilegedAdmin ? (adminScope === 'MINE' ? myRequests : staffRequests) : myRequests;
+  // Super Admin & Director toggle between 'ALL' workforce queue and 'MINE', while other roles see their own and To-mentioned requests
+  const baseStaffRequests = canSeeAllRequests ? (adminScope === 'MINE' ? myRequests : staffRequests) : myRequests;
 
   const pendingStaffCount = baseStaffRequests.filter(r => r.status === 'PENDING').length;
 
@@ -168,7 +173,7 @@ export const RequestsPage: React.FC = () => {
           </div>
 
           {/* Admin Scope Toggle: All Workforce Queue vs My Requisitions */}
-          {isPrivilegedAdmin && (
+          {canSeeAllRequests && (
             <div className="flex items-center gap-1.5 p-1 bg-[#060B18] border border-[#1E293B] rounded-xl text-[11px] font-semibold">
               <button
                 type="button"
@@ -258,6 +263,12 @@ export const RequestsPage: React.FC = () => {
                     <span className="bg-[#042F20] border border-[#065F46] text-[#34D399] font-bold text-[10px] px-2 py-0.5 rounded uppercase tracking-wider">
                       {req.type}
                     </span>
+                    {getRequestMentionStatus(req, currentUser).inTo && (
+                      <span className="inline-flex items-center gap-1 bg-sky-950/90 border border-sky-700/80 text-sky-300 font-bold text-[10px] px-2 py-0.5 rounded">
+                        <AtSign className="w-3 h-3 text-sky-400" />
+                        Mentioned in To
+                      </span>
+                    )}
                   </div>
 
                   <span
@@ -288,6 +299,16 @@ export const RequestsPage: React.FC = () => {
                   </p>
                 </div>
 
+                {/* To Mentioned Recipients */}
+                {req.to && (
+                  <div className="p-2.5 rounded-xl bg-[#060B18] border border-[#1E293B] space-y-1 text-[11px]">
+                    <div className="flex items-start gap-1.5 text-slate-300">
+                      <span className="font-bold text-sky-400 shrink-0">To:</span>
+                      <span className="font-medium text-white break-words">{req.to}</span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Details: Applicant & Scope */}
                 <div className="border-t border-[#1E293B]/80 pt-3 flex items-center justify-between text-xs">
                   <div className="text-slate-400 truncate pr-2">
@@ -301,10 +322,10 @@ export const RequestsPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Actions for Privileged Roles if Pending */}
-                {isPrivilegedAdmin && isPending && (
+                {/* Actions if Pending: Any user mentioned in To (Employee, Super Admin, HR, Manager, Director) or Super Admin can Approve/Reject */}
+                {isPending && (canUserApproveRequest(currentUser?.role, req.type, req, currentUser) || canSeeAllRequests) && (
                   <div className="pt-2 border-t border-[#1E293B]/60 flex items-center justify-end gap-2 flex-wrap">
-                    {canUserApproveRequest(currentUser?.role, req.type, req) ? (
+                    {canUserApproveRequest(currentUser?.role, req.type, req, currentUser) ? (
                       <>
                         <button
                           type="button"
@@ -324,7 +345,7 @@ export const RequestsPage: React.FC = () => {
                       </>
                     ) : (
                       <span className="text-[11px] font-medium text-amber-400/90 bg-[#2A1B02] border border-[#B45309]/60 px-2.5 py-1 rounded-lg">
-                        View Only • HR, Super Admin, or Director Approval Required
+                        View Only • Mentioned Recipient or Super Admin Approval Required
                       </span>
                     )}
                   </div>

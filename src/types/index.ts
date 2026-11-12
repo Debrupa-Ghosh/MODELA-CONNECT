@@ -75,16 +75,23 @@ export function isBucketHolidayRequest(
 
 /**
  * Requirement:
- * - Every request can be only accepted or rejected by HR or Super Admin or Director.
+ * - The Employee or Super Admin or HR or Manager or Director who is mentioned in "To" input can accept or reject the request.
+ * - Super Admin can accept or reject any request.
  */
 export function canUserApproveRequest(
   role?: UserRole | string | null,
   _requestType?: StaffRequestType | string,
-  _req?: Partial<StaffWorkflowRequest> | null
+  req?: Partial<StaffWorkflowRequest> | null,
+  user?: { id?: string; employeeId?: string; name?: string; email?: string; role?: UserRole | string | null } | null
 ): boolean {
-  if (!role) return false;
-  const norm = normalizeRole(role);
-  return norm === 'SUPER_ADMIN' || norm === 'DIRECTOR' || norm === 'HR';
+  const effectiveRole = role || user?.role;
+  if (effectiveRole && normalizeRole(effectiveRole) === 'SUPER_ADMIN') {
+    return true;
+  }
+  if (req && user && getRequestMentionStatus(req, user).inTo) {
+    return true;
+  }
+  return false;
 }
 
 export type UserStatus = 'APPROVED' | 'PENDING' | 'REJECTED';
@@ -124,6 +131,14 @@ export type RequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
 export type RequestPriority = 'URGENT' | 'HIGH' | 'MEDIUM' | 'LOW';
 
+export interface MentionedUser {
+  id: string;
+  name: string;
+  email: string;
+  employeeId?: string;
+  role?: string | null;
+}
+
 export interface StaffWorkflowRequest {
   id: string;
   employeeId: string;
@@ -151,6 +166,60 @@ export interface StaffWorkflowRequest {
   attachments?: string[];
   justification?: string;
   supervisorName?: string;
+  to?: string;
+  cc?: string;
+  toUsers?: MentionedUser[];
+  ccUsers?: MentionedUser[];
+  isLiveStaffRequest?: boolean;
+}
+
+export function getRequestMentionStatus(
+  req?: Partial<StaffWorkflowRequest> | null,
+  user?: { id?: string; employeeId?: string; name?: string; email?: string } | null
+): { isMentioned: boolean; inTo: boolean; inCc: boolean } {
+  if (!req || !user) return { isMentioned: false, inTo: false, inCc: false };
+
+  const userEmail = (user.email || '').toLowerCase().trim();
+  const userName = (user.name || '').toLowerCase().trim();
+  const userEmpId = (user.employeeId || '').toUpperCase().trim();
+  const userId = (user.id || '').toUpperCase().trim();
+
+  const matchesList = (list?: MentionedUser[], rawText?: string): boolean => {
+    if (Array.isArray(list) && list.length > 0) {
+      const matchedInArray = list.some(item => {
+        if (!item) return false;
+        const itemEmail = (item.email || '').toLowerCase().trim();
+        const itemName = (item.name || '').toLowerCase().trim();
+        const itemEmpId = (item.employeeId || '').toUpperCase().trim();
+        const itemId = (item.id || '').toUpperCase().trim();
+        return (
+          (Boolean(userEmail && itemEmail) && userEmail === itemEmail) ||
+          (Boolean(userName && itemName) && userName === itemName) ||
+          (Boolean(userEmpId && itemEmpId) && userEmpId === itemEmpId) ||
+          (Boolean(userId && itemId) && userId === itemId)
+        );
+      });
+      if (matchedInArray) return true;
+    }
+    if (rawText && rawText.trim()) {
+      const lowerRaw = rawText.toLowerCase();
+      if (userName && (lowerRaw.includes(`@${userName}`) || lowerRaw.includes(userName))) {
+        return true;
+      }
+      if (userEmail && lowerRaw.includes(userEmail)) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const inTo = matchesList(req.toUsers, req.to);
+
+  return {
+    isMentioned: inTo,
+    inTo,
+    inCc: false
+  };
 }
 
 export interface EmployeeAllowances {

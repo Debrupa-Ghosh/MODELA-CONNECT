@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useApp } from '../context/AppContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { NewStaffRequestModal } from '../components/requests/NewStaffRequestModal';
-import { isRequestOwnedByUser, getRoleLabel, canUserApproveRequest, isBucketHolidayRequest } from '../types';
+import { isRequestOwnedByUser, getRoleLabel, canUserApproveRequest, isBucketHolidayRequest, getRequestMentionStatus, normalizeRole } from '../types';
 import {
   Users,
   Calendar,
@@ -22,11 +22,13 @@ import {
   Building,
   User,
   Send,
-  Plus
+  Plus,
+  Bell,
+  AtSign
 } from 'lucide-react';
 
 export const DashboardPage: React.FC = () => {
-  const { currentUser, hasFullAccess, isHR, isDirector } = useAuth();
+  const { currentUser, hasFullAccess } = useAuth();
   const { employees, staffRequests, openRequestDetails, updateStaffRequestStatus } = useApp();
   const navigate = useNavigate();
 
@@ -36,11 +38,153 @@ export const DashboardPage: React.FC = () => {
   const roleName = getRoleLabel(currentUser?.role);
   const userDept = currentUser?.department || 'Operations';
 
+  const normalizedRole = normalizeRole(currentUser?.role);
+  const isDirectorOrSuperAdmin = normalizedRole === 'SUPER_ADMIN' || normalizedRole === 'DIRECTOR';
+
   const myRequests = staffRequests.filter(req => isRequestOwnedByUser(req, currentUser));
   const myPendingRequests = myRequests.filter(r => r.status === 'PENDING');
 
-  const pendingRequests = staffRequests.filter(r => r.status === 'PENDING');
+  const mentionedRequests = staffRequests.filter(req => getRequestMentionStatus(req, currentUser).inTo);
+
+  const visibleAdminRequests = isDirectorOrSuperAdmin
+    ? staffRequests
+    : staffRequests.filter(req => isRequestOwnedByUser(req, currentUser) || getRequestMentionStatus(req, currentUser).inTo);
+
+  const pendingRequests = visibleAdminRequests.filter(r => r.status === 'PENDING');
   const pendingRequestsCount = pendingRequests.length;
+
+  const renderMentionNotificationsSection = () => {
+    if (mentionedRequests.length === 0) return null;
+
+    return (
+      <div className="bg-[#0B132B] border-2 border-sky-500/60 rounded-2xl p-6 shadow-lg space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#1E293B] pb-3">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <div className="w-8 h-8 rounded-xl bg-sky-500/20 border border-sky-500/40 text-sky-400 flex items-center justify-center">
+              <Bell className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-base font-bold text-white tracking-tight">
+                  Mentioned Request Notifications
+                </h2>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-sky-500/20 text-sky-300 border border-sky-500/40">
+                  {mentionedRequests.length} {mentionedRequests.length === 1 ? 'Notification' : 'Notifications'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Staff workflow requests where you were mentioned in <strong className="text-sky-300">To</strong>
+              </p>
+            </div>
+          </div>
+
+          <Link
+            to="/requests"
+            className="text-xs text-sky-400 hover:text-sky-300 font-semibold flex items-center gap-1.5 self-start sm:self-auto"
+          >
+            <span>Open Requests Central</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+          {mentionedRequests.map(req => {
+            return (
+              <div
+                key={`mention-${req.id}`}
+                className="p-4 bg-[#070D1D] rounded-xl border border-[#1E293B] hover:border-sky-500/50 transition-all flex flex-col justify-between space-y-3"
+              >
+                <div className="space-y-2.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[10px] font-mono font-bold text-slate-300 px-1.5 py-0.5 bg-[#0B132B] border border-[#1E293B] rounded">
+                          {req.id}
+                        </span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">
+                          {req.subType || req.type}
+                        </span>
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-sky-950/90 text-sky-300 border border-sky-700/80">
+                          <AtSign className="w-3 h-3 text-sky-400" />
+                          Mentioned in To
+                        </span>
+                      </div>
+                      <h3 className="text-sm font-bold text-white mt-1.5">
+                        {req.title}
+                      </h3>
+                    </div>
+
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold border shrink-0 ${
+                        req.status === 'APPROVED'
+                          ? 'bg-emerald-950 text-emerald-400 border-emerald-800'
+                          : req.status === 'REJECTED'
+                          ? 'bg-rose-950 text-rose-400 border-rose-800'
+                          : 'bg-amber-950/80 text-amber-400 border-amber-800'
+                      }`}
+                    >
+                      {req.status}
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-slate-400 line-clamp-2">
+                    {req.description}
+                  </p>
+
+                  {req.to && (
+                    <div className="p-2.5 rounded-lg bg-[#0B132B] border border-[#1E293B] space-y-1 text-[11px]">
+                      <div className="flex items-start gap-1.5 text-slate-300">
+                        <span className="font-bold text-sky-400 shrink-0">To:</span>
+                        <span className="font-medium text-white break-words">{req.to}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="pt-2 border-t border-[#1E293B] flex items-center justify-between text-[11px] text-slate-400">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span>Submitted by:</span>
+                      <strong className="text-white font-semibold">{req.employeeName}</strong>
+                      <span className="font-mono text-sky-400">({req.employeeId})</span>
+                    </div>
+                    <span className="font-mono text-slate-300 font-semibold">{req.amountOrDays}</span>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-[#1E293B] flex items-center justify-between gap-2">
+                  <button
+                    onClick={() => openRequestDetails(req)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-950/80 hover:bg-blue-900 text-sky-300 text-xs font-bold rounded-xl border border-blue-800 transition-colors cursor-pointer"
+                  >
+                    <Eye className="w-3.5 h-3.5 text-sky-400" />
+                    <span>View details</span>
+                  </button>
+
+                  {req.status === 'PENDING' && canUserApproveRequest(currentUser?.role, req.type, req, currentUser) && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => updateStaffRequestStatus(req.id, 'REJECTED')}
+                        className="px-2.5 py-1 bg-rose-950/50 hover:bg-rose-900/60 text-rose-300 text-xs font-semibold rounded-lg border border-rose-800/60 transition-colors flex items-center gap-1 cursor-pointer"
+                      >
+                        <XCircle className="w-3 h-3" />
+                        Reject
+                      </button>
+                      <button
+                        onClick={() => updateStaffRequestStatus(req.id, 'APPROVED')}
+                        className="px-3 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 text-white text-xs font-semibold rounded-lg shadow transition-all flex items-center gap-1 cursor-pointer"
+                      >
+                        <CheckCircle2 className="w-3 h-3" />
+                        Approve
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
 
   /* =========================================================================
      1. EMPLOYEE SELF-SERVICE DASHBOARD (Matches Image 1 Exactly for Employees)
@@ -139,6 +283,9 @@ export const DashboardPage: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Mentioned Request Notifications Section (Directly after KPI Cards) */}
+        {renderMentionNotificationsSection()}
 
         {/* Bottom Split (Matches Image 1 Exactly) */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -332,8 +479,11 @@ export const DashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Verified Staff Workflow Requisitions (Pending Action) */}
-      {pendingRequests.length > 0 && (
+      {/* Mentioned Request Notifications Section (Directly after KPI Cards) */}
+      {renderMentionNotificationsSection()}
+
+      {/* Verified Staff Workflow Requisitions (Pending Action) - Shown for Director or Super Admin ONLY when they are NOT present in To input box */}
+      {isDirectorOrSuperAdmin && mentionedRequests.length === 0 && pendingRequests.length > 0 && (
         <div className="bg-[#0B132B] border-2 border-amber-500/60 rounded-2xl p-6 shadow-sm space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#1E293B] pb-3">
             <div className="flex items-center gap-2.5">
@@ -386,6 +536,13 @@ export const DashboardPage: React.FC = () => {
                     {req.description}
                   </p>
 
+                  {req.to && (
+                    <div className="p-2 rounded-lg bg-[#0B132B] border border-[#1E293B] text-[11px] flex items-start gap-1.5">
+                      <span className="font-bold text-sky-400 shrink-0">To:</span>
+                      <span className="font-medium text-white break-words">{req.to}</span>
+                    </div>
+                  )}
+
                   <div className="pt-2 border-t border-[#1E293B] flex items-center justify-between text-[11px] text-slate-400">
                     <div className="flex items-center gap-1.5">
                       <span>Applicant:</span>
@@ -409,7 +566,7 @@ export const DashboardPage: React.FC = () => {
                   </button>
 
                   <div className="flex items-center gap-2">
-                    {canUserApproveRequest(currentUser?.role, req.type, req) ? (
+                    {canUserApproveRequest(currentUser?.role, req.type, req, currentUser) ? (
                       <>
                         <button
                           onClick={() => updateStaffRequestStatus(req.id, 'REJECTED')}
@@ -428,7 +585,7 @@ export const DashboardPage: React.FC = () => {
                       </>
                     ) : (
                       <span className="text-[11px] font-medium text-amber-400/90 bg-[#2A1B02] border border-[#B45309]/60 px-2.5 py-1 rounded-lg">
-                        View Only • HR, Super Admin, or Director Approval Required
+                        View Only • Mentioned Recipient or Super Admin Approval Required
                       </span>
                     )}
                   </div>

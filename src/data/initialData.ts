@@ -270,6 +270,21 @@ export const INITIAL_USERS: User[] = [
     requestedAt: "2026-11-04T08:00:00.000Z",
     reviewedAt: "2026-11-04T08:05:00.000Z",
     reviewedBy: "System Root"
+  },
+  {
+    id: "USR-222EH297",
+    uid: "USR-222EH297",
+    name: "Tiasha Chakraborty",
+    email: "tiasha@modelatechnologies.com",
+    avatar_url: "https://ui-avatars.com/api/?name=Tiasha+Chakraborty&background=0284c7&color=fff",
+    status: "APPROVED",
+    role: "EMPLOYEE",
+    employeeId: "MOD001",
+    designation: "Staff Candidate",
+    department: "General Staff",
+    requestedAt: "2026-11-06T08:51:11.659Z",
+    reviewedAt: "2026-11-06T08:51:42.597Z",
+    reviewedBy: "modelatech4@gmail.com"
   }
 ];
 
@@ -527,6 +542,20 @@ export const INITIAL_EMPLOYEES: Employee[] = [
     location: "San Francisco HQ",
     compensation: { basic: 50000, allowances: 15000 },
     avatar: "https://ui-avatars.com/api/?name=Swagata+Chattopadhyay&background=0284c7&color=fff"
+  },
+  {
+    id: "MOD001",
+    firstName: "Tiasha",
+    lastName: "Chakraborty",
+    email: "tiasha@modelatechnologies.com",
+    joiningDate: "2026-11-06",
+    designation: "Staff Candidate",
+    phone: "",
+    department: "General Staff",
+    status: "ACTIVE",
+    location: "San Francisco HQ",
+    compensation: { basic: 50000, allowances: 15000 },
+    avatar: "https://ui-avatars.com/api/?name=Tiasha+Chakraborty&background=0284c7&color=fff"
   }
 ];
 

@@ -305,6 +305,21 @@ const DEFAULT_SERVER_USERS: ServerUser[] = [
     requestedAt: "2026-11-04T08:00:00.000Z",
     reviewedAt: "2026-11-04T08:05:00.000Z",
     reviewedBy: "System Root"
+  },
+  {
+    id: "USR-222EH297",
+    uid: "USR-222EH297",
+    name: "Tiasha Chakraborty",
+    email: "tiasha@modelatechnologies.com",
+    avatar_url: "https://ui-avatars.com/api/?name=Tiasha+Chakraborty&background=0284c7&color=fff",
+    status: "APPROVED",
+    role: "EMPLOYEE",
+    employeeId: "MOD001",
+    designation: "Staff Candidate",
+    department: "General Staff",
+    requestedAt: "2026-11-06T08:51:11.659Z",
+    reviewedAt: "2026-11-06T08:51:42.597Z",
+    reviewedBy: "modelatech4@gmail.com"
   }
 ];
 
@@ -314,8 +329,7 @@ const PERMANENTLY_DELETED_REQUEST_KEYS = new Set([
   'deb@gmail.com',
   'usr-qyg6aplc',
   'vikram.sengupta@gmail.com',
-  'usr-pending-03',
-  'tiasha@modelatechnologies.com'
+  'usr-pending-03'
 ]);
 
 const PROTECTED_ACTIVE_KEYS = new Set([
@@ -373,7 +387,11 @@ const PROTECTED_ACTIVE_KEYS = new Set([
   'mtk022',
   'swagatac@modelatech.com',
   'usr-mtk024',
-  'mtk024'
+  'mtk024',
+  'tiasha@modelatechnologies.com',
+  'usr-222eh297',
+  'usr-mod001',
+  'mod001'
 ]);
 
 let users: ServerUser[] = [...DEFAULT_SERVER_USERS];
@@ -383,7 +401,8 @@ let serverDeletedIds = new Set<string>([
   'req-3779',
   'req-9074',
   'req-2709',
-  'req-6425'
+  'req-6425',
+  'req-6677'
 ]);
 let persistedEmployees: any[] = [];
 let persistedPayroll: any[] = [];
@@ -396,6 +415,26 @@ const isExcludedServerStaffRequest = (r: any): boolean => {
   const empId = String(r.employeeId || '').trim().toUpperCase();
   const empName = String(r.employeeName || '').trim().toLowerCase();
   const reqTitle = String(r.title || '').trim().toLowerCase();
+  const reqStatus = String(r.status || 'PENDING').trim().toUpperCase();
+
+  if (
+    reqId === 'REQ-6677' ||
+    (empId === 'MTK023' &&
+      reqStatus === 'PENDING' &&
+      (reqTitle === 'abc' ||
+        !r.submittedAt ||
+        new Date(r.submittedAt).getTime() <= new Date('2026-11-06T10:28:00.000Z').getTime()))
+  ) {
+    return true;
+  }
+
+  if (
+    r.isLiveStaffRequest ||
+    Boolean(r.to && String(r.to).trim()) ||
+    (Array.isArray(r.toUsers) && r.toUsers.length > 0)
+  ) {
+    return false;
+  }
   if (
     reqId === 'REQ-1572' ||
     reqId === 'REQ-2709' ||
@@ -456,6 +495,14 @@ try {
               avatar_url: 'https://ui-avatars.com/api/?name=Poulami+Manna&background=0284c7&color=fff'
             };
           }
+          if (emailLower === 'tiasha@modelatechnologies.com' || empIdUpper === 'MOD001') {
+            return {
+              ...u,
+              name: 'Tiasha Chakraborty',
+              employeeId: (!empIdUpper || empIdUpper === 'MOD000') ? 'MOD001' : empIdUpper,
+              avatar_url: 'https://ui-avatars.com/api/?name=Tiasha+Chakraborty&background=0284c7&color=fff'
+            };
+          }
           return u;
         });
       DEFAULT_SERVER_USERS.forEach(defU => {
@@ -490,8 +537,7 @@ try {
     if (Array.isArray(parsed.employees)) {
       persistedEmployees = parsed.employees.filter((pe: any) => {
         const idUp = String(pe?.id || '').toUpperCase().trim();
-        const emLo = String(pe?.email || '').toLowerCase().trim();
-        return idUp !== 'MOD008' && idUp !== 'MOD001' && idUp !== 'MOD011' && emLo !== 'tiasha@modelatechnologies.com';
+        return idUp !== 'MOD008' && idUp !== 'MOD011';
       });
     }
     if (Array.isArray(parsed.payroll)) {
@@ -755,6 +801,20 @@ let employees = [
     location: "San Francisco HQ",
     compensation: { basic: 50000, allowances: 15000 },
     avatar: "https://ui-avatars.com/api/?name=Swagata+Chattopadhyay&background=0284c7&color=fff"
+  },
+  {
+    id: "MOD001",
+    firstName: "Tiasha",
+    lastName: "Chakraborty",
+    email: "tiasha@modelatechnologies.com",
+    joiningDate: "2026-11-06",
+    designation: "Staff Candidate",
+    phone: "",
+    department: "General Staff",
+    status: "ACTIVE",
+    location: "San Francisco HQ",
+    compensation: { basic: 50000, allowances: 15000 },
+    avatar: "https://ui-avatars.com/api/?name=Tiasha+Chakraborty&background=0284c7&color=fff"
   }
 ];
 
@@ -789,8 +849,12 @@ interface ServerStaffRequest {
   department: string;
   designation: string;
   type: string;
+  subType?: string;
   title: string;
   amountOrDays: string;
+  startDate?: string;
+  endDate?: string;
+  requestDate?: string;
   targetDates?: string;
   priority: string;
   status: string;
@@ -800,6 +864,11 @@ interface ServerStaffRequest {
   reviewedAt?: string | null;
   reviewedBy?: string | null;
   remarks?: string;
+  to?: string;
+  cc?: string;
+  toUsers?: any[];
+  ccUsers?: any[];
+  isLiveStaffRequest?: boolean;
 }
 
 let staffRequests: ServerStaffRequest[] = [...persistedRequests];
@@ -1159,12 +1228,13 @@ app.get('/api/audit-logs', (req: Request, res: Response) => {
 
 // Staff workflow requests endpoints
 app.get('/api/requests', (req: Request, res: Response) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   staffRequests = staffRequests.filter(r => !isExcludedServerStaffRequest(r));
   res.json({ success: true, requests: staffRequests });
 });
 
 app.post('/api/requests', (req: Request, res: Response) => {
-  const newReq = req.body;
+  const newReq = { ...req.body, isLiveStaffRequest: true };
   if (!newReq || !newReq.title) {
     return res.status(400).json({ success: false, message: 'Invalid request' });
   }
@@ -1172,7 +1242,7 @@ app.post('/api/requests', (req: Request, res: Response) => {
     return res.json({ success: true, request: newReq });
   }
   staffRequests = [newReq, ...staffRequests.filter(r => r.id !== newReq.id && !isExcludedServerStaffRequest(r))];
-  saveServerState();
+  saveServerState(true);
   res.json({ success: true, request: newReq });
 });
 
@@ -1192,7 +1262,7 @@ app.post('/api/requests/status', (req: Request, res: Response) => {
       }
       return r;
     });
-  saveServerState();
+  saveServerState(true);
   res.json({ success: true });
 });
 

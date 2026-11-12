@@ -27,24 +27,24 @@ const PERMANENTLY_EXCLUDED_KEYS = new Set([
   'vikram.sengupta@gmail.com',
   'usr-pending-03',
   'req-vikram_sengupta_gmail_com',
-  'tiasha@modelatechnologies.com',
   'req-1572',
   'req-2709',
   'req-6425',
   'req-3779',
-  'req-9074'
+  'req-9074',
+  'req-6677'
 ]);
 
 const DEFAULT_DELETED_IDS = [
   'alex.morgan@modela.io',
   'elena.rostova@modela.io',
   'rani123@gmail.com',
-  'tiasha@modelatechnologies.com',
   'req-1572',
   'req-2709',
   'req-6425',
   'req-3779',
   'req-9074',
+  'req-6677',
   'req-622',
   'req-719',
   'req-1042',
@@ -179,7 +179,14 @@ const ACTIVE_DB_PROTECTED_KEYS = [
   'swagatac@modelatech.com',
   'usr-mtk024',
   'mtk024',
-  'swagata chattopadhyay'
+  'swagata chattopadhyay',
+  // 19. Tiasha Chakraborty (MOD001)
+  'tiasha@modelatechnologies.com',
+  'usr-222eh297',
+  'usr-mod001',
+  'req-tiasha_modelatechnologies_com',
+  'mod001',
+  'tiasha chakraborty'
 ];
 
 const SYSTEM_PROTECTED_KEYS = new Set(ACTIVE_DB_PROTECTED_KEYS);
@@ -203,10 +210,11 @@ const DEFAULT_EMP_ID_BY_EMAIL: Record<string, string> = {
   'shuvamm@modelatech.com': 'MTK009',
   'smandal@modelatechnologies.com': 'MOD116',
   'subhabratas@modelatech.com': 'MTK022',
-  'swagatac@modelatech.com': 'MTK024'
+  'swagatac@modelatech.com': 'MTK024',
+  'tiasha@modelatechnologies.com': 'MOD001'
 };
 
-const OBSOLETE_FALLBACK_IDS = new Set(['MOD000', 'MOD001', 'MOD008', 'MOD011']);
+const OBSOLETE_FALLBACK_IDS = new Set(['MOD000', 'MOD008', 'MOD011']);
 
 let cachedUnblocked: Set<string> | null = null;
 let cachedDeleted: Set<string> | null = null;
@@ -223,7 +231,7 @@ export const getUnblockedRegistry = (): Set<string> => {
       if (Array.isArray(arr)) {
         arr.forEach(s => {
           const clean = String(s || '').toLowerCase().trim();
-          if (clean && clean !== 'mod008' && clean !== 'mod011' && clean !== 'mod001') {
+          if (clean && clean !== 'mod008' && clean !== 'mod011') {
             result.add(clean);
           }
         });
@@ -340,7 +348,7 @@ export const applyRemoteSyncRegistry = (data: any): boolean => {
 
     if (remoteUnblockedSet) {
       remoteUnblockedSet.forEach(clean => {
-        if (clean && clean !== 'mod008' && clean !== 'mod011' && clean !== 'mod001' && clean !== 'mod000') {
+        if (clean && clean !== 'mod008' && clean !== 'mod011' && clean !== 'mod000') {
           if (!unblocked.has(clean)) {
             unblocked.add(clean);
             unblockedChanged = true;
@@ -379,7 +387,7 @@ export const applyRemoteSyncRegistry = (data: any): boolean => {
       let mapChanged = false;
       Object.entries(data.empIdMap).forEach(([k, v]) => {
         const cleanKey = String(k || '').trim().toLowerCase();
-        // Only apply email-keyed overrides and never overwrite database IDs with obsolete fallback IDs (MOD000, MOD001, MOD008, MOD011)
+        // Only apply email-keyed overrides and never overwrite database IDs with obsolete fallback IDs (MOD000, MOD008, MOD011)
         if (cleanKey.includes('@') && typeof v === 'string' && v.trim()) {
           const cleanVal = v.trim().toUpperCase();
           if (OBSOLETE_FALLBACK_IDS.has(cleanVal) && DEFAULT_EMP_ID_BY_EMAIL[cleanKey]) {
@@ -545,7 +553,6 @@ export const resolveEmpId = (email?: string | null, fallbackId?: string | null):
     const cleanFallback = fallbackId.trim().toUpperCase();
     if (cleanFallback === 'MOD008') return 'MTK020';
     if (cleanFallback === 'MOD011') return 'MTK023';
-    if (cleanFallback === 'MOD001') return 'MTK006';
     return cleanFallback;
   }
   return '';
