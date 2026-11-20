@@ -2,21 +2,6 @@ import { User, Employee, StaffWorkflowRequest, AttendanceRecord, PayrollRecord, 
 
 export const INITIAL_USERS: User[] = [
   {
-    id: "USR-Q94BIIQ5",
-    uid: "USR-Q94BIIQ5",
-    name: "Sushoovan Das",
-    email: "sushovand@modelatech.com",
-    avatar_url: "https://ui-avatars.com/api/?name=Sushoovan+Das&background=3b82f6&color=fff",
-    status: "APPROVED",
-    role: "SUPER_ADMIN",
-    employeeId: "MTK006",
-    designation: "Staff Candidate",
-    department: "Executive Office",
-    requestedAt: "2026-09-20T08:44:15.481Z",
-    reviewedAt: "2026-09-20T08:44:35.660Z",
-    reviewedBy: "System Root"
-  },
-  {
     id: "USR-ADITI-008",
     uid: "USR-ADITI-008",
     name: "Aditi Chakrabarty",
@@ -289,22 +274,6 @@ export const INITIAL_USERS: User[] = [
 ];
 
 export const INITIAL_EMPLOYEES: Employee[] = [
-  {
-    id: "MTK006",
-    firstName: "Sushoovan",
-    lastName: "Das",
-    email: "sushovand@modelatech.com",
-    joiningDate: "2024-01-15",
-    designation: "Executive Director & Super Admin",
-    phone: "+1 (555) 234-5678",
-    department: "Executive Office",
-    status: "ACTIVE",
-    location: "San Francisco HQ",
-    compensation: { basic: 85000, allowances: 25000 },
-    pan: "DASSV1989K",
-    bankAccount: "815801500111",
-    avatar: "https://ui-avatars.com/api/?name=Sushoovan+Das&background=3b82f6&color=fff"
-  },
   {
     id: "MTK020",
     firstName: "Aditi",

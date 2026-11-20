@@ -134,24 +134,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }));
     }
 
-    // Ensure Sushoovan Das (Super Admin MTK006) and all 18 active database employees are always in the Employees page
-    const sushoovanEmployee: Employee = {
-      id: resolveEmpId("sushovand@modelatech.com", "MTK006") || "MTK006",
-      firstName: "Sushoovan",
-      lastName: "Das",
-      email: "sushovand@modelatech.com",
-      joiningDate: "2024-01-15",
-      designation: "Executive Director & Super Admin",
-      phone: "+1 (555) 234-5678",
-      department: "Executive Office",
-      status: "ACTIVE",
-      location: "San Francisco HQ",
-      compensation: { basic: 85000, allowances: 25000 },
-      pan: "DASSV1989K",
-      bankAccount: "815801500111",
-      avatar: "https://ui-avatars.com/api/?name=Sushoovan+Das&background=3b82f6&color=fff"
-    };
-
     const isTonyStark = (firstName?: string, lastName?: string, email?: string, id?: string): boolean => {
       const full = `${firstName || ''} ${lastName || ''}`.trim().toLowerCase();
       const em = (email || '').trim().toLowerCase();
@@ -165,6 +147,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         (full.includes('sourav') && full.includes('ganguly')) ||
         full.includes('pooja sharma') ||
         (full.includes('pooja') && full.includes('sharma')) ||
+        full.includes('sushoovan das') ||
+        (full.includes('sushoovan') && full.includes('das')) ||
         em.includes('tonystark') ||
         em.includes('tony.stark') ||
         em.includes('marcus.vance') ||
@@ -172,9 +156,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         em.includes('pooja.sharma') ||
         em === 'modelatech2026@gmail.com' ||
         em === 'sushoovandas@gmail.com' ||
+        em === 'sushovand@modelatech.com' ||
         em === 'ghoshdebrupa005@gmail.com' ||
         (em.includes('tony') && em.includes('stark')) ||
         i.includes('tonystark') ||
+        i === 'mtk006' ||
         i === 'mod000' ||
         i === 'mod008' ||
         i === 'mod011' ||
@@ -190,7 +176,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     currentList = currentList.filter(e => !isTonyStark(e.firstName, e.lastName, e.email, e.id));
 
     const requiredEmployees: Employee[] = [
-      sushoovanEmployee,
       ...INITIAL_EMPLOYEES.filter(e => e.email?.toLowerCase() !== 'sushovand@modelatech.com').map(e => ({
         ...e,
         id: resolveEmpId(e.email, e.id) || e.id
@@ -799,9 +784,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const cleanedEmpIds = new Set<string>();
     const seededEmpIds = new Set<string>();
 
-    // Immediately delete legacy duplicate MOD008 from Firestore employees and backend
+    // Immediately delete legacy duplicate MOD008 and removed MTK006 from Firestore employees and backend
     deleteDoc(doc(db, 'employees', 'MOD008')).catch(() => {});
     fetch('/api/employees/MOD008', { method: 'DELETE' }).catch(() => {});
+    deleteDoc(doc(db, 'employees', 'MTK006')).catch(() => {});
+    fetch('/api/employees/MTK006', { method: 'DELETE' }).catch(() => {});
 
     const unsub = onSnapshot(
       collection(db, 'employees'),
@@ -863,14 +850,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             (fullName.includes('sourav') && fullName.includes('ganguly')) ||
             fullName.includes('pooja sharma') ||
             (fullName.includes('pooja') && fullName.includes('sharma')) ||
+            fullName.includes('sushoovan das') ||
+            (fullName.includes('sushoovan') && fullName.includes('das')) ||
             lowerEmail === 'marcus.vance@modela.io' ||
             lowerEmail === 'sourav.ganguly@modela.io' ||
             lowerEmail === 'pooja.sharma@modela.io' ||
             lowerEmail === 'modelatech2026@gmail.com' ||
             lowerEmail === 'sushoovandas@gmail.com' ||
+            lowerEmail === 'sushovand@modelatech.com' ||
             lowerEmail === 'ghoshdebrupa005@gmail.com' ||
+            docSnap.id.toUpperCase() === 'MTK006' ||
             docSnap.id.toUpperCase() === 'MOD008' ||
             docSnap.id.toUpperCase() === 'MOD011' ||
+            upperId === 'MTK006' ||
             upperId === 'MOD008' ||
             upperId === 'MOD011' ||
             upperId === 'MOD101' ||

@@ -34,23 +34,7 @@ app.use(express.json({ limit: '50mb' }));
 
 const STATE_FILE_PATH = path.resolve(__dirname, '.server-users-state.json');
 
-// Default baseline users (all 18 active database employees)
 const DEFAULT_SERVER_USERS: ServerUser[] = [
-  {
-    id: "USR-Q94BIIQ5",
-    uid: "USR-Q94BIIQ5",
-    name: "Sushoovan Das",
-    email: "sushovand@modelatech.com",
-    avatar_url: "https://ui-avatars.com/api/?name=Sushoovan+Das&background=3b82f6&color=fff",
-    status: "APPROVED",
-    role: "SUPER_ADMIN",
-    employeeId: "MTK006",
-    designation: "Staff Candidate",
-    department: "Executive Office",
-    requestedAt: "2026-09-20T08:44:15.481Z",
-    reviewedAt: "2026-09-20T08:44:35.660Z",
-    reviewedBy: "System Root"
-  },
   {
     id: "USR-ADITI-008",
     uid: "USR-ADITI-008",
@@ -329,13 +313,16 @@ const PERMANENTLY_DELETED_REQUEST_KEYS = new Set([
   'deb@gmail.com',
   'usr-qyg6aplc',
   'vikram.sengupta@gmail.com',
-  'usr-pending-03'
-]);
-
-const PROTECTED_ACTIVE_KEYS = new Set([
+  'usr-pending-03',
   'sushovand@modelatech.com',
   'usr-q94biiq5',
   'mtk006',
+  'usr-mtk006',
+  'req-sushovand_modelatech_com',
+  'sushoovan das'
+]);
+
+const PROTECTED_ACTIVE_KEYS = new Set([
   'aditichakraborty2005@gmail.com',
   'aditichakrabarty2005@gmail.com',
   'usr-aditi-008',
@@ -459,20 +446,13 @@ try {
         .filter(
           (u: ServerUser) =>
             u &&
-            (u.isLiveRequest ||
-              (!PERMANENTLY_DELETED_REQUEST_KEYS.has(String(u.email || '').toLowerCase().trim()) &&
-                !PERMANENTLY_DELETED_REQUEST_KEYS.has(String(u.id || '').toLowerCase().trim())))
+            !PERMANENTLY_DELETED_REQUEST_KEYS.has(String(u.email || '').toLowerCase().trim()) &&
+            !PERMANENTLY_DELETED_REQUEST_KEYS.has(String(u.id || '').toLowerCase().trim()) &&
+            !PERMANENTLY_DELETED_REQUEST_KEYS.has(String(u.employeeId || '').toLowerCase().trim())
         )
         .map((u: ServerUser) => {
           const emailLower = String(u.email || '').toLowerCase().trim();
           const empIdUpper = String(u.employeeId || '').toUpperCase().trim();
-          if (emailLower === 'sushovand@modelatech.com') {
-            return {
-              ...u,
-              designation: 'Staff Candidate',
-              employeeId: (!empIdUpper || empIdUpper === 'MOD001' || empIdUpper === 'MOD000') ? 'MTK006' : empIdUpper
-            };
-          }
           if (emailLower === 'aditichakraborty2005@gmail.com' || emailLower === 'aditichakrabarty2005@gmail.com') {
             return { ...u, employeeId: (!empIdUpper || empIdUpper === 'MOD008') ? 'MTK020' : empIdUpper };
           }
@@ -516,11 +496,11 @@ try {
       if (u && u.isLiveRequest && (u.status === 'PENDING' || u.status === 'APPROVED')) {
         const em = String(u.email || '').toLowerCase().trim();
         const id = String(u.id || '').toLowerCase().trim();
-        if (em) {
+        if (em && !PERMANENTLY_DELETED_REQUEST_KEYS.has(em)) {
           activeLiveEmailsAndIds.add(em);
           serverDeletedIds.delete(em);
         }
-        if (id) {
+        if (id && !PERMANENTLY_DELETED_REQUEST_KEYS.has(id)) {
           activeLiveEmailsAndIds.add(id);
           serverDeletedIds.delete(id);
         }
@@ -537,7 +517,8 @@ try {
     if (Array.isArray(parsed.employees)) {
       persistedEmployees = parsed.employees.filter((pe: any) => {
         const idUp = String(pe?.id || '').toUpperCase().trim();
-        return idUp !== 'MOD008' && idUp !== 'MOD011';
+        const emLo = String(pe?.email || '').toLowerCase().trim();
+        return idUp !== 'MOD008' && idUp !== 'MOD011' && idUp !== 'MTK006' && emLo !== 'sushovand@modelatech.com';
       });
     }
     if (Array.isArray(parsed.payroll)) {
@@ -550,20 +531,6 @@ try {
 } catch {}
 
 let employees = [
-  {
-    id: "MTK006",
-    firstName: "Sushoovan",
-    lastName: "Das",
-    email: "sushovand@modelatech.com",
-    joiningDate: "2024-01-15",
-    designation: "Executive Director & Super Admin",
-    phone: "+1 (555) 234-5678",
-    department: "Executive Office",
-    status: "ACTIVE",
-    location: "San Francisco HQ",
-    compensation: { basic: 85000, allowances: 25000 },
-    avatar: "https://ui-avatars.com/api/?name=Sushoovan+Das&background=3b82f6&color=fff"
-  },
   {
     id: "MTK020",
     firstName: "Aditi",

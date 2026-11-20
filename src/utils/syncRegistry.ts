@@ -14,6 +14,12 @@ const PERMANENTLY_EXCLUDED_KEYS = new Set([
   'mod101',
   'sushoovandas@gmail.com',
   'usr-sushoovan-gmail',
+  'sushovand@modelatech.com',
+  'usr-q94biiq5',
+  'mtk006',
+  'usr-mtk006',
+  'req-sushovand_modelatech_com',
+  'sushoovan das',
   'ghoshdebrupa005@gmail.com',
   'usr-obopa1gq',
   'mod007',
@@ -39,6 +45,12 @@ const DEFAULT_DELETED_IDS = [
   'alex.morgan@modela.io',
   'elena.rostova@modela.io',
   'rani123@gmail.com',
+  'sushovand@modelatech.com',
+  'usr-q94biiq5',
+  'mtk006',
+  'usr-mtk006',
+  'req-sushovand_modelatech_com',
+  'sushoovan das',
   'req-1572',
   'req-2709',
   'req-6425',
@@ -86,11 +98,6 @@ const DEFAULT_DELETED_IDS = [
 const ACTIVE_DB_PROTECTED_KEYS = [
   'sync-registry-global',
   'sync@system.internal',
-  // 1. Sushoovan Das (MTK006)
-  'sushovand@modelatech.com',
-  'usr-q94biiq5',
-  'mtk006',
-  'sushoovan das',
   // 2. Aditi Chakrabarty (MTK020)
   'aditichakraborty2005@gmail.com',
   'aditichakrabarty2005@gmail.com',
@@ -192,7 +199,6 @@ const ACTIVE_DB_PROTECTED_KEYS = [
 const SYSTEM_PROTECTED_KEYS = new Set(ACTIVE_DB_PROTECTED_KEYS);
 
 const DEFAULT_EMP_ID_BY_EMAIL: Record<string, string> = {
-  'sushovand@modelatech.com': 'MTK006',
   'aditichakraborty2005@gmail.com': 'MTK020',
   'aditichakrabarty2005@gmail.com': 'MTK020',
   'surupa008@gmail.com': 'MTK023',
@@ -231,7 +237,12 @@ export const getUnblockedRegistry = (): Set<string> => {
       if (Array.isArray(arr)) {
         arr.forEach(s => {
           const clean = String(s || '').toLowerCase().trim();
-          if (clean && clean !== 'mod008' && clean !== 'mod011') {
+          if (
+            clean &&
+            clean !== 'mod008' &&
+            clean !== 'mod011' &&
+            !PERMANENTLY_EXCLUDED_KEYS.has(clean)
+          ) {
             result.add(clean);
           }
         });
@@ -348,7 +359,7 @@ export const applyRemoteSyncRegistry = (data: any): boolean => {
 
     if (remoteUnblockedSet) {
       remoteUnblockedSet.forEach(clean => {
-        if (clean && clean !== 'mod008' && clean !== 'mod011' && clean !== 'mod000') {
+        if (clean && clean !== 'mod008' && clean !== 'mod011' && clean !== 'mod000' && !PERMANENTLY_EXCLUDED_KEYS.has(clean)) {
           if (!unblocked.has(clean)) {
             unblocked.add(clean);
             unblockedChanged = true;
@@ -449,6 +460,7 @@ export const removeDeletedRecord = (...identifiers: (string | undefined | null)[
     identifiers.forEach(id => {
       if (id && id.trim()) {
         const clean = id.toLowerCase().trim();
+        if (PERMANENTLY_EXCLUDED_KEYS.has(clean)) return;
         if (!unblocked.has(clean)) {
           unblocked.add(clean);
           changed = true;
@@ -476,9 +488,9 @@ export const isRecordDeleted = (...identifiers: (string | undefined | null)[]): 
     if (!id) return false;
     const clean = id.toLowerCase().trim();
     if (!clean) return false;
+    if (PERMANENTLY_EXCLUDED_KEYS.has(clean)) return true;
     if (unblocked.has(clean) || SYSTEM_PROTECTED_KEYS.has(clean)) return false;
     if (
-      PERMANENTLY_EXCLUDED_KEYS.has(clean) ||
       clean.includes('tony stark') ||
       clean.includes('tonystark') ||
       clean.includes('tony.stark') ||
@@ -488,6 +500,10 @@ export const isRecordDeleted = (...identifiers: (string | undefined | null)[]): 
       clean.includes('sourav.ganguly') ||
       clean.includes('pooja sharma') ||
       clean.includes('pooja.sharma') ||
+      clean.includes('sushoovan das') ||
+      clean === 'sushovand@modelatech.com' ||
+      clean === 'mtk006' ||
+      clean === 'usr-q94biiq5' ||
       clean === 'mod003' ||
       clean === 'mod005' ||
       clean === 'mod006' ||

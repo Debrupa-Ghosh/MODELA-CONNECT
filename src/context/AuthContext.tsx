@@ -185,13 +185,16 @@ const isLegacyExcludedUser = (u: Partial<User>, docId?: string): boolean => {
     lowerName.includes('marcus vance') ||
     lowerName.includes('sourav ganguly') ||
     lowerName.includes('pooja sharma') ||
+    lowerName.includes('sushoovan das') ||
     lowerEmail.includes('tonystark') ||
     lowerEmail.includes('tony.stark') ||
     lowerEmail === 'marcus.vance@modela.io' ||
     lowerEmail === 'sourav.ganguly@modela.io' ||
     lowerEmail === 'pooja.sharma@modela.io' ||
+    lowerEmail === 'sushovand@modelatech.com' ||
+    lowerEmail === 'sushoovandas@gmail.com' ||
+    upperEmpId === 'MTK006' ||
     ((lowerEmail === 'modelatech2026@gmail.com' ||
-      lowerEmail === 'sushoovandas@gmail.com' ||
       lowerEmail === 'ghoshdebrupa005@gmail.com') &&
       isRecordDeleted(lowerEmail)) ||
     ((upperEmpId === 'MOD101' ||
@@ -209,15 +212,6 @@ const normalizeCanonicalUser = (u: User): User => {
   const emailLower = (u.email || '').toLowerCase().trim();
   const empIdUpper = (u.employeeId || '').toUpperCase().trim();
   let next = u;
-  if (emailLower === 'sushovand@modelatech.com') {
-    const cleanId = (!empIdUpper || empIdUpper === 'MOD001' || empIdUpper === 'MOD000') ? 'MTK006' : empIdUpper;
-    next = {
-      ...next,
-      name: 'Sushoovan Das',
-      employeeId: cleanId,
-      designation: 'Staff Candidate'
-    };
-  }
   if (emailLower === 'aditichakraborty2005@gmail.com' || emailLower === 'aditichakrabarty2005@gmail.com') {
     const cleanId = (!empIdUpper || empIdUpper === 'MOD008') ? 'MTK020' : empIdUpper;
     next = {
@@ -256,7 +250,7 @@ const normalizeCanonicalUser = (u: User): User => {
       avatar_url: 'https://ui-avatars.com/api/?name=Subhasri+Mandal&background=0284c7&color=fff'
     };
   }
-  if (emailLower === 'tiasha@modelatechnologies.com' || (empIdUpper === 'MOD001' && emailLower !== 'smandal@modelatechnologies.com' && emailLower !== 'sushovand@modelatech.com')) {
+  if (emailLower === 'tiasha@modelatechnologies.com' || (empIdUpper === 'MOD001' && emailLower !== 'smandal@modelatechnologies.com')) {
     const cleanId = (!empIdUpper || empIdUpper === 'MOD000') ? 'MOD001' : empIdUpper;
     next = {
       ...next,
@@ -310,6 +304,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const baselineUsers = INITIAL_USERS.filter(
       u =>
         !isDeletedSeedSignupRequest(u) &&
+        !isLegacyExcludedUser(u) &&
         !isRecordDeleted(u.id, u.uid, u.email, u.employeeId, resolveEmpId(u.email, u.employeeId))
     ).map(u => ({
       ...u,
@@ -334,6 +329,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const reqDocId = `REQ-${emailKey.replace(/[^a-zA-Z0-9]/g, '_')}`;
       if (
         isDeletedSeedSignupRequest(liveUser) ||
+        isLegacyExcludedUser(liveUser) ||
         liveUser.status === 'REJECTED' ||
         isRecordDeleted(liveUser.id, liveUser.uid, emailKey, reqDocId, liveUser.employeeId)
       ) {
@@ -354,39 +350,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
     if (liveCleaned) {
       saveLiveRequestsMap(liveMap);
-    }
-
-    const sushoovanUser: User = {
-      id: "USR-Q94BIIQ5",
-      uid: "USR-Q94BIIQ5",
-      name: "Sushoovan Das",
-      email: "sushovand@modelatech.com",
-      avatar_url: "https://ui-avatars.com/api/?name=Sushoovan+Das&background=3b82f6&color=fff",
-      status: "APPROVED",
-      role: "SUPER_ADMIN",
-      employeeId: resolveEmpId("sushovand@modelatech.com", "MTK006") || "MTK006",
-      designation: "Staff Candidate",
-      department: "Executive Office",
-      requestedAt: "2026-09-20T08:44:15.481Z",
-      reviewedAt: "2026-09-20T08:44:35.660Z",
-      reviewedBy: "System Root"
-    };
-
-    if (!isRecordDeleted('USR-Q94BIIQ5', 'sushovand@modelatech.com', 'MTK006', sushoovanUser.employeeId)) {
-      const idx = list.findIndex(u => u.email?.toLowerCase() === 'sushovand@modelatech.com' || u.id === 'USR-Q94BIIQ5');
-      if (idx >= 0) {
-        const curStatus = list[idx].status;
-        list[idx] = {
-          ...sushoovanUser,
-          ...list[idx],
-          designation: "Staff Candidate",
-          status: curStatus || 'APPROVED',
-          role: curStatus === 'PENDING' ? (list[idx].role ?? null) : (list[idx].role || 'SUPER_ADMIN'),
-          employeeId: curStatus === 'PENDING' ? list[idx].employeeId : (resolveEmpId('sushovand@modelatech.com', list[idx].employeeId || 'MTK006') || 'MTK006')
-        };
-      } else {
-        list.unshift(sushoovanUser);
-      }
     }
 
     try {
@@ -715,6 +678,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     let isSubscribed = true;
 
+    deleteDoc(doc(db, 'users', 'USR-Q94BIIQ5')).catch(() => {});
+    deleteDoc(doc(db, 'users', 'USR-MTK006')).catch(() => {});
+    deleteDoc(doc(db, 'users', 'REQ-sushovand_modelatech_com')).catch(() => {});
+    fetch('/api/users/USR-Q94BIIQ5', { method: 'DELETE' }).catch(() => {});
+
     const unsub = onSnapshot(
       collection(db, 'users'),
       async snapshot => {
@@ -909,40 +877,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             });
           }
         });
-
-        // Ensure Sushoovan Das is present in users map if not deleted (preserving PENDING status if re-applying)
-        if (!isRecordDeleted('USR-Q94BIIQ5', 'sushovand@modelatech.com', 'MTK006', resolveEmpId('sushovand@modelatech.com', 'MTK006'))) {
-          const sushoovanUser: User = {
-            id: "USR-Q94BIIQ5",
-            uid: "USR-Q94BIIQ5",
-            name: "Sushoovan Das",
-            email: "sushovand@modelatech.com",
-            avatar_url: "https://ui-avatars.com/api/?name=Sushoovan+Das&background=3b82f6&color=fff",
-            status: "APPROVED",
-            role: "SUPER_ADMIN",
-            employeeId: "MTK006",
-            designation: "Staff Candidate",
-            department: "Executive Office",
-            requestedAt: "2026-09-20T08:44:15.481Z",
-            reviewedAt: "2026-09-20T08:44:35.660Z",
-            reviewedBy: "System Root"
-          };
-          const curSushoovan = map.get('sushovand@modelatech.com');
-          const curStatus = curSushoovan?.status;
-          const updatedSushoovan: User = {
-            ...sushoovanUser,
-            ...(curSushoovan || {}),
-            status: curStatus || 'APPROVED',
-            role: curStatus === 'PENDING' ? (curSushoovan?.role ?? null) : (curSushoovan?.role || 'SUPER_ADMIN'),
-            employeeId: curStatus === 'PENDING' ? curSushoovan?.employeeId : (resolveEmpId('sushovand@modelatech.com', curSushoovan?.employeeId || 'MTK006') || 'MTK006'),
-            name: curSushoovan?.name || 'Sushoovan Das',
-            designation: 'Staff Candidate'
-          };
-          map.set('sushovand@modelatech.com', updatedSushoovan);
-          if (curSushoovan && (curSushoovan.designation !== 'Staff Candidate' || curSushoovan.employeeId !== 'MTK006')) {
-            setDoc(doc(db, 'users', updatedSushoovan.id || 'USR-Q94BIIQ5'), { designation: 'Staff Candidate', employeeId: 'MTK006' }, { merge: true }).catch(() => {});
-          }
-        }
 
         const surupaEntry = map.get('surupa008@gmail.com');
         if (surupaEntry && surupaEntry.employeeId !== 'MTK023') {
